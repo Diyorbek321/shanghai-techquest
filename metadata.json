@@ -1,0 +1,6 @@
+{
+  "name": "Shanghai TechQuest",
+  "description": "A gamified Student Dashboard for a hybrid IT education platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
