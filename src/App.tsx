@@ -122,7 +122,7 @@ export default function App({ user }: { user: User }) {
       case 'attendance':
         return <Attendance user={mockUser} />;
       case 'homework':
-        return <Homework />;
+        return <Homework user={mockUser} />;
       case 'notifications':
         return <Notifications />;
       case 'grades':

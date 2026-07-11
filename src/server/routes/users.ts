@@ -77,6 +77,7 @@ const updateSchema = z.object({
   avatarUrl: z.string().url().optional(),
   theme: z.enum(['dark', 'neon', 'cyber']).optional(),
   audioEnabled: z.boolean().optional(),
+  pushEnabled: z.boolean().optional(),
   onlineVisible: z.boolean().optional(),
   profilePublic: z.boolean().optional(),
 });

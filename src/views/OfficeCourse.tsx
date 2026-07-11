@@ -305,6 +305,18 @@ const OFFICE_MODULE_CATALOG = [
   }
 ];
 
+// Maps real catalog modules onto the visual skill-tree layout. Position/color/icon are
+// purely presentational; level/locked/progress are derived from real ModuleProgress data.
+const SKILL_NODE_CONFIG: { moduleKey: string; color: 'blue' | 'green' | 'orange'; pos: string; icon: React.ReactNode }[] = [
+  { moduleKey: 'excel-pivot-charts', color: 'green', pos: 'top-[10%] left-[20%]', icon: <Table size={16} /> },
+  { moduleKey: 'excel-formulas-deep-dive', color: 'green', pos: 'top-[40%] left-[5%]', icon: <Zap size={16} /> },
+  { moduleKey: 'excel-macros-automation', color: 'green', pos: 'bottom-[10%] left-[20%]', icon: <SettingsIcon size={16} /> },
+  { moduleKey: 'word-doc-design', color: 'blue', pos: 'top-[10%] right-[20%]', icon: <FileText size={16} /> },
+  { moduleKey: 'word-collaboration-review', color: 'blue', pos: 'top-[40%] right-[5%]', icon: <Users size={16} /> },
+  { moduleKey: 'word-mail-merge', color: 'blue', pos: 'bottom-[10%] right-[20%]', icon: <Mail size={16} /> },
+  { moduleKey: 'ppt-animations-transitions', color: 'orange', pos: 'bottom-[5%] left-[50%] -translate-x-1/2', icon: <Sparkles size={16} /> },
+];
+
 const OFFICE_PROJECTS = [
   {
     id: 'annual-report',
@@ -376,6 +388,23 @@ export function OfficeCourse({ onNavigate }: { onNavigate: (view: ViewType) => v
       .map((key) => OFFICE_MODULE_CATALOG.find((m) => m.moduleKey === key)?.title ?? key);
     return { ...project, unlocked: missingModules.length === 0, missingModules };
   });
+
+  const skillNodes = SKILL_NODE_CONFIG.map((cfg) => {
+    const mod = officeModules.find((m) => m.moduleKey === cfg.moduleKey);
+    return {
+      ...cfg,
+      title: mod?.title ?? cfg.moduleKey,
+      desc: mod?.desc ?? '',
+      progress: mod?.progress ?? 0,
+      locked: mod ? mod.status === 'locked' : true,
+    };
+  });
+
+  const overallLevel = Math.round(completionPct / 10);
+  const activeModule = officeModules.find((m) => m.status === 'active');
+  const bossModules = officeModules.filter((m) => m.type === 'excel_boss' || m.type === 'capstone');
+  const nextBossModule = bossModules.find((m) => m.progress < 100);
+  const remainingBossCount = bossModules.filter((m) => m.progress < 100).length;
 
   const queryClient = useQueryClient();
 
@@ -564,24 +593,18 @@ export function OfficeCourse({ onNavigate }: { onNavigate: (view: ViewType) => v
 
                     <p className="text-sm text-gray-400 mb-8 leading-relaxed">{mod.desc}</p>
 
-                    <div className="flex items-center justify-between mt-auto pt-6 border-t border-white/5">
-                      <div className="flex -space-x-2">
-                        {[1, 2, 3].map(j => (
-                          <img key={j} src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${mod.id + j}`} className="w-6 h-6 rounded-full border-2 border-black" alt="" />
-                        ))}
-                        <div className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-[8px] text-gray-500 border-2 border-black font-bold">
-                          +42
-                        </div>
-                      </div>
-
+                    <div className="flex items-center justify-end mt-auto pt-6 border-t border-white/5">
                       {mod.status === 'locked' ? (
                         <div className="flex items-center gap-2 text-xs text-gray-600 font-bold uppercase">
                           <Lock size={14} /> Oldingi Modul Talab Etiladi
                         </div>
                       ) : (
-                        <button className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all flex items-center gap-2 ${
-                          mod.status === 'completed' ? 'bg-white/5 text-gray-400 hover:text-white' : 'bg-blue-600 text-white shadow-xl shadow-blue-900/20'
-                        }`}>
+                        <button
+                          onClick={() => onNavigate('codelab')}
+                          className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all flex items-center gap-2 ${
+                            mod.status === 'completed' ? 'bg-white/5 text-gray-400 hover:text-white' : 'bg-blue-600 text-white shadow-xl shadow-blue-900/20'
+                          }`}
+                        >
                           {mod.status === 'completed' ? 'Qayta ko\'rish' : 'Missiyani Davom Ettirish'}
                           <ChevronRight size={14} />
                         </button>
@@ -626,7 +649,7 @@ export function OfficeCourse({ onNavigate }: { onNavigate: (view: ViewType) => v
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full bg-white/5 border-2 border-white/10 flex items-center justify-center z-10">
                 <div className="text-center">
                   <p className="text-[8px] font-black text-gray-500 uppercase">Umumiy Kuch</p>
-                  <p className="text-2xl font-black text-white italic">LV.12</p>
+                  <p className="text-2xl font-black text-white italic">LV.{overallLevel}</p>
                 </div>
               </div>
 
@@ -638,95 +661,65 @@ export function OfficeCourse({ onNavigate }: { onNavigate: (view: ViewType) => v
                 <circle cx="400" cy="250" r="150" fill="none" stroke="white" strokeWidth="1" strokeDasharray="8 8" />
               </svg>
 
-              {/* Skill Nodes */}
+              {/* Skill Nodes — derived from real /progress/modules data */}
               <div className="relative w-full h-full max-w-4xl">
-                <SkillNode
-                  title="Pivot Mantiqi"
-                  level={4}
-                  color="green"
-                  pos="top-[10%] left-[20%]"
-                  icon={<Table size={16} />}
-                  desc="Dinamik ma'lumotlarni umumlashtirish va guruhlash."
-                />
-                <SkillNode
-                  title="Formula Ustasi"
-                  level={7}
-                  color="green"
-                  pos="top-[40%] left-[5%]"
-                  icon={<Zap size={16} />}
-                  desc="Murakkab ichma-ich funksiyalar va mantiq."
-                />
-                <SkillNode
-                  title="Makro Bot"
-                  level={1}
-                  color="green"
-                  pos="bottom-[10%] left-[20%]"
-                  locked
-                  icon={<Lock size={16} />}
-                  desc="VBA va asosiy avtomatlashtirish skriptlari."
-                />
-
-                <SkillNode
-                  title="Uslub Ustasi"
-                  level={5}
-                  color="blue"
-                  pos="top-[10%] right-[20%]"
-                  icon={<FileText size={16} />}
-                  desc="Umumiy hujjat uslublari va mavzulari."
-                />
-                <SkillNode
-                  title="Ko'rib Chiqish Oqimi"
-                  level={3}
-                  color="blue"
-                  pos="top-[40%] right-[5%]"
-                  icon={<Users size={16} />}
-                  desc="O'zgarishlarni kuzatish va birgalikda tahrirlash."
-                />
-                <SkillNode
-                  title="Pochta Birlashtirish"
-                  level={0}
-                  color="blue"
-                  pos="bottom-[10%] right-[20%]"
-                  locked
-                  icon={<Lock size={16} />}
-                  desc="Ommaviy hujjat yaratish."
-                />
-
-                <SkillNode
-                  title="Harakat San'ati"
-                  level={2}
-                  color="orange"
-                  pos="bottom-[5%] left-[50%] -translate-x-1/2"
-                  icon={<PlayCircle size={16} />}
-                  desc="Morf o'tishlari va ilg'or animatsiyalar."
-                />
+                {skillNodes.map((node) => (
+                  <SkillNode
+                    key={node.moduleKey}
+                    title={node.title}
+                    level={Math.round(node.progress / 10)}
+                    color={node.color}
+                    pos={node.pos}
+                    locked={node.locked}
+                    icon={node.icon}
+                    desc={node.desc}
+                  />
+                ))}
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="glass-panel p-6 border border-white/10 bg-blue-600/5">
-              <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-tighter">Joriy Mashg'ulot: <span className="text-blue-400 italic">VLOOKUP'ni Egallash</span></h4>
-              <div className="w-full h-2 bg-black/40 rounded-full overflow-hidden mb-2">
-                <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: '65%' }}
-                  className="h-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"
-                />
-              </div>
-              <p className="text-[10px] text-gray-500 font-mono text-right uppercase">65% bajarildi &bull; Darajani oshirishga 2.4k XP qoldi</p>
+              {activeModule ? (
+                <>
+                  <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-tighter">Joriy Mashg'ulot: <span className="text-blue-400 italic">{activeModule.title}</span></h4>
+                  <div className="w-full h-2 bg-black/40 rounded-full overflow-hidden mb-2">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${activeModule.progress}%` }}
+                      className="h-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"
+                    />
+                  </div>
+                  <p className="text-[10px] text-gray-500 font-mono text-right uppercase">{activeModule.progress}% bajarildi &bull; Tugatishga {100 - activeModule.progress}% qoldi</p>
+                </>
+              ) : (
+                <>
+                  <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-tighter">Joriy Mashg'ulot</h4>
+                  <p className="text-xs text-gray-500">Hozircha faol modul yo'q. Yangi modulni boshlash uchun "O'quv Dasturi" bo'limiga o'ting.</p>
+                </>
+              )}
             </div>
             <div className="glass-panel p-6 border border-white/10 bg-green-600/5">
-              <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-tighter">Keyingi Bosqich: <span className="text-green-400 italic">Ma'lumotlar Arxitektori Darajasi</span></h4>
+              <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-tighter">Keyingi Bosqich: <span className="text-green-400 italic">{nextBossModule ? nextBossModule.title : 'Boss Modullar'}</span></h4>
               <div className="flex items-center gap-4">
                 <div className="flex -space-x-2">
-                  {[1, 2, 3].map(i => (
-                    <div key={i} className="w-8 h-8 rounded-lg bg-green-500/20 border border-green-500/30 flex items-center justify-center text-green-500">
+                  {bossModules.map((boss) => (
+                    <div
+                      key={boss.moduleKey}
+                      className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
+                        boss.progress >= 100 ? 'bg-green-500/20 border-green-500/30 text-green-500' : 'bg-white/5 border-white/10 text-gray-600'
+                      }`}
+                    >
                       <Trophy size={14} />
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-gray-400 italic">"Professional sertifikatgacha sizga atigi 2 ta boss modul qoldi."</p>
+                <p className="text-xs text-gray-400 italic">
+                  {remainingBossCount > 0
+                    ? `"Professional sertifikatgacha sizga yana ${remainingBossCount} ta boss modul qoldi."`
+                    : '"Barcha boss modullar tugallandi!"'}
+                </p>
               </div>
             </div>
           </div>
@@ -759,7 +752,10 @@ export function OfficeCourse({ onNavigate }: { onNavigate: (view: ViewType) => v
 
               <div className="pt-6 border-t border-white/5">
                 {project.unlocked ? (
-                  <button className="px-6 py-2 rounded-xl text-xs font-black uppercase transition-all flex items-center gap-2 bg-brand-purple text-white shadow-xl shadow-brand-purple/20">
+                  <button
+                    onClick={() => onNavigate('codelab')}
+                    className="px-6 py-2 rounded-xl text-xs font-black uppercase transition-all flex items-center gap-2 bg-brand-purple text-white shadow-xl shadow-brand-purple/20"
+                  >
                     Loyihani Boshlash <ChevronRight size={14} />
                   </button>
                 ) : (
@@ -782,29 +778,29 @@ export function OfficeCourse({ onNavigate }: { onNavigate: (view: ViewType) => v
 
       {/* Featured Resources */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="glass-panel p-6 border border-white/10 bg-blue-600/5 flex flex-col justify-between group cursor-pointer hover:border-blue-500/50 transition-all">
+        <div className="glass-panel p-6 border border-white/10 bg-blue-600/5 flex flex-col justify-between">
           <div className="flex items-center gap-3 text-blue-400 mb-4">
             <Download size={24} />
             <span className="text-[10px] font-black uppercase tracking-widest">Shablonlar</span>
           </div>
-          <h4 className="text-white font-bold mb-2">Korporativ Hisobot To'plami</h4>
-          <p className="text-xs text-gray-500">Biznes uchun 24 ta professional Word va Excel shablonlari.</p>
+          <h4 className="text-white font-bold mb-2">Hujjat Shablonlari</h4>
+          <p className="text-xs text-gray-500">Bu funksiya hali ishlab chiqilmoqda &mdash; tez orada tayyor Word va Excel shablonlari qo'shiladi.</p>
         </div>
-        <div className="glass-panel p-6 border border-white/10 bg-green-600/5 flex flex-col justify-between group cursor-pointer hover:border-green-500/50 transition-all">
+        <div className="glass-panel p-6 border border-white/10 bg-green-600/5 flex flex-col justify-between">
           <div className="flex items-center gap-3 text-green-400 mb-4">
             <PlayCircle size={24} />
             <span className="text-[10px] font-black uppercase tracking-widest">Darsliklar</span>
           </div>
-          <h4 className="text-white font-bold mb-2">Pivot Jadval Siri</h4>
-          <p className="text-xs text-gray-500">Video: 10 daqiqada dinamik ma'lumotlar xulosasini egallash.</p>
+          <h4 className="text-white font-bold mb-2">Video Darsliklar</h4>
+          <p className="text-xs text-gray-500">Bu funksiya hali ishlab chiqilmoqda &mdash; tez orada qo'shimcha video darslar qo'shiladi.</p>
         </div>
-        <div className="glass-panel p-6 border border-white/10 bg-orange-600/5 flex flex-col justify-between group cursor-pointer hover:border-orange-500/50 transition-all">
+        <div className="glass-panel p-6 border border-white/10 bg-orange-600/5 flex flex-col justify-between">
           <div className="flex items-center gap-3 text-orange-400 mb-4">
             <Users size={24} />
             <span className="text-[10px] font-black uppercase tracking-widest">Jamoa</span>
           </div>
-          <h4 className="text-white font-bold mb-2">Formatlash Gildiyasi</h4>
-          <p className="text-xs text-gray-500">400+ talaba bilan birga eng yaxshi hujjat dizaynlaringizni ulashing.</p>
+          <h4 className="text-white font-bold mb-2">Hamjamiyat Gildiyasi</h4>
+          <p className="text-xs text-gray-500">Bu funksiya hali ishlab chiqilmoqda &mdash; tez orada talabalar bilan ulashish imkoniyati qo'shiladi.</p>
         </div>
       </div>
     </div>
@@ -827,7 +823,7 @@ function SkillNode({ title, level, color, pos, icon, desc, locked }: any) {
       <div className={`w-14 h-14 rounded-2xl border-2 flex items-center justify-center transition-all cursor-pointer ${
         locked ? 'border-white/5 bg-white/5 text-gray-600' : colors[color] + ' hover:scale-110'
       }`}>
-        {icon}
+        {locked ? <Lock size={16} /> : icon}
       </div>
       
       {/* Tooltip */}

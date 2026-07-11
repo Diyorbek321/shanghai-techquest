@@ -1,22 +1,47 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Cpu, 
-  Settings, 
-  Play, 
-  Square, 
-  Terminal as TerminalIcon, 
-  Radio, 
-  Gauge, 
-  Zap, 
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  Cpu,
+  Settings,
+  Play,
+  Square,
+  Terminal as TerminalIcon,
+  Radio,
+  Gauge,
+  Zap,
   Activity,
   AlertTriangle,
   RefreshCcw,
   Eye,
   Info,
-  Maximize2
+  Maximize2,
+  Download
 } from 'lucide-react';
 import { ViewType } from '../types';
+import { api } from '../lib/api';
+import { useQuestManager } from '../lib/QuestManager';
+
+interface ModuleProgressRow {
+  moduleKey: string;
+  progress: number;
+  unlocked: boolean;
+}
+
+const MISSION_KEY = 'robotics-perimeter-patrol';
+const MISSION_XP = 150;
+
+function downloadTextFile(filename: string, content: string) {
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 export function RoboticsLab() {
   const [selectedBoard, setSelectedBoard] = useState<'arduino' | 'nodemcu'>('arduino');
@@ -28,7 +53,24 @@ export function RoboticsLab() {
     { msg: "Protokol dizaynini boshlash uchun komponentlar va tilni tanlang.", type: 'info' }
   ]);
   const [sensors, setSensors] = useState({ distance: 45, light: 12, voltage: 12.4 });
-  
+
+  const { addXp } = useQuestManager();
+  const queryClient = useQueryClient();
+
+  const { data: progressRows = [] } = useQuery({
+    queryKey: ['progress', 'modules', 'robotics'],
+    queryFn: () => api.get<ModuleProgressRow[]>('/progress/modules?track=robotics'),
+  });
+
+  const missionCompleted = (progressRows.find((r) => r.moduleKey === MISSION_KEY)?.progress ?? 0) >= 100;
+
+  const completeMission = useMutation({
+    mutationFn: () => api.patch(`/progress/modules/${MISSION_KEY}`, { progress: 100, unlocked: true }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['progress', 'modules', 'robotics'] });
+    },
+  });
+
   const boilerplates = {
     cpp: "#include <Arduino.h>\n\nvoid setup() {\n  Serial.begin(9600);\n  pinMode(13, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(1000);\n  digitalWrite(13, LOW);\n  delay(1000);\n}",
     python: "import machine\nimport time\n\nled = machine.Pin(2, machine.Pin.OUT)\n\nwhile True:\n    led.on()\n    time.sleep(1)\n    led.off()\n    time.sleep(1)",
@@ -83,6 +125,11 @@ export function RoboticsLab() {
     setTimeout(() => {
       addLog("Joylashtirish muvaffaqiyatli yakunlandi.", "success");
       addLog("Rover Protokolni Bajarmoqda: 'moveForward(50)'", "info");
+      if (!missionCompleted && !completeMission.isPending) {
+        addXp(MISSION_XP, "Robotics: Perimetr Patruli missiyasi");
+        completeMission.mutate();
+        addLog(`Missiya yakunlandi: Perimetr Patruli! +${MISSION_XP} XP qo'lga kiritildi.`, "success");
+      }
     }, 1500);
   };
 
@@ -93,6 +140,33 @@ export function RoboticsLab() {
 
   const addLog = (msg: string, type: 'info' | 'error' | 'success' | 'warn') => {
     setLogs(prev => [...prev, { msg, type }]);
+  };
+
+  const handleExportProject = () => {
+    const ext = selectedLanguage === 'cpp' ? 'ino' : selectedLanguage === 'python' ? 'py' : 'js';
+    const header = `// Eduly Robotics Lab -- Loyiha eksporti\n// Plata: ${selectedBoard.toUpperCase()}\n// Til: ${selectedLanguage.toUpperCase()}\n// Ulangan komponentlar: ${connectedComponents.join(', ') || "yo'q"}\n\n`;
+    const filename = `robotics-lab-${selectedBoard}.${ext}`;
+    downloadTextFile(filename, header + code);
+    addLog(`Loyiha fayli yuklab olindi: ${filename}`, 'success');
+  };
+
+  const handleExportWiringDiagram = () => {
+    const lines = [
+      'ULANISH DIAGRAMMASI',
+      `Plata: ${selectedBoard.toUpperCase()}`,
+      `Sana: ${new Date().toLocaleString()}`,
+      '',
+      ...connectedComponents.map((id) => {
+        const comp = components.find((c) => c.id === id);
+        return comp ? `- ${comp.name}: ${comp.pins}` : `- ${id}`;
+      }),
+    ];
+    if (connectedComponents.length === 0) {
+      lines.push('(Hech qanday apparat ulanmagan)');
+    }
+    const filename = `wiring-diagram-${selectedBoard}.txt`;
+    downloadTextFile(filename, lines.join('\n'));
+    addLog(`Ulanish diagrammasi eksport qilindi: ${filename}`, 'success');
   };
 
   return (
@@ -378,12 +452,15 @@ export function RoboticsLab() {
                   <span className="text-xs font-bold text-brand-cyan">1</span>
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs font-bold text-gray-200 uppercase">Ikkilik Faylni Yaratish</p>
-                  <p className="text-[10px] text-gray-500">{selectedBoard.toUpperCase()} uchun {selectedLanguage.toUpperCase()} asboblar to'plami orqali kompilyatsiya qiladi.</p>
+                  <p className="text-xs font-bold text-gray-200 uppercase">Loyiha Faylini Eksport Qilish</p>
+                  <p className="text-[10px] text-gray-500">{selectedBoard.toUpperCase()} uchun {selectedLanguage.toUpperCase()} manba kodi va pin konfiguratsiyasini yuklab oling.</p>
                 </div>
               </div>
-              <button className="w-full py-3 bg-brand-purple/20 hover:bg-brand-purple/30 border border-brand-purple/40 rounded-xl text-[10px] font-black text-brand-purple transition-all uppercase tracking-[0.2em] flex items-center justify-center gap-2">
-                <TerminalIcon size={12} /> .hex faylni yuklab olish
+              <button
+                onClick={handleExportProject}
+                className="w-full py-3 bg-brand-purple/20 hover:bg-brand-purple/30 border border-brand-purple/40 rounded-xl text-[10px] font-black text-brand-purple transition-all uppercase tracking-[0.2em] flex items-center justify-center gap-2"
+              >
+                <Download size={12} /> Loyiha faylini yuklab olish
               </button>
               <div className="h-px bg-white/5" />
               <div className="flex gap-4">
@@ -392,10 +469,13 @@ export function RoboticsLab() {
                 </div>
                 <div className="flex-1">
                   <p className="text-xs font-bold text-gray-200">Ulanish Sxemasi</p>
-                  <p className="text-[10px] text-gray-500">Barcha {connectedComponents.length} ta ulanishning PDF xaritasi.</p>
+                  <p className="text-[10px] text-gray-500">Barcha {connectedComponents.length} ta ulanishning matnli xaritasi.</p>
                 </div>
               </div>
-              <button className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-bold text-white transition-all uppercase tracking-widest">
+              <button
+                onClick={handleExportWiringDiagram}
+                className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-bold text-white transition-all uppercase tracking-widest"
+              >
                 Ulanish Diagrammasini Eksport qilish
               </button>
             </div>

@@ -48,10 +48,18 @@ export function Settings({ user }: SettingsProps) {
   const [audioEnabled, setAudioEnabled] = React.useState(user.audioEnabled);
   const [onlineVisible, setOnlineVisible] = React.useState(user.onlineVisible);
   const [profilePublic, setProfilePublic] = React.useState(user.profilePublic);
-  const [notifications, setNotifications] = React.useState(true);
+  const [pushEnabled, setPushEnabled] = React.useState(user.pushEnabled);
+  const [uiSfxVolume, setUiSfxVolume] = React.useState<number>(() => {
+    const stored = localStorage.getItem('techquest.uiSfxVolume');
+    return stored !== null ? Number(stored) : 50;
+  });
+  const [bgmVolume, setBgmVolume] = React.useState<number>(() => {
+    const stored = localStorage.getItem('techquest.bgmVolume');
+    return stored !== null ? Number(stored) : 50;
+  });
 
   const updateUser = useMutation({
-    mutationFn: (body: Partial<Pick<User, 'theme' | 'audioEnabled' | 'onlineVisible' | 'profilePublic'>>) =>
+    mutationFn: (body: Partial<Pick<User, 'theme' | 'audioEnabled' | 'onlineVisible' | 'profilePublic' | 'pushEnabled'>>) =>
       api.patch<User>('/users/me', body),
     onSuccess: (updatedUser) => {
       queryClient.setQueryData(['auth', 'me'], updatedUser);
@@ -82,6 +90,22 @@ export function Settings({ user }: SettingsProps) {
     const next = !profilePublic;
     setProfilePublic(next);
     updateUser.mutate({ profilePublic: next });
+  };
+
+  const handlePushToggle = () => {
+    const next = !pushEnabled;
+    setPushEnabled(next);
+    updateUser.mutate({ pushEnabled: next });
+  };
+
+  const handleUiSfxVolumeChange = (value: number) => {
+    setUiSfxVolume(value);
+    localStorage.setItem('techquest.uiSfxVolume', String(value));
+  };
+
+  const handleBgmVolumeChange = (value: number) => {
+    setBgmVolume(value);
+    localStorage.setItem('techquest.bgmVolume', String(value));
   };
 
   return (
@@ -213,14 +237,28 @@ export function Settings({ user }: SettingsProps) {
                     <p className="text-sm font-medium text-gray-300">Interfeys effektlari</p>
                     <p className="text-xs text-gray-500">Bosish va hover paytida yengil tovushlar chiqarish</p>
                   </div>
-                  <input type="range" className="w-32 accent-brand-cyan" />
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={uiSfxVolume}
+                    onChange={(e) => handleUiSfxVolumeChange(Number(e.target.value))}
+                    className="w-32 accent-brand-cyan"
+                  />
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-300">Fon musiqasi</p>
                     <p className="text-xs text-gray-500">Diqqatni jamlash uchun low-fi kiber ohanglar</p>
                   </div>
-                  <input type="range" className="w-32 accent-brand-purple" />
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={bgmVolume}
+                    onChange={(e) => handleBgmVolumeChange(Number(e.target.value))}
+                    className="w-32 accent-brand-purple"
+                  />
                 </div>
               </div>
             </motion.div>
@@ -238,12 +276,12 @@ export function Settings({ user }: SettingsProps) {
               </h2>
               <label className="flex items-center gap-4 cursor-pointer group">
                 <button
-                  onClick={() => setNotifications(!notifications)}
+                  onClick={handlePushToggle}
                   className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${
-                    notifications ? 'border-brand-orange/50' : 'border-white/20 group-hover:border-brand-cyan'
+                    pushEnabled ? 'border-brand-orange/50' : 'border-white/20 group-hover:border-brand-cyan'
                   }`}
                 >
-                  {notifications && <div className="w-3 h-3 bg-brand-orange rounded-sm" />}
+                  {pushEnabled && <div className="w-3 h-3 bg-brand-orange rounded-sm" />}
                 </button>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-300">Push bildirishnomalar</p>

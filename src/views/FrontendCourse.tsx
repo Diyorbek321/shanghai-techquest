@@ -16,12 +16,10 @@ import {
   Users,
   Monitor,
   MapPin,
-  Mic,
   MessageSquare,
   Calendar,
   Clock,
   QrCode,
-  Hand,
   Info,
   GitBranch,
   Layers,
@@ -57,6 +55,22 @@ interface DailyExerciseData {
   fileUrl: string | null;
   fileName: string | null;
   streak: number;
+}
+
+interface CalendarEventData {
+  id: string;
+  title: string;
+  type: 'CLASS' | 'DEADLINE' | 'EXAM' | 'EVENT';
+  startsAt: string;
+  endsAt: string | null;
+}
+
+function formatEventDate(iso: string) {
+  return new Date(iso).toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long' });
+}
+
+function formatEventTime(iso: string) {
+  return new Date(iso).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
 }
 
 const MODULE_CATALOG = [
@@ -285,6 +299,33 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
       }
     },
   });
+
+  const { data: calendarEvents = [] } = useQuery({
+    queryKey: ['calendar'],
+    queryFn: () => api.get<CalendarEventData[]>('/calendar'),
+  });
+
+  const classEvents = React.useMemo(
+    () =>
+      calendarEvents
+        .filter((e) => e.type === 'CLASS')
+        .slice()
+        .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()),
+    [calendarEvents]
+  );
+
+  const now = Date.now();
+
+  const liveClassEvent = classEvents.find((e) => {
+    const start = new Date(e.startsAt).getTime();
+    const end = e.endsAt ? new Date(e.endsAt).getTime() : null;
+    return end !== null && now >= start && now <= end;
+  });
+
+  const upcomingClassEvents = classEvents.filter((e) => new Date(e.startsAt).getTime() > now);
+  const nextClassEvent = upcomingClassEvents[0];
+  const heroEvent = liveClassEvent ?? nextClassEvent;
+  const scheduleEvents = (liveClassEvent ? [liveClassEvent, ...upcomingClassEvents] : upcomingClassEvents).slice(0, 4);
 
   const [dailyFile, setDailyFile] = React.useState<File | null>(null);
 
@@ -640,32 +681,13 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
       {/* Student Gallery */}
       {activeTab === 'gallery' && (
         <div className="py-8">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">Tanlangan Jamoat Loyihalari</h2>
-            <button className="bg-brand-cyan hover:bg-brand-cyan/80 text-black font-bold py-2 px-4 rounded transition-colors text-sm">
-              Loyiha Yuborish
-            </button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              { author: 'NeonCoder', title: 'Kiberpank Portfolio', likes: 142, img: 'bg-brand-purple/20' },
-              { author: 'Sarah.JS', title: 'Ob-havo Paneli', likes: 98, img: 'bg-brand-cyan/20' },
-              { author: 'Alex_Dev', title: 'React Kalkulyator', likes: 56, img: 'bg-brand-orange/20' },
-            ].map((proj, i) => (
-              <div key={i} className="glass-panel overflow-hidden border border-white/10 hover:border-brand-cyan/30 transition-colors group cursor-pointer">
-                <div className={`h-40 ${proj.img} relative flex items-center justify-center`}>
-                   <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors"></div>
-                   <Code size={48} className="text-white/30" />
-                </div>
-                <div className="p-4">
-                  <h3 className="font-bold text-lg mb-1 group-hover:text-brand-cyan transition-colors">{proj.title}</h3>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-400">{proj.author} tomonidan</span>
-                    <span className="text-[#FFD700] font-bold flex items-center gap-1">♥️ {proj.likes}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <h2 className="text-xl font-bold mb-6">Talabalar Galereyasi</h2>
+          <div className="glass-panel p-6 border border-white/10 rounded-2xl bg-brand-purple/5 max-w-xl">
+            <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+              <Code size={20} className="text-brand-purple" />
+              Jamoat Loyihalari Galereyasi
+            </h3>
+            <p className="text-xs text-gray-500">Bu funksiya hali ishlab chiqilmoqda &mdash; tez orada talabalar o'z loyihalarini shu yerda ulashib, jamoat bilan baham ko'rishlari mumkin bo'ladi.</p>
           </div>
         </div>
       )}
@@ -676,86 +698,76 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Live Session Status */}
             <div className="lg:col-span-2 space-y-6">
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 className="glass-panel p-8 border border-brand-cyan/30 bg-brand-cyan/5 relative overflow-hidden"
               >
-                <div className="absolute top-0 right-0 p-4">
-                  <div className="flex items-center gap-2 px-3 py-1 bg-brand-red animate-pulse text-white text-[10px] font-black rounded-full shadow-[0_0_15px_rgba(239,68,68,0.5)]">
-                    <div className="w-1.5 h-1.5 rounded-full bg-white"></div> HOZIR JONLI
+                {liveClassEvent && (
+                  <div className="absolute top-0 right-0 p-4">
+                    <div className="flex items-center gap-2 px-3 py-1 bg-brand-red animate-pulse text-white text-[10px] font-black rounded-full shadow-[0_0_15px_rgba(239,68,68,0.5)]">
+                      <div className="w-1.5 h-1.5 rounded-full bg-white"></div> HOZIR JONLI
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="flex flex-col md:flex-row gap-8 items-start">
                   <div className="w-24 h-24 rounded-2xl bg-brand-cyan/20 flex items-center justify-center text-brand-cyan border border-brand-cyan/30 shrink-0">
                     <Monitor size={48} />
                   </div>
-                  <div className="space-y-4">
-                    <div>
-                      <h2 className="text-2xl font-black text-white italic tracking-tight mb-1 uppercase">Ilg'or JS: Asinxron Naqshlar</h2>
-                      <p className="text-gray-400 text-sm">O'qituvchi: <span className="text-brand-cyan font-bold">Dr. Neural_Node</span> | Xona 402 va Onlayn</p>
-                    </div>
-                    <div className="flex flex-wrap gap-4">
-                      <div className="flex items-center gap-2 text-xs text-gray-300 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
-                        <Calendar size={14} className="text-brand-cyan" /> Bugun, soat 10:00
+                  <div className="space-y-4 flex-1">
+                    {heroEvent ? (
+                      <>
+                        <div>
+                          <h2 className="text-2xl font-black text-white italic tracking-tight mb-1 uppercase">{heroEvent.title}</h2>
+                          <p className="text-gray-400 text-sm">
+                            {liveClassEvent ? 'Hozir davom etmoqda' : 'Keyingi rejalashtirilgan onlayn dars'}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-4">
+                          <div className="flex items-center gap-2 text-xs text-gray-300 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
+                            <Calendar size={14} className="text-brand-cyan" /> {formatEventDate(heroEvent.startsAt)}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-300 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
+                            <Clock size={14} className="text-brand-purple" />
+                            {formatEventTime(heroEvent.startsAt)}
+                            {heroEvent.endsAt ? ` – ${formatEventTime(heroEvent.endsAt)}` : ''}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div>
+                        <h2 className="text-xl font-bold text-white mb-1">Hozircha rejalashtirilgan onlayn dars yo'q</h2>
+                        <p className="text-gray-400 text-sm">Yangi gibrid darslar jadvalga qo'shilganda, ular shu yerda ko'rinadi.</p>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-300 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
-                        <Users size={14} className="text-brand-purple" /> 24 talaba faol
-                      </div>
-                    </div>
-                    <div className="flex gap-4 pt-2">
-                      <button className="px-8 py-3 bg-brand-cyan text-black font-black rounded-xl hover:bg-brand-cyan/80 transition-all shadow-[0_0_20px_rgba(0,217,255,0.4)] uppercase text-sm flex items-center gap-2">
-                        <PlayCircle size={18} /> Efirga Qo'shilish
-                      </button>
-                      <button className="px-6 py-3 bg-white/5 text-white font-bold rounded-xl border border-white/10 hover:bg-white/10 transition-all uppercase text-sm">
-                        Slaydlarni Ko'rish
-                      </button>
-                    </div>
+                    )}
                   </div>
                 </div>
               </motion.div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="glass-panel p-6 border border-white/10 bg-black/40 space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-brand-purple/20 rounded-lg text-brand-purple">
-                      <Hand size={20} />
-                    </div>
-                    <h3 className="font-bold text-white">Jonli Muloqot</h3>
+              <div className="glass-panel p-6 border border-white/10 bg-black/40 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-brand-orange/20 rounded-lg text-brand-orange">
+                    <Clock size={20} />
                   </div>
-                  <p className="text-xs text-gray-400">Adashib qoldingizmi? O'qituvchiga real vaqtda xabar berish uchun quyidagi tugmalardan foydalaning.</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button className="py-3 bg-white/5 border border-white/10 rounded-xl hover:bg-brand-purple/20 hover:border-brand-purple/50 transition-all text-xs font-bold text-gray-300 flex flex-col items-center gap-2">
-                      <Mic size={18} /> Qo'l Ko'tarish
-                    </button>
-                    <button className="py-3 bg-white/5 border border-white/10 rounded-xl hover:bg-brand-cyan/20 hover:border-brand-cyan/50 transition-all text-xs font-bold text-gray-300 flex flex-col items-center gap-2">
-                      <MessageSquare size={18} /> Tezkor Savol
-                    </button>
-                  </div>
+                  <h3 className="font-bold text-white">Dars Jadvali</h3>
                 </div>
-
-                <div className="glass-panel p-6 border border-white/10 bg-black/40 space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-brand-orange/20 rounded-lg text-brand-orange">
-                      <Clock size={20} />
-                    </div>
-                    <h3 className="font-bold text-white">Dars Jadvali</h3>
-                  </div>
+                {scheduleEvents.length === 0 ? (
+                  <p className="text-xs text-gray-500">Hozircha rejalashtirilgan onlayn dars yo'q.</p>
+                ) : (
                   <div className="space-y-3">
-                    {[
-                      { time: '10:00', event: 'Promise\'larga Kirish', status: 'done' },
-                      { time: '10:30', event: 'Async/Await\'ni Chuqur O\'rganish', status: 'active' },
-                      { time: '11:15', event: 'Amaliy Dars: Fetch API', status: 'upcoming' },
-                    ].map((item, i) => (
-                      <div key={i} className="flex items-center gap-3">
-                        <span className="text-[10px] font-mono text-gray-500 w-10">{item.time}</span>
-                        <div className={`w-1.5 h-1.5 rounded-full ${item.status === 'done' ? 'bg-brand-green' : item.status === 'active' ? 'bg-brand-cyan animate-pulse' : 'bg-gray-700'}`}></div>
-                        <span className={`text-[11px] ${item.status === 'active' ? 'text-white font-bold' : 'text-gray-400'}`}>{item.event}</span>
-                      </div>
-                    ))}
+                    {scheduleEvents.map((event) => {
+                      const isLive = liveClassEvent?.id === event.id;
+                      return (
+                        <div key={event.id} className="flex items-center gap-3">
+                          <span className="text-[10px] font-mono text-gray-500 w-10">{formatEventTime(event.startsAt)}</span>
+                          <div className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-brand-cyan animate-pulse' : 'bg-gray-700'}`}></div>
+                          <span className={`text-[11px] ${isLive ? 'text-white font-bold' : 'text-gray-400'}`}>{event.title}</span>
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
@@ -810,9 +822,9 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
                <h4 className="text-white font-bold">Gibrid Ta'lim Qanday Ishlaydi</h4>
                <p className="text-gray-400 text-sm">Uydan efir orqali qo'shiling yoki jismoniy kampusimizga tashrif buyuring. Barcha progress, XP va materiallar ikkala muhitda ham real vaqtda sinxronlashadi.</p>
              </div>
-             <div className="flex gap-4">
-               <button className="text-xs font-bold text-brand-purple hover:underline">Kampus Xaritasi</button>
-               <button className="text-xs font-bold text-brand-purple hover:underline">Yordam Markazi</button>
+             <div className="flex gap-4 items-center">
+               <span className="text-xs font-bold text-gray-500">Kampus Xaritasi</span>
+               <button onClick={() => onNavigate('help')} className="text-xs font-bold text-brand-purple hover:underline">Yordam Markazi</button>
              </div>
           </div>
         </div>

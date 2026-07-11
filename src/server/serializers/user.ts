@@ -17,10 +17,12 @@ export function serializeUser(user: PrismaUser) {
     track: user.track ? (user.track.toLowerCase() as 'frontend' | 'robotics' | 'office') : null,
     theme: user.theme.toLowerCase() as 'dark' | 'neon' | 'cyber',
     audioEnabled: user.audioEnabled,
+    pushEnabled: user.pushEnabled,
     onlineVisible: user.onlineVisible,
     profilePublic: user.profilePublic,
     eloRating: user.eloRating,
     teamId: user.teamId,
     teamRole: user.teamRole ? (user.teamRole.toLowerCase() as 'leader' | 'member') : null,
+    createdAt: user.createdAt,
   };
 }

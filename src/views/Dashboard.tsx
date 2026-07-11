@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Clock, PlayCircle, Star, Target, Zap, ChevronRight, Activity, ArrowUpRight, Code, CheckSquare, Trophy, Gift, LayoutGrid, LayoutList } from 'lucide-react';
+import { Clock, PlayCircle, Star, Target, Zap, ChevronRight, Activity, ArrowUpRight, Code, CheckSquare, Trophy, Gift, LayoutList } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { User } from '../types';
 import { TaskSequencer } from '../components/TaskSequencer';
@@ -33,6 +33,21 @@ interface Quest {
   completed: boolean;
 }
 
+interface ActivityNotification {
+  id: string;
+  type: 'INFO' | 'SUCCESS' | 'WARNING' | 'ALERT';
+  title: string;
+  body: string;
+  createdAt: string;
+}
+
+const ACTIVITY_STYLES: Record<ActivityNotification['type'], { text: string; dot: string }> = {
+  SUCCESS: { text: 'text-brand-green', dot: 'bg-brand-green' },
+  INFO: { text: 'text-brand-cyan', dot: 'bg-brand-cyan' },
+  WARNING: { text: 'text-brand-orange', dot: 'bg-brand-orange' },
+  ALERT: { text: 'text-brand-purple', dot: 'bg-brand-purple' },
+};
+
 function moduleTitle(moduleKey: string): string {
   return moduleKey.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
 }
@@ -64,6 +79,12 @@ export function Dashboard({ user, onNavigate, onTriggerSuccess }: DashboardProps
     queryKey: ['quests'],
     queryFn: () => api.get<Quest[]>('/quests'),
   });
+
+  const { data: notifications = [] } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: () => api.get<ActivityNotification[]>('/notifications'),
+  });
+  const recentActivity = notifications.slice(0, 3);
 
   const activeModule = moduleProgress.find((m) => m.unlocked && m.progress < 100) ?? moduleProgress[0];
   const upcomingAssignments = [...assignments]
@@ -275,51 +296,6 @@ export function Dashboard({ user, onNavigate, onTriggerSuccess }: DashboardProps
           
           <TaskSequencer />
 
-          {/* Peer Project Gallery (Mentor Only Feature) */}
-          <section className="glass-panel p-5 relative overflow-hidden">
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center gap-2">
-                <LayoutGrid className="text-brand-cyan" size={18} />
-                <h2 className="font-semibold text-lg">Hamkasblar loyihalari galereyasi</h2>
-              </div>
-              {user.level >= 20 && (
-                <span className="text-[10px] bg-brand-purple/20 text-brand-purple px-2 py-1 rounded border border-brand-purple/50 font-bold uppercase tracking-widest">Mentor kirishi</span>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { name: 'Sarah J.', title: 'Neon soat komponenti', img: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=400&q=80', level: 18 },
-                { name: 'Marcus D.', title: 'Kiberpank forma interfeysi', img: 'https://images.unsplash.com/photo-1558655146-d09347e92766?w=400&q=80', level: 15 }
-              ].map((project, i) => (
-                <div key={i} className="group relative bg-black/40 border border-brand-border rounded-xl overflow-hidden hover:border-brand-cyan/50 transition-all">
-                  <div className="aspect-video relative">
-                    <img src={project.img} alt="" className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent"></div>
-                    <div className="absolute bottom-2 left-2">
-                      <p className="text-[10px] text-gray-400 font-mono">Muallif: {project.name}</p>
-                    </div>
-                  </div>
-                  <div className="p-2 space-y-2">
-                    <h4 className="text-xs font-bold text-white truncate">{project.title}</h4>
-                    {user.level >= 20 ? (
-                      <button
-                        onClick={() => alert(`${project.name} loyihasi uchun rasmiy taqriz boshlanmoqda...`)}
-                        className="w-full py-1.5 bg-brand-purple text-white text-[10px] font-bold rounded flex items-center justify-center gap-1 hover:bg-brand-purple/80 transition-colors"
-                      >
-                        <Trophy size={12} /> Loyihani ko'rib chiqish
-                      </button>
-                    ) : (
-                      <button className="w-full py-1.5 bg-white/5 text-gray-500 text-[10px] font-bold rounded cursor-not-allowed flex items-center justify-center gap-1">
-                        <Star size={12} /> Faqat ko'rish
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
           {/* Stats Grid */}
           <div className="grid grid-cols-2 gap-4">
             <div className="glass-panel p-4 flex flex-col items-center justify-center text-center">
@@ -362,16 +338,15 @@ export function Dashboard({ user, onNavigate, onTriggerSuccess }: DashboardProps
                   <p className="text-xs text-gray-300">Sizning shaxsiy dasturlash mentoringiz</p>
                 </div>
               </div>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Kodingiz haqida savol bering..."
-                  className="w-full bg-black/40 border border-brand-border rounded-lg pl-3 pr-10 py-2.5 text-sm focus:outline-none focus:border-brand-purple focus:ring-1 focus:ring-brand-purple transition-all"
-                />
-                <button className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-brand-purple hover:bg-brand-purple/20 rounded">
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent('toggle-ai-mentor'))}
+                className="w-full flex items-center justify-between gap-2 bg-black/40 border border-brand-border rounded-lg pl-3 pr-2 py-2.5 text-sm text-gray-400 hover:border-brand-purple hover:text-white transition-all group/mentor"
+              >
+                <span>Kodingiz haqida savol bering...</span>
+                <span className="p-1 text-brand-purple group-hover/mentor:bg-brand-purple/20 rounded transition-colors">
                   <ArrowUpRight size={18} />
-                </button>
-              </div>
+                </span>
+              </button>
             </div>
           </section>
 
@@ -384,24 +359,26 @@ export function Dashboard({ user, onNavigate, onTriggerSuccess }: DashboardProps
               </div>
             </div>
             <div className="space-y-4 relative before:absolute before:inset-0 before:ml-2.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-brand-border before:via-brand-border before:to-transparent">
-              {[
-                { action: "Nishon qo'lga kiritildi:", target: "Xato ovchisi", time: '2 soat oldin', color: 'text-brand-purple', dot: 'bg-brand-purple' },
-                { action: 'Bajarildi:', target: 'CSS Flexbox Layoutlari', time: '5 soat oldin', color: 'text-brand-green', dot: 'bg-brand-green' },
-                { action: 'Daraja oshirildi:', target: '12-daraja Kod Jangchisi', time: '1 kun oldin', color: 'text-brand-cyan', dot: 'bg-brand-cyan' }
-              ].map((item, i) => (
-                <div key={i} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                  <div className={`flex items-center justify-center w-5 h-5 rounded-full border-2 border-brand-bg ${item.dot} shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10`}></div>
-                  <div className="w-[calc(100%-3rem)] md:w-[calc(50%-1.5rem)] bg-black/20 p-3 rounded-lg border border-brand-border">
-                    <div className="flex flex-col">
-                      <span className="text-[10px] text-gray-500 mb-1">{item.time}</span>
-                      <p className="text-sm">
-                        <span className="text-gray-400">{item.action} </span>
-                        <span className={`font-semibold ${item.color}`}>{item.target}</span>
-                      </p>
+              {recentActivity.length === 0 && (
+                <p className="text-sm text-gray-500">Hozircha faoliyat yo'q.</p>
+              )}
+              {recentActivity.map((item) => {
+                const style = ACTIVITY_STYLES[item.type];
+                return (
+                  <div key={item.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                    <div className={`flex items-center justify-center w-5 h-5 rounded-full border-2 border-brand-bg ${style.dot} shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10`}></div>
+                    <div className="w-[calc(100%-3rem)] md:w-[calc(50%-1.5rem)] bg-black/20 p-3 rounded-lg border border-brand-border">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-gray-500 mb-1">{formatRelativeTime(item.createdAt)}</span>
+                        <p className="text-sm">
+                          <span className={`font-semibold ${style.text}`}>{item.title}</span>
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{item.body}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
 

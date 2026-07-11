@@ -1,38 +1,55 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Play, 
-  RotateCcw, 
-  Check, 
-  Terminal, 
-  LayoutTemplate, 
+import {
+  Play,
+  RotateCcw,
+  Check,
+  Terminal,
+  LayoutTemplate,
   MessageSquareCode,
   FileCode2,
   ChevronDown,
-  XCircle,
   CheckCircle2,
-  Maximize2,
   Loader2,
   BrainCircuit,
-  Eye,
-  CheckCircle,
-  Cpu,
-  Zap
+  Zap,
+  Send
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { api } from '../lib/api';
 
 import { useQuestManager } from '../lib/QuestManager';
+
+const INITIAL_CODE = {
+  html: '<div class="card">\n  <h2>Profil</h2>\n  <p>Talaba dasturchi</p>\n</div>',
+  css: '.card {\n  background: rgba(10, 14, 39, 0.8);\n  border: 1px solid #00D9FF;\n  border-radius: 8px;\n  padding: 20px;\n  color: white;\n  text-align: center;\n  box-shadow: 0 0 10px rgba(0, 217, 255, 0.2);\n}\n\n.card h2 {\n  color: #00D9FF;\n  margin-bottom: 8px;\n}',
+  js: 'console.log("Card component initialized.");'
+};
+
+interface ChatMessage {
+  id: string;
+  role: 'USER' | 'ASSISTANT';
+  content: string;
+}
 
 export function CodeLab() {
   const [activeTab, setActiveTab] = useState<'preview' | 'console' | 'tests' | 'ai' | 'review'>('preview');
   const [activeFile, setActiveFile] = useState<'html' | 'css' | 'js'>('html');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  
+  const [code, setCode] = useState(INITIAL_CODE);
+  const [runCount, setRunCount] = useState(0);
+  const [consoleLogs, setConsoleLogs] = useState<{ level: string; text: string }[]>([]);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
   const { addXp } = useQuestManager();
   const [aiReview, setAiReview] = useState<{ rating: number; feedback: string; cyberSuggestion: string } | null>(null);
   const [isReviewing, setIsReviewing] = useState(false);
+
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatting, setIsChatting] = useState(false);
 
   const handleAiReview = async () => {
     setIsReviewing(true);
@@ -63,21 +80,48 @@ export function CodeLab() {
     }, 2000);
   };
 
-  const [code, setCode] = useState({
-    html: '<div class="card">\n  <h2>Profil</h2>\n  <p>Talaba dasturchi</p>\n</div>',
-    css: '.card {\n  background: rgba(10, 14, 39, 0.8);\n  border: 1px solid #00D9FF;\n  border-radius: 8px;\n  padding: 20px;\n  color: white;\n  text-align: center;\n  box-shadow: 0 0 10px rgba(0, 217, 255, 0.2);\n}\n\n.card h2 {\n  color: #00D9FF;\n  margin-bottom: 8px;\n}',
-    js: 'console.log("Card component initialized.");'
-  });
+  const handleReset = () => {
+    setCode(INITIAL_CODE);
+    setConsoleLogs([]);
+  };
+
+  const handleRun = () => {
+    setConsoleLogs([]);
+    setRunCount((c) => c + 1);
+    setActiveTab('console');
+  };
+
+  const sendChat = async (content: string) => {
+    if (!content.trim() || isChatting) return;
+    const userMsg: ChatMessage = { id: `local-${Date.now()}`, role: 'USER', content };
+    setChatMessages((prev) => [...prev, userMsg]);
+    setChatInput('');
+    setIsChatting(true);
+    try {
+      const res = await api.post<{ assistantMessage: ChatMessage }>('/mentor/messages', { content });
+      setChatMessages((prev) => [...prev, res.assistantMessage]);
+    } catch (error) {
+      setChatMessages((prev) => [...prev, { id: `err-${Date.now()}`, role: 'ASSISTANT', content: "Javob olishning imkoni bo'lmadi. Birozdan so'ng qayta urinib ko'ring." }]);
+    } finally {
+      setIsChatting(false);
+    }
+  };
 
   React.useEffect(() => {
-    const handleRunCode = () => {
-      // In a real app, this would trigger the actual execution logic
-      console.log('Shortcut: Running code...');
-      handleSubmit();
+    const handleMessage = (event: MessageEvent) => {
+      if (event.source !== iframeRef.current?.contentWindow) return;
+      if (event.data?.type !== 'codelab-console') return;
+      setConsoleLogs((prev) => [...prev, { level: event.data.level, text: event.data.text }]);
     };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  React.useEffect(() => {
+    const handleRunCode = () => handleRun();
     window.addEventListener('run-code-shortcut', handleRunCode);
     return () => window.removeEventListener('run-code-shortcut', handleRunCode);
-  }, [code]);
+  }, []);
 
   const handleEditorChange = (value: string | undefined) => {
     if (value !== undefined) {
@@ -92,9 +136,31 @@ export function CodeLab() {
   };
 
   const renderPreview = () => {
+    const consoleShim = `
+      <script>
+        (function () {
+          function forward(level) {
+            return function (...args) {
+              window.parent.postMessage({
+                type: 'codelab-console',
+                level,
+                text: args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ')
+              }, '*');
+            };
+          }
+          console.log = forward('log');
+          console.warn = forward('warn');
+          console.error = forward('error');
+          window.onerror = function (message) {
+            window.parent.postMessage({ type: 'codelab-console', level: 'error', text: String(message) }, '*');
+          };
+        })();
+      </script>
+    `;
     const srcDoc = `
       <html>
         <head>
+          ${consoleShim}
           <style>
             body { font-family: system-ui, sans-serif; background: #000; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
             ${code.css}
@@ -108,17 +174,14 @@ export function CodeLab() {
     `;
     return (
       <div className="w-full h-full bg-black relative">
-        <iframe 
+        <iframe
+          ref={iframeRef}
+          key={runCount}
           srcDoc={srcDoc}
           title="ko'rib chiqish"
           className="w-full h-full border-none"
           sandbox="allow-scripts"
         />
-        <div className="absolute top-2 right-2 flex gap-2">
-          <button className="bg-black/50 p-1.5 rounded text-gray-400 hover:text-white backdrop-blur">
-            <Maximize2 size={16} />
-          </button>
-        </div>
       </div>
     );
   };
@@ -137,20 +200,27 @@ export function CodeLab() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-400 hover:text-white bg-white/5 rounded-md transition-colors">
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-400 hover:text-white bg-white/5 rounded-md transition-colors"
+          >
             <RotateCcw size={16} /> Qayta boshlash
           </button>
-          <button className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-brand-purple bg-brand-purple/10 border border-brand-purple/30 rounded-md hover:bg-brand-purple/20 transition-colors">
+          <button
+            onClick={() => { setActiveTab('ai'); sendChat('Bu CodeLab mashqi uchun maslahat bering.'); }}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-brand-purple bg-brand-purple/10 border border-brand-purple/30 rounded-md hover:bg-brand-purple/20 transition-colors"
+          >
             <MessageSquareCode size={16} /> Maslahat Olish
           </button>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
+            onClick={handleRun}
             className="flex items-center gap-2 px-4 py-1.5 text-sm font-bold text-brand-bg bg-brand-cyan rounded-md hover:bg-brand-cyan/90 transition-all neon-glow-cyan shadow-lg"
           >
             <Play size={16} fill="currentColor" /> Kodni Ishga Tushirish
           </motion.button>
-          <motion.button 
+          <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={handleAiReview}
@@ -168,7 +238,7 @@ export function CodeLab() {
             className="flex items-center gap-2 px-4 py-1.5 text-sm font-bold text-white bg-gradient-to-r from-brand-purple to-brand-cyan rounded-md hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
           >
             {isSubmitting ? <RotateCcw size={16} className="animate-spin" /> : <Check size={16} />}
-            {isSubmitting ? 'Tekshirilmoqda...' : 'Yuborish'}
+            {isSubmitting ? 'Yakunlanmoqda...' : 'Mashqni Yakunlash'}
           </motion.button>
         </div>
       </div>
@@ -309,112 +379,70 @@ export function CodeLab() {
             
             {activeTab === 'console' && (
               <div className="p-4 font-mono text-sm h-full bg-[#0d1117] overflow-y-auto">
-                <div className="text-gray-500 mb-2"># Veb Konsol</div>
-                <div className="text-brand-green flex gap-2"><span className="text-gray-500">&gt;</span> Karta komponenti ishga tushirildi.</div>
+                <div className="text-gray-500 mb-2"># Veb Konsol — "Kodni Ishga Tushirish" bosilganda yangilanadi</div>
+                {consoleLogs.length === 0 && (
+                  <div className="text-gray-600">Hali chiqish yo'q. console.log() dan foydalaning va "Kodni Ishga Tushirish" tugmasini bosing.</div>
+                )}
+                {consoleLogs.map((log, i) => (
+                  <div key={i} className={cn('flex gap-2', log.level === 'error' ? 'text-brand-red' : log.level === 'warn' ? 'text-brand-orange' : 'text-brand-green')}>
+                    <span className="text-gray-500">&gt;</span> {log.text}
+                  </div>
+                ))}
               </div>
             )}
-            
-            {activeTab === 'tests' && (
-              <div className="p-4 h-full overflow-y-auto bg-brand-bg">
-                <div className="flex justify-between items-end mb-4">
-                  <h3 className="font-semibold text-gray-200">Sinov Natijalari</h3>
-                  <span className="text-xs font-mono text-brand-green bg-brand-green/10 px-2 py-1 rounded">2/3 O'tdi</span>
-                </div>
-                
-                <div className="w-full bg-gray-800 rounded-full h-2 mb-6">
-                  <div className="bg-brand-cyan h-2 rounded-full" style={{ width: '66%' }}></div>
-                </div>
 
-                <div className="space-y-3">
-                  <div className="bg-black/30 border border-brand-border rounded p-3 flex gap-3">
-                    <CheckCircle2 className="text-brand-green shrink-0 mt-0.5" size={18} />
-                    <div>
-                      <div className="text-sm font-medium">Karta elementi mavjud</div>
-                      <div className="text-xs text-gray-500 mt-1">.card hujjatda bo'lishi kutilgan edi</div>
-                    </div>
-                  </div>
-                  <div className="bg-black/30 border border-brand-border rounded p-3 flex gap-3">
-                    <CheckCircle2 className="text-brand-green shrink-0 mt-0.5" size={18} />
-                    <div>
-                      <div className="text-sm font-medium">Kartaga uslub qo'llangan</div>
-                      <div className="text-xs text-gray-500 mt-1">Fon va chegara xususiyatlari kutilgan edi</div>
-                    </div>
-                  </div>
-                  <div className="bg-brand-orange/5 border border-brand-orange/30 rounded p-3 flex gap-3">
-                    <XCircle className="text-brand-orange shrink-0 mt-0.5" size={18} />
-                    <div>
-                      <div className="text-sm font-medium text-brand-orange">Hover effekti qo'llanilgan</div>
-                      <div className="text-xs text-gray-400 mt-1">Hoverda transform scale kutilgan edi.</div>
-                      <div className="mt-2 text-xs font-mono bg-black/50 p-2 rounded border border-brand-orange/20 text-gray-300">
-                        Kutilgan: transform: scale(1.05)<br/>
-                        Qabul qilindi: none
-                      </div>
-                    </div>
-                  </div>
-                </div>
+            {activeTab === 'tests' && (
+              <div className="h-full flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-brand-border rounded-2xl m-4">
+                <CheckCircle2 size={48} className="text-gray-600 mb-4" />
+                <h4 className="text-gray-400 font-bold mb-2">Avtomatik sinovlar mavjud emas</h4>
+                <p className="text-gray-600 text-sm max-w-xs">
+                  Bu erkin mashq maydoni — baholangan test holatlari yo'q. Kodingizni tekshirish uchun "AI Sharh" tugmasidan foydalaning.
+                </p>
               </div>
             )}
 
             {activeTab === 'ai' && (
               <div className="flex flex-col h-full bg-brand-bg">
                 <div className="flex-1 p-4 overflow-y-auto space-y-4">
-                  <div className="flex gap-3">
-                    <div className="w-8 h-8 rounded bg-brand-purple/20 border border-brand-purple/50 flex items-center justify-center shrink-0">
-                      🤖
+                  {chatMessages.length === 0 && (
+                    <div className="flex gap-3">
+                      <div className="w-8 h-8 rounded bg-brand-purple/20 border border-brand-purple/50 flex items-center justify-center shrink-0">
+                        🤖
+                      </div>
+                      <div className="bg-brand-card p-3 rounded-lg rounded-tl-none border border-brand-border text-sm">
+                        Salom! Men TechSensei man. Kodingiz haqida savol bering yoki "Maslahat Olish" tugmasini bosing.
+                      </div>
                     </div>
-                    <div className="bg-brand-card p-3 rounded-lg rounded-tl-none border border-brand-border text-sm">
-                      <p className="mb-2">Salom! Men TechSensei man. Ko'ryapmanki, siz Profil Kartasi topshirig'i ustida ishlayapsiz.</p>
-                      <p>Hozirgi kodingiz yaxshi ko'rinadi, lekin 3-sinov uchun hover holati yetishmayapti. CSS'ingizga <code className="text-brand-cyan bg-black/50 px-1 rounded">:hover</code> psevdo-klassini qo'shib ko'ring.</p>
+                  )}
+                  {chatMessages.map((m) => (
+                    <div key={m.id} className={cn('flex gap-3', m.role === 'USER' && 'flex-row-reverse')}>
+                      <div className="w-8 h-8 rounded bg-brand-purple/20 border border-brand-purple/50 flex items-center justify-center shrink-0">
+                        {m.role === 'USER' ? '🧑' : '🤖'}
+                      </div>
+                      <div className="bg-brand-card p-3 rounded-lg border border-brand-border text-sm max-w-[80%] whitespace-pre-wrap">
+                        {m.content}
+                      </div>
                     </div>
-                  </div>
+                  ))}
+                  {isChatting && <div className="text-xs text-gray-500 flex items-center gap-2"><Loader2 size={12} className="animate-spin" /> TechSensei yozmoqda...</div>}
                 </div>
                 <div className="p-3 border-t border-brand-border bg-black/20">
                   <div className="flex gap-2">
                     <input
                       type="text"
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') sendChat(chatInput); }}
                       placeholder="Maslahat so'rang..."
                       className="flex-1 bg-black/40 border border-brand-border rounded pl-3 py-1.5 text-sm focus:border-brand-purple focus:outline-none"
                     />
-                    <button className="px-3 py-1.5 bg-brand-purple/20 text-brand-purple border border-brand-purple/50 rounded text-sm font-medium hover:bg-brand-purple/30">
-                      Yuborish
+                    <button
+                      onClick={() => sendChat(chatInput)}
+                      disabled={isChatting || !chatInput.trim()}
+                      className="px-3 py-1.5 bg-brand-purple/20 text-brand-purple border border-brand-purple/50 rounded text-sm font-medium hover:bg-brand-purple/30 disabled:opacity-50 flex items-center gap-1"
+                    >
+                      <Send size={14} /> Yuborish
                     </button>
-                  </div>
-                </div>
-              </div>
-            )}
-            {activeTab === 'review' && (
-              <div className="flex flex-col h-full bg-brand-bg">
-                <div className="p-3 border-b border-brand-border bg-black/40 flex justify-between items-center">
-                  <div className="text-sm font-medium">Hamkasb Sharhlari (2)</div>
-                  <button className="text-xs bg-brand-purple/20 text-brand-purple px-2 py-1 rounded border border-brand-purple/50">Sharh So'rash</button>
-                </div>
-                <div className="flex-1 p-4 overflow-y-auto space-y-4">
-                  <div className="bg-black/30 border border-brand-border rounded p-3">
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center text-xs">AS</div>
-                        <span className="text-sm font-bold text-gray-300">Alex_Student</span>
-                      </div>
-                      <span className="text-xs text-gray-500">10 daqiqa oldin</span>
-                    </div>
-                    <div className="bg-black/50 border-l-2 border-brand-cyan p-2 mb-2 font-mono text-xs text-gray-400">
-                      5-qator (CSS): <span className="text-brand-cyan">padding: 20px;</span>
-                    </div>
-                    <p className="text-sm text-gray-300">Turli qurilmalarda yaxshiroq moslashish uchun px o'rniga rem birliklaridan foydalanishni ko'rib chiqing!</p>
-                  </div>
-                  
-                  <div className="bg-black/30 border border-brand-border rounded p-3">
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center text-xs">SJ</div>
-                        <span className="text-sm font-bold text-gray-300">Sarah.JS</span>
-                      </div>
-                      <span className="text-xs text-gray-500">1 soat oldin</span>
-                    </div>
-                    <div className="bg-black/50 border-l-2 border-brand-cyan p-2 mb-2 font-mono text-xs text-gray-400">
-                      7-qator (CSS): <span className="text-brand-cyan">text-align: center;</span>
-                    </div>
-                    <p className="text-sm text-gray-300">Juda yaxshi chiqibdi. Balki kartaga yanada interaktiv ko'rinish berish uchun sezilarli hover effekti qo'sharsiz?</p>
                   </div>
                 </div>
               </div>

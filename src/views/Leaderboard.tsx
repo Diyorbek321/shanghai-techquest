@@ -40,9 +40,12 @@ interface Battle {
 
 type Scope = 'track' | 'global';
 
+// Backend (/leaderboard) only distinguishes two real scopes: the caller's own
+// track and the global pool — there is no weekly/monthly time window, so the
+// tabs must map 1:1 to those two distinct behaviors instead of implying a
+// time-period split that doesn't exist server-side.
 const SCOPE_TABS: { label: string; scope: Scope }[] = [
-  { label: 'Haftalik', scope: 'track' },
-  { label: 'Oylik', scope: 'track' },
+  { label: 'Trekim', scope: 'track' },
   { label: 'Barcha davr', scope: 'global' },
 ];
 
@@ -188,7 +191,10 @@ export function Leaderboard({ user, onNavigate, onSelectBattle }: LeaderboardPro
                   </p>
                 </div>
               </div>
-              <button className="px-4 py-2 bg-brand-cyan text-brand-bg font-bold rounded hover:bg-brand-cyan/90 transition-colors text-sm">
+              <button
+                onClick={() => onNavigate('mission_log')}
+                className="px-4 py-2 bg-brand-cyan text-brand-bg font-bold rounded hover:bg-brand-cyan/90 transition-colors text-sm"
+              >
                 Missiya bajarish
               </button>
             </div>

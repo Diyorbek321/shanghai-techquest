@@ -5,8 +5,7 @@ import {
   MessageSquare,
   Award,
   AlertTriangle,
-  Info,
-  MoreHorizontal
+  Info
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
@@ -100,9 +99,6 @@ export function Notifications() {
               </div>
             )}
 
-            <button className="self-center p-2 text-gray-600 hover:text-white transition-colors">
-              <MoreHorizontal size={18} />
-            </button>
           </motion.div>
         ))}
       </div>

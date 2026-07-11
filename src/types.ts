@@ -20,9 +20,11 @@ export interface User {
   track: Track | null;
   theme: 'dark' | 'neon' | 'cyber';
   audioEnabled: boolean;
+  pushEnabled: boolean;
   onlineVisible: boolean;
   profilePublic: boolean;
   eloRating: number;
   teamId: string | null;
   teamRole: 'leader' | 'member' | null;
+  createdAt: string;
 }

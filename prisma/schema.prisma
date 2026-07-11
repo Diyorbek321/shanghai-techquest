@@ -153,6 +153,7 @@ model User {
 
   theme          UiTheme  @default(DARK)
   audioEnabled   Boolean  @default(true)
+  pushEnabled    Boolean  @default(true)
   onlineVisible  Boolean  @default(true)
   profilePublic  Boolean  @default(true)
   lastSeenAt     DateTime?

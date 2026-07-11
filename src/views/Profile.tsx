@@ -1,15 +1,104 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useQuery } from '@tanstack/react-query';
-import { Github, Linkedin, Globe, MapPin, Calendar, Award, Zap, Shield, Star, Medal, Lock } from 'lucide-react';
+import { Github, Linkedin, Globe, Calendar, Award, Zap, Shield, Star, Medal, Lock, Activity as ActivityIcon } from 'lucide-react';
 import { User } from '../types';
 import { api } from '../lib/api';
+import { formatDate, formatRelativeTime } from '../lib/utils';
 
 const ROLE_LABELS: Record<User['role'], string> = {
   student: "O'quvchi",
   teacher: "O'qituvchi",
   admin: 'Administrator',
 };
+
+const TRACK_LABEL: Record<string, string> = {
+  frontend: 'Frontend',
+  robotics: 'Robototexnika',
+  office: 'Ofis',
+};
+
+function trackLabel(track: string): string {
+  return TRACK_LABEL[track] ?? track;
+}
+
+function moduleTitle(moduleKey: string): string {
+  return moduleKey.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+}
+
+interface ProjectSubmission {
+  status: string;
+  githubUrl: string | null;
+  demoUrl: string | null;
+}
+
+interface ProfileAssignment {
+  id: string;
+  title: string;
+  track: string;
+  submission: ProjectSubmission | null;
+}
+
+interface ActivityNotification {
+  id: string;
+  type: 'INFO' | 'SUCCESS' | 'WARNING' | 'ALERT';
+  title: string;
+  body: string;
+  createdAt: string;
+}
+
+const ACTIVITY_STYLES: Record<ActivityNotification['type'], { text: string; dot: string }> = {
+  SUCCESS: { text: 'text-brand-green', dot: 'bg-brand-green' },
+  INFO: { text: 'text-brand-cyan', dot: 'bg-brand-cyan' },
+  WARNING: { text: 'text-brand-orange', dot: 'bg-brand-orange' },
+  ALERT: { text: 'text-brand-purple', dot: 'bg-brand-purple' },
+};
+
+const SKILL_COLORS = ['bg-brand-cyan', 'bg-brand-purple', 'bg-brand-orange', 'bg-brand-green', 'bg-yellow-400'];
+
+function ProjectCard({ project }: { project: ProfileAssignment }) {
+  const submission = project.submission;
+  return (
+    <motion.div whileHover={{ y: -5 }} className="glass-panel p-0 overflow-hidden group border border-brand-border hover:border-brand-purple/50 transition-colors">
+      <div className="h-32 bg-gray-800 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-tr from-brand-purple/20 to-brand-cyan/20"></div>
+      </div>
+      <div className="p-4">
+        <h4 className="font-bold mb-1 group-hover:text-brand-purple transition-colors">{project.title}</h4>
+        <p className="text-xs text-gray-400 mb-3">
+          {submission?.status === 'GRADED' ? 'Baholangan loyiha' : 'Topshirilgan loyiha'}
+        </p>
+        <div className="flex gap-2 flex-wrap">
+          <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded capitalize">{trackLabel(project.track)}</span>
+          {submission?.githubUrl && (
+            <a href={submission.githubUrl} target="_blank" rel="noreferrer" className="text-[10px] bg-white/10 px-2 py-0.5 rounded hover:bg-white/20 transition-colors flex items-center gap-1">
+              <Github size={10} /> GitHub
+            </a>
+          )}
+          {submission?.demoUrl && (
+            <a href={submission.demoUrl} target="_blank" rel="noreferrer" className="text-[10px] bg-white/10 px-2 py-0.5 rounded hover:bg-white/20 transition-colors flex items-center gap-1">
+              <Globe size={10} /> Demo
+            </a>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function SkillBar({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div>
+      <div className="flex justify-between text-xs mb-1">
+        <span>{label}</span>
+        <span className="text-gray-400">{value}%</span>
+      </div>
+      <div className="w-full bg-gray-800 rounded-full h-1.5">
+        <div className={`${color} h-1.5 rounded-full`} style={{ width: `${value}%` }}></div>
+      </div>
+    </div>
+  );
+}
 
 type Rarity = 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY';
 type Category = 'PROGRAMMING' | 'SPEED' | 'SOCIAL' | 'SPECIAL' | 'SECRET';
@@ -152,17 +241,37 @@ interface ProfileProps {
 }
 
 interface ModuleProgressEntry {
+  moduleKey: string;
+  progress: number;
   unlocked: boolean;
 }
 
+const TABS = ["Umumiy ko'rinish", 'Loyihalar', "Ko'nikmalar", 'Faollik'] as const;
+type ProfileTab = (typeof TABS)[number];
+
 export function Profile({ user, onRoleToggle }: ProfileProps) {
   const [isBadgeCaseOpen, setIsBadgeCaseOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<ProfileTab>(TABS[0]);
 
   const { data: modules = [] } = useQuery({
     queryKey: ['progress', 'modules'],
     queryFn: () => api.get<ModuleProgressEntry[]>('/progress/modules'),
   });
   const completedModules = modules.filter((m) => m.unlocked).length;
+  const unlockedModules = modules.filter((m) => m.unlocked);
+
+  const { data: assignments = [] } = useQuery({
+    queryKey: ['assignments'],
+    queryFn: () => api.get<ProfileAssignment[]>('/assignments'),
+  });
+  const projects = assignments.filter(
+    (a) => a.submission && (a.submission.status === 'SUBMITTED' || a.submission.status === 'GRADED')
+  );
+
+  const { data: activity = [] } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: () => api.get<ActivityNotification[]>('/notifications'),
+  });
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-10">
@@ -199,8 +308,7 @@ export function Profile({ user, onRoleToggle }: ProfileProps) {
               <p className="text-brand-cyan font-medium mb-3">{user.title}</p>
               
               <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
-                <span className="flex items-center gap-1"><MapPin size={14} /> Shanxay, Xitoy</span>
-                <span className="flex items-center gap-1"><Calendar size={14} /> 2025-yil sentyabrda qo'shilgan</span>
+                <span className="flex items-center gap-1"><Calendar size={14} /> {formatDate(user.createdAt)} sanasida qo'shilgan</span>
               </div>
             </div>
             
@@ -239,7 +347,7 @@ export function Profile({ user, onRoleToggle }: ProfileProps) {
             </motion.div>
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.3 }} className="bg-black/30 p-4 rounded-xl border border-brand-border">
               <div className="text-gray-400 text-xs uppercase tracking-wider mb-1">Loyihalar</div>
-              <div className="text-2xl font-mono font-bold text-white">14</div>
+              <div className="text-2xl font-mono font-bold text-white">{projects.length}</div>
             </motion.div>
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.4 }} className="bg-black/30 p-4 rounded-xl border border-brand-border relative overflow-hidden">
               <div className="absolute -right-2 -bottom-2 text-brand-orange opacity-20">
@@ -254,59 +362,100 @@ export function Profile({ user, onRoleToggle }: ProfileProps) {
 
       {/* Tabs */}
       <div className="flex gap-6 border-b border-brand-border px-2">
-        {["Umumiy ko'rinish", 'Loyihalar', "Ko'nikmalar", 'Faollik'].map((tab, i) => (
-          <button key={tab} className={`py-3 text-sm font-medium border-b-2 transition-colors ${
-            i === 0 ? 'border-brand-cyan text-brand-cyan' : 'border-transparent text-gray-400 hover:text-white'
-          }`}>
+        {TABS.map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === tab ? 'border-brand-cyan text-brand-cyan' : 'border-transparent text-gray-400 hover:text-white'
+            }`}
+          >
             {tab}
           </button>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 space-y-6">
-          <h3 className="font-bold text-lg flex items-center gap-2"><Award className="text-brand-purple" /> Tanlangan loyihalar</h3>
-          <div className="grid sm:grid-cols-2 gap-4">
-            {[1, 2].map((i) => (
-              <motion.div key={i} whileHover={{ y: -5 }} className="glass-panel p-0 overflow-hidden group border border-brand-border hover:border-brand-purple/50 transition-colors">
-                <div className="h-32 bg-gray-800 relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-tr from-brand-purple/20 to-brand-cyan/20"></div>
-                </div>
-                <div className="p-4">
-                  <h4 className="font-bold mb-1 group-hover:text-brand-purple transition-colors">Onlayn-do'kon boshqaruv paneli</h4>
-                  <p className="text-xs text-gray-400 mb-3 line-clamp-2">React va Tailwind CSS yordamida yaratilgan to'liq moslashuvchan boshqaruv paneli. Tungi rejim va murakkab setka joylashuvlariga ega.</p>
-                  <div className="flex gap-2">
-                    <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded">React</span>
-                    <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded">Tailwind</span>
+      {activeTab === "Umumiy ko'rinish" && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="md:col-span-2 space-y-6">
+            <h3 className="font-bold text-lg flex items-center gap-2"><Award className="text-brand-purple" /> Tanlangan loyihalar</h3>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {projects.length === 0 && (
+                <p className="text-sm text-gray-500 sm:col-span-2">Hali loyihalar yo'q. Birinchi vazifangizni topshiring!</p>
+              )}
+              {projects.slice(0, 2).map((project) => (
+                <ProjectCard key={project.id} project={project} />
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <h3 className="font-bold text-lg">Asosiy ko'nikmalar</h3>
+            <div className="glass-panel p-5 space-y-4">
+              {unlockedModules.length === 0 && (
+                <p className="text-sm text-gray-500">Hali modul boshlanmagan.</p>
+              )}
+              {unlockedModules.slice(0, 4).map((m, i) => (
+                <SkillBar key={m.moduleKey} label={moduleTitle(m.moduleKey)} value={m.progress} color={SKILL_COLORS[i % SKILL_COLORS.length]} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'Loyihalar' && (
+        <div className="space-y-6">
+          <h3 className="font-bold text-lg flex items-center gap-2"><Award className="text-brand-purple" /> Barcha loyihalar</h3>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {projects.length === 0 && (
+              <p className="text-sm text-gray-500 sm:col-span-2 lg:col-span-3">Hali loyihalar yo'q. Birinchi vazifangizni topshiring!</p>
+            )}
+            {projects.map((project) => (
+              <ProjectCard key={project.id} project={project} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === "Ko'nikmalar" && (
+        <div className="max-w-xl space-y-6">
+          <h3 className="font-bold text-lg">Modullar bo'yicha ko'nikmalar</h3>
+          <div className="glass-panel p-5 space-y-4">
+            {unlockedModules.length === 0 && (
+              <p className="text-sm text-gray-500">Hali modul boshlanmagan.</p>
+            )}
+            {unlockedModules.map((m, i) => (
+              <SkillBar key={m.moduleKey} label={moduleTitle(m.moduleKey)} value={m.progress} color={SKILL_COLORS[i % SKILL_COLORS.length]} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'Faollik' && (
+        <div className="space-y-4">
+          <h3 className="font-bold text-lg flex items-center gap-2"><ActivityIcon className="text-brand-purple" /> Faoliyat lentasi</h3>
+          <div className="glass-panel p-5 space-y-3">
+            {activity.length === 0 && (
+              <p className="text-sm text-gray-500">Hozircha faoliyat yo'q.</p>
+            )}
+            {activity.slice(0, 10).map((item) => {
+              const style = ACTIVITY_STYLES[item.type];
+              return (
+                <div key={item.id} className="bg-black/20 p-3 rounded-lg border border-brand-border flex items-start gap-3">
+                  <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${style.dot}`}></div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-sm font-semibold ${style.text}`}>{item.title}</span>
+                      <span className="text-[10px] text-gray-500 shrink-0">{formatRelativeTime(item.createdAt)}</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">{item.body}</p>
                   </div>
                 </div>
-              </motion.div>
-            ))}
+              );
+            })}
           </div>
         </div>
-        
-        <div className="space-y-6">
-          <h3 className="font-bold text-lg">Asosiy ko'nikmalar</h3>
-          <div className="glass-panel p-5 space-y-4">
-            {[
-              { name: 'JavaScript', val: 90, color: 'bg-yellow-400' },
-              { name: 'React', val: 85, color: 'bg-blue-400' },
-              { name: 'CSS/Tailwind', val: 95, color: 'bg-brand-cyan' },
-              { name: 'Python', val: 60, color: 'bg-brand-green' },
-            ].map(skill => (
-              <div key={skill.name}>
-                <div className="flex justify-between text-xs mb-1">
-                  <span>{skill.name}</span>
-                  <span className="text-gray-400">{skill.val}%</span>
-                </div>
-                <div className="w-full bg-gray-800 rounded-full h-1.5">
-                  <div className={`${skill.color} h-1.5 rounded-full`} style={{ width: `${skill.val}%` }}></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

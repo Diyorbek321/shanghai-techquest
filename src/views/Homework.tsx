@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   BookText,
   Clock,
   CheckCircle2,
   ChevronRight,
-  FileText
+  FileText,
+  Plus
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { formatRelativeTime } from '../lib/utils';
+import { Track, User } from '../types';
 
 interface HomeworkItem {
   id: string;
@@ -22,9 +24,11 @@ interface HomeworkItem {
 
 type Filter = 'all' | 'pending' | 'completed';
 
-export function Homework() {
+export function Homework({ user }: { user: User }) {
   const [filter, setFilter] = useState<Filter>('all');
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const queryClient = useQueryClient();
+  const canCreate = user.role === 'teacher' || user.role === 'admin';
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ['homework'],
@@ -58,6 +62,16 @@ export function Homework() {
             <p className="text-xs text-gray-500 font-mono">Kichik topshiriqlar va bilimlarni mustahkamlash</p>
           </div>
         </div>
+        {canCreate && (
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setIsFormOpen(true)}
+            className="flex items-center gap-2 bg-brand-orange/20 hover:bg-brand-orange/30 text-brand-orange border border-brand-orange/50 font-medium px-4 py-2 rounded-lg text-sm transition-colors"
+          >
+            <Plus size={16} /> Yangi uy vazifasi
+          </motion.button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -113,7 +127,118 @@ export function Homework() {
           </motion.div>
         ))}
       </div>
+
+      {canCreate && <CreateHomeworkModal isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} />}
     </div>
+  );
+}
+
+function CreateHomeworkModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [title, setTitle] = useState('');
+  const [course, setCourse] = useState('');
+  const [track, setTrack] = useState<Track>('frontend');
+  const [dueDate, setDueDate] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const createMutation = useMutation({
+    mutationFn: () => api.post('/homework', { title, course, track, dueDate }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['homework'] });
+      setTitle('');
+      setCourse('');
+      setTrack('frontend');
+      setDueDate('');
+      onClose();
+    },
+    onError: (err) => setError(err instanceof ApiError ? err.message : 'Xatolik yuz berdi.'),
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    createMutation.mutate();
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+          />
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            className="relative w-full max-w-md glass-panel p-8 border border-white/20 shadow-[0_0_50px_rgba(0,0,0,0.5)]"
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-heading font-bold text-white">Yangi uy vazifasi yaratish</h2>
+              <button onClick={onClose} className="text-gray-500 hover:text-white p-2">&times;</button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Vazifa nomi</label>
+                <input
+                  required
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full bg-black/30 border border-brand-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Kurs</label>
+                <input
+                  required
+                  value={course}
+                  onChange={(e) => setCourse(e.target.value)}
+                  placeholder="Masalan: JavaScript asoslari"
+                  className="w-full bg-black/30 border border-brand-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Yo'nalish</label>
+                <select
+                  value={track}
+                  onChange={(e) => setTrack(e.target.value as Track)}
+                  className="w-full bg-black/30 border border-brand-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"
+                >
+                  <option value="frontend" className="bg-brand-bg">Frontend</option>
+                  <option value="robotics" className="bg-brand-bg">Robototexnika</option>
+                  <option value="office" className="bg-brand-bg">Ofis</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Topshirish muddati</label>
+                <input
+                  required
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="w-full bg-black/30 border border-brand-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"
+                />
+              </div>
+
+              {error && <p className="text-xs text-brand-red">{error}</p>}
+
+              <button
+                type="submit"
+                disabled={createMutation.isPending}
+                className="w-full bg-brand-orange/20 hover:bg-brand-orange/30 text-brand-orange border border-brand-orange/50 font-medium py-2.5 rounded-lg text-sm transition-colors disabled:opacity-50"
+              >
+                {createMutation.isPending ? 'Yaratilmoqda...' : 'Vazifa yaratish'}
+              </button>
+            </form>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 }
 
