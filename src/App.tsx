@@ -33,6 +33,7 @@ import { AssignmentSubmissions } from './views/AssignmentSubmissions';
 import { Notifications } from './views/Notifications';
 import { Grades } from './views/Grades';
 import { Calendar } from './views/Calendar';
+import { UserManagement } from './views/UserManagement';
 import { AIMentorChat } from './components/AIMentorChat';
 import { SuccessParticles } from './components/SuccessParticles';
 import { Companion } from './components/Companion';
@@ -66,7 +67,7 @@ export default function App({ user }: { user: User }) {
       case 'dashboard':
         return <Dashboard user={mockUser} onNavigate={setCurrentView} onTriggerSuccess={triggerSuccess} />;
       case 'classes':
-        return <Classes onNavigate={setCurrentView} />;
+        return <Classes user={mockUser} onNavigate={setCurrentView} />;
       case 'assignments':
         return <Assignments user={mockUser} onNavigate={setCurrentView} onSelectAssignment={setSelectedAssignmentId} />;
       case 'assignment_detail':
@@ -128,6 +129,8 @@ export default function App({ user }: { user: User }) {
         return <Grades />;
       case 'calendar':
         return <Calendar />;
+      case 'user_management':
+        return <UserManagement />;
       default:
         return <Dashboard user={mockUser} onNavigate={setCurrentView} onTriggerSuccess={triggerSuccess} />;
     }

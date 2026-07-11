@@ -26,7 +26,8 @@ import {
   Presentation,
   GraduationCap,
   Calendar as CalendarIcon,
-  LogOut
+  LogOut,
+  UserCog
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { ViewType, User, Track } from '../types';
@@ -49,7 +50,11 @@ export function Layout({ children, currentView, onNavigate, user }: LayoutProps)
 
   type NavItem = { id: ViewType; label: string; icon: React.ReactNode; customColor?: string; trackRequirement?: Track };
 
-  const allNavItems: NavItem[] = [
+  const isStaff = user.role === 'teacher' || user.role === 'admin';
+
+  // Students get the full gamified experience (quests, city-building, PvP, shop).
+  // Staff manage the platform, so their menu is a separate, focused set below.
+  const studentNavItems: NavItem[] = [
     { id: 'dashboard', label: 'Boshqaruv paneli', icon: <LayoutDashboard size={20} /> },
     { id: 'mission_log', label: 'Missiyalar jurnali', icon: <ScrollText size={20} />, customColor: 'text-brand-cyan shadow-[0_0_10px_rgba(0,217,255,0.5)]' },
     { id: 'myworld', label: 'Mening Shahrim', icon: <Globe size={20} />, customColor: 'text-brand-purple shadow-[0_0_10px_rgba(176,38,255,0.5)]' },
@@ -69,16 +74,29 @@ export function Layout({ children, currentView, onNavigate, user }: LayoutProps)
     { id: 'leaderboard', label: 'Reyting', icon: <Trophy size={20} /> },
     { id: 'teams', label: 'Jamoalar', icon: <Users size={20} />, customColor: 'text-brand-orange' },
     { id: 'achievements', label: 'Yutuqlar', icon: <Medal size={20} /> },
-    ...(user.role === 'teacher' || user.role === 'admin' ? [{ id: 'teacher_portal' as ViewType, label: "O'qituvchi paneli", icon: <ShieldCheck size={20} />, customColor: 'text-brand-purple' }] : []),
     { id: 'shop', label: "Do'kon", icon: <Store size={20} />, customColor: 'text-[#FFD700]' },
     { id: 'profile', label: 'Profil', icon: <UserIcon size={20} /> },
   ];
 
-  const navItems = allNavItems.filter(item => {
-    // Staff (null track) see every course track; students only see their own.
-    if (!item.trackRequirement) return true;
-    return user.role !== 'student' || user.track === item.trackRequirement;
-  });
+  const staffNavItems: NavItem[] = [
+    { id: 'dashboard', label: 'Boshqaruv paneli', icon: <LayoutDashboard size={20} /> },
+    { id: 'teacher_portal', label: "O'qituvchi paneli", icon: <ShieldCheck size={20} />, customColor: 'text-brand-purple' },
+    { id: 'classes', label: 'Sinflar', icon: <BookOpen size={20} /> },
+    { id: 'assignments', label: 'Vazifalar', icon: <CheckSquare size={20} /> },
+    { id: 'homework', label: 'Uy vazifasi', icon: <BookText size={20} />, customColor: 'text-brand-orange' },
+    { id: 'attendance', label: 'Davomat', icon: <CalendarDays size={20} /> },
+    { id: 'grades', label: 'Baholar', icon: <GraduationCap size={20} /> },
+    { id: 'calendar', label: 'Jadval', icon: <CalendarIcon size={20} /> },
+    { id: 'notifications', label: 'Bildirishnomalar', icon: <Bell size={20} />, customColor: 'text-brand-purple' },
+    ...(user.role === 'admin'
+      ? [{ id: 'user_management' as ViewType, label: 'Foydalanuvchilar', icon: <UserCog size={20} />, customColor: 'text-brand-cyan' }]
+      : []),
+    { id: 'profile', label: 'Profil', icon: <UserIcon size={20} /> },
+  ];
+
+  const navItems = isStaff
+    ? staffNavItems
+    : studentNavItems.filter(item => !item.trackRequirement || user.track === item.trackRequirement);
 
   const handleNavigate = (id: ViewType) => {
     audioManager.playClick();
@@ -239,12 +257,14 @@ export function Layout({ children, currentView, onNavigate, user }: LayoutProps)
           </div>
 
           <div className="flex items-center gap-3 sm:gap-5">
-            <div className="flex items-center gap-1 text-brand-orange bg-brand-orange/10 px-3 py-1 rounded-full border border-brand-orange/20">
-              <span className="text-sm font-bold">🔥 {user.streak}</span>
-            </div>
-            
-            <button 
-              onClick={() => handleNavigate('mission_log')}
+            {!isStaff && (
+              <div className="flex items-center gap-1 text-brand-orange bg-brand-orange/10 px-3 py-1 rounded-full border border-brand-orange/20">
+                <span className="text-sm font-bold">🔥 {user.streak}</span>
+              </div>
+            )}
+
+            <button
+              onClick={() => handleNavigate(isStaff ? 'notifications' : 'mission_log')}
               onMouseEnter={() => audioManager.playHover()}
               className="relative p-2 text-gray-400 hover:text-white transition-colors"
             >

@@ -1,9 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import bcrypt from 'bcryptjs';
+import { Role } from '@prisma/client';
 import { prisma } from '../db';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRole } from '../middleware/auth';
 import { serializeUser } from '../serializers/user';
 import { checkAchievements } from '../achievements/check';
+import { toClientTrack, toPrismaTrack } from '../serializers/track';
 
 export const usersRouter = Router();
 
@@ -11,6 +14,62 @@ usersRouter.use(requireAuth);
 
 usersRouter.get('/me', (req, res) => {
   res.json(serializeUser(req.user!));
+});
+
+// Admin-only user directory: create/list/update/remove staff and student accounts.
+// Public /auth/register always creates STUDENT accounts, so this is the only
+// way to provision TEACHER or ADMIN logins.
+usersRouter.get('/', requireRole(Role.ADMIN), async (_req, res) => {
+  const users = await prisma.user.findMany({
+    orderBy: [{ role: 'asc' }, { name: 'asc' }],
+    select: { id: true, email: true, name: true, role: true, track: true, createdAt: true, lastSeenAt: true },
+  });
+  res.json(
+    users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      role: u.role.toLowerCase() as 'student' | 'teacher' | 'admin',
+      track: toClientTrack(u.track),
+      createdAt: u.createdAt,
+      lastSeenAt: u.lastSeenAt,
+    }))
+  );
+});
+
+const createUserSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  name: z.string().min(1).max(100),
+  role: z.enum(['student', 'teacher', 'admin']),
+  track: z.enum(['frontend', 'robotics', 'office']).optional(),
+});
+
+usersRouter.post('/', requireRole(Role.ADMIN), async (req, res) => {
+  const parsed = createUserSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Noto'g'ri ma'lumot kiritildi." });
+  }
+  const { email, password, name, role, track } = parsed.data;
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    return res.status(409).json({ error: 'Bu email bilan hisob allaqachon mavjud.' });
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  const user = await prisma.user.create({
+    data: {
+      email,
+      passwordHash,
+      name,
+      role: role.toUpperCase() as Role,
+      track: track ? toPrismaTrack(track) : null,
+      title: role === 'student' ? 'New Recruit' : undefined,
+      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(email)}`,
+    },
+  });
+  res.status(201).json(serializeUser(user));
 });
 
 const updateSchema = z.object({
@@ -85,4 +144,38 @@ usersRouter.post('/me/spend', async (req, res) => {
   }
   const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id } });
   res.json(serializeUser(user));
+});
+
+// NOTE: these two must stay registered after every '/me*' route above —
+// Express matches '/:id' against the literal segment 'me' too, so an
+// earlier registration would hijack all /me requests for non-admins.
+const updateUserSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  role: z.enum(['student', 'teacher', 'admin']).optional(),
+  track: z.enum(['frontend', 'robotics', 'office']).nullable().optional(),
+});
+
+usersRouter.patch('/:id', requireRole(Role.ADMIN), async (req, res) => {
+  const parsed = updateUserSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Noto'g'ri ma'lumot kiritildi." });
+  }
+  const { role, track, name } = parsed.data;
+  const user = await prisma.user.update({
+    where: { id: req.params.id },
+    data: {
+      name,
+      role: role ? (role.toUpperCase() as Role) : undefined,
+      track: track === undefined ? undefined : track ? toPrismaTrack(track) : null,
+    },
+  });
+  res.json(serializeUser(user));
+});
+
+usersRouter.delete('/:id', requireRole(Role.ADMIN), async (req, res) => {
+  if (req.params.id === req.user!.id) {
+    return res.status(400).json({ error: "O'zingizni o'chira olmaysiz." });
+  }
+  await prisma.user.delete({ where: { id: req.params.id } });
+  res.status(204).send();
 });
