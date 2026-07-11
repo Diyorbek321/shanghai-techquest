@@ -9,15 +9,20 @@ export const attendanceRouter = Router();
 attendanceRouter.use(requireAuth);
 
 attendanceRouter.get('/', async (req, res) => {
-  const where =
-    req.user!.role === Role.STUDENT
-      ? { userId: req.user!.id }
-      : typeof req.query.userId === 'string'
-        ? { userId: req.query.userId }
-        : undefined;
+  if (req.user!.role === Role.STUDENT) {
+    const records = await prisma.attendance.findMany({
+      where: { userId: req.user!.id },
+      orderBy: { date: 'desc' },
+    });
+    return res.json(records);
+  }
+
+  const classId = typeof req.query.classId === 'string' ? req.query.classId : undefined;
+  const date = typeof req.query.date === 'string' ? new Date(req.query.date) : undefined;
+  const userId = typeof req.query.userId === 'string' ? req.query.userId : undefined;
 
   const records = await prisma.attendance.findMany({
-    where,
+    where: { classId, date, userId },
     orderBy: { date: 'desc' },
   });
   res.json(records);

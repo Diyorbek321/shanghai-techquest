@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   MapPin,
@@ -6,16 +6,21 @@ import {
   XCircle,
   BarChart,
   CalendarDays,
-  Info
+  Info,
+  Clock3,
+  FileQuestion
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { formatDate } from '../lib/utils';
+import { Track, User } from '../types';
+
+type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED';
 
 interface AttendanceRecord {
   id: string;
   date: string;
-  status: 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED';
+  status: AttendanceStatus;
 }
 
 const STATUS_STYLE: Record<AttendanceRecord['status'], string> = {
@@ -32,7 +37,14 @@ const STATUS_LABEL: Record<AttendanceRecord['status'], string> = {
   EXCUSED: 'Uzrli',
 };
 
-export function Attendance() {
+export function Attendance({ user }: { user: User }) {
+  if (user.role === 'teacher' || user.role === 'admin') {
+    return <TeacherAttendancePanel />;
+  }
+  return <StudentAttendanceView />;
+}
+
+function StudentAttendanceView() {
   const { data: logs = [], isLoading } = useQuery({
     queryKey: ['attendance'],
     queryFn: () => api.get<AttendanceRecord[]>('/attendance'),
@@ -154,6 +166,138 @@ function PresenceStat({ label, value, color, icon }: { label: string; value: num
           animate={{ width: `${value}%` }}
           className={`h-full ${color}`}
         />
+      </div>
+    </div>
+  );
+}
+
+interface ClassOption {
+  id: string;
+  title: string;
+  track: Track;
+}
+
+interface ClassStudent {
+  id: string;
+  name: string;
+  avatar: string | null;
+}
+
+const STATUS_OPTIONS: { value: AttendanceStatus; label: string; icon: React.ReactNode; activeClass: string }[] = [
+  { value: 'PRESENT', label: 'Bor', icon: <CheckCircle2 size={14} />, activeClass: 'bg-brand-green/20 text-brand-green border-brand-green/50' },
+  { value: 'LATE', label: 'Kechikdi', icon: <Clock3 size={14} />, activeClass: 'bg-brand-orange/20 text-brand-orange border-brand-orange/50' },
+  { value: 'ABSENT', label: "Yo'q", icon: <XCircle size={14} />, activeClass: 'bg-brand-red/20 text-brand-red border-brand-red/50' },
+  { value: 'EXCUSED', label: 'Uzrli', icon: <FileQuestion size={14} />, activeClass: 'bg-gray-500/20 text-gray-300 border-gray-500/50' },
+];
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function TeacherAttendancePanel() {
+  const queryClient = useQueryClient();
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  const [date, setDate] = useState(todayIso());
+
+  const { data: classes = [] } = useQuery({
+    queryKey: ['classes'],
+    queryFn: () => api.get<ClassOption[]>('/classes'),
+  });
+
+  useEffect(() => {
+    if (!selectedClassId && classes.length > 0) {
+      setSelectedClassId(classes[0].id);
+    }
+  }, [classes, selectedClassId]);
+
+  const { data: students = [], isLoading } = useQuery({
+    queryKey: ['classes', selectedClassId, 'students'],
+    queryFn: () => api.get<ClassStudent[]>(`/classes/${selectedClassId}/students`),
+    enabled: !!selectedClassId,
+  });
+
+  const markMutation = useMutation({
+    mutationFn: ({ userId, status }: { userId: string; status: AttendanceStatus }) =>
+      api.post('/attendance', { userId, classId: selectedClassId, date, status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance', selectedClassId, date] });
+    },
+  });
+
+  const { data: existing = [] } = useQuery({
+    queryKey: ['attendance', selectedClassId, date],
+    queryFn: () => api.get<{ userId: string; status: AttendanceStatus }[]>(`/attendance?classId=${selectedClassId}&date=${date}`),
+    enabled: !!selectedClassId,
+  });
+  const statusByUser = new Map(existing.map((r) => [r.userId, r.status]));
+
+  return (
+    <div className="max-w-5xl mx-auto py-6 space-y-6">
+      <div className="glass-panel p-6 border border-white/10 bg-black/40 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-brand-cyan/10 rounded-2xl border border-brand-cyan/20">
+            <CalendarDays size={28} className="text-brand-cyan" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-white italic tracking-tighter uppercase">Davomat belgilash</h1>
+            <p className="text-xs text-gray-500 font-mono">Sinf va sanani tanlab, har bir o'quvchi uchun holatni belgilang</p>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <select
+            value={selectedClassId ?? ''}
+            onChange={(e) => setSelectedClassId(e.target.value)}
+            className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-brand-cyan"
+          >
+            {classes.map((c) => (
+              <option key={c.id} value={c.id} className="bg-brand-bg">{c.title}</option>
+            ))}
+          </select>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-brand-cyan"
+          />
+        </div>
+      </div>
+
+      <div className="glass-panel border border-white/10 bg-black/40 overflow-hidden">
+        {isLoading && <p className="text-sm text-gray-500 p-6">O'quvchilar yuklanmoqda...</p>}
+        {!isLoading && students.length === 0 && (
+          <p className="text-sm text-gray-500 p-6">Bu sinfda hali o'quvchi yo'q.</p>
+        )}
+        <div className="divide-y divide-white/5">
+          {students.map((student) => {
+            const currentStatus = statusByUser.get(student.id);
+            return (
+              <div key={student.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={student.avatar ?? undefined}
+                    alt=""
+                    className="w-9 h-9 rounded-full border border-white/10 bg-white/5"
+                  />
+                  <p className="text-sm font-bold text-white">{student.name}</p>
+                </div>
+                <div className="flex gap-2">
+                  {STATUS_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => markMutation.mutate({ userId: student.id, status: opt.value })}
+                      disabled={markMutation.isPending}
+                      className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-50 ${
+                        currentStatus === opt.value ? opt.activeClass : 'bg-white/5 text-gray-400 border-white/10 hover:text-white'
+                      }`}
+                    >
+                      {opt.icon} {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

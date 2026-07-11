@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Users,
   BookOpen,
@@ -7,11 +8,14 @@ import {
   AlertCircle,
   Mail,
   GraduationCap,
-  LayoutDashboard
+  LayoutDashboard,
+  Send,
+  Star,
+  CalendarCheck
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import { formatRelativeTime } from '../lib/utils';
+import { formatRelativeTime, formatDate } from '../lib/utils';
 import { Track } from '../types';
 
 interface ClassGroup {
@@ -35,6 +39,7 @@ export function TeacherPortal() {
   const [activeTab, setActiveTab] = useState<'overview' | 'students'>('overview');
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [detailStudent, setDetailStudent] = useState<StudentRow | null>(null);
 
   const { data: classes = [] } = useQuery({
     queryKey: ['classes'],
@@ -116,7 +121,11 @@ export function TeacherPortal() {
             {studentsLoading && <p className="text-sm text-gray-500">Yuklanmoqda...</p>}
             <div className="space-y-4">
               {students.slice(0, 5).map((student) => (
-                <div key={student.id} className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-xl group hover:border-white/10 transition-all">
+                <button
+                  key={student.id}
+                  onClick={() => setDetailStudent(student)}
+                  className="w-full flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-xl group hover:border-white/10 transition-all text-left"
+                >
                   <div className="flex items-center gap-4">
                     <img src={student.avatar ?? undefined} alt="" className="w-10 h-10 rounded-full border border-white/10" />
                     <div>
@@ -127,7 +136,7 @@ export function TeacherPortal() {
                     </div>
                   </div>
                   <ChevronRight size={20} className="text-gray-500" />
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -161,7 +170,11 @@ export function TeacherPortal() {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {visibleStudents.map((student) => (
-                  <tr key={student.id} className="hover:bg-white/5 transition-colors group">
+                  <tr
+                    key={student.id}
+                    onClick={() => setDetailStudent(student)}
+                    className="hover:bg-white/5 transition-colors group cursor-pointer"
+                  >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <img src={student.avatar ?? undefined} alt="" className="w-8 h-8 rounded-full border border-white/10" />
@@ -180,7 +193,11 @@ export function TeacherPortal() {
                       {student.lastSubmittedAt ? formatRelativeTime(student.lastSubmittedAt) : '—'}
                     </td>
                     <td className="px-6 py-4">
-                      <button className="p-2 bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors" title="Xabar yuborish">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDetailStudent(student); }}
+                        className="p-2 bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors"
+                        title="Xabar yuborish"
+                      >
                         <Mail size={16} />
                       </button>
                     </td>
@@ -191,7 +208,131 @@ export function TeacherPortal() {
           </div>
         </div>
       )}
+
+      <StudentDetailModal student={detailStudent} onClose={() => setDetailStudent(null)} />
     </div>
+  );
+}
+
+interface GradeRow {
+  id: string;
+  subject: string;
+  score: number;
+  maxScore: number;
+  gradedAt: string;
+}
+
+interface AttendanceRow {
+  id: string;
+  date: string;
+  status: 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED';
+}
+
+const ATTENDANCE_LABEL: Record<AttendanceRow['status'], string> = {
+  PRESENT: 'Bor',
+  LATE: 'Kechikdi',
+  ABSENT: "Yo'q",
+  EXCUSED: 'Uzrli',
+};
+
+function StudentDetailModal({ student, onClose }: { student: StudentRow | null; onClose: () => void }) {
+  const [message, setMessage] = useState('');
+
+  const { data: grades = [] } = useQuery({
+    queryKey: ['grades', student?.id],
+    queryFn: () => api.get<GradeRow[]>(`/grades?userId=${student!.id}`),
+    enabled: !!student,
+  });
+
+  const { data: attendance = [] } = useQuery({
+    queryKey: ['attendance', 'user', student?.id],
+    queryFn: () => api.get<AttendanceRow[]>(`/attendance?userId=${student!.id}`),
+    enabled: !!student,
+  });
+
+  const sendMessage = useMutation({
+    mutationFn: () => api.post('/notifications', { userId: student!.id, body: message }),
+    onSuccess: () => setMessage(''),
+  });
+
+  return (
+    <AnimatePresence>
+      {student && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+          />
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            className="relative w-full max-w-lg glass-panel p-8 border border-white/20 shadow-[0_0_50px_rgba(0,0,0,0.5)] max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-3">
+                <img src={student.avatar ?? undefined} alt="" className="w-10 h-10 rounded-full border border-white/10" />
+                <div>
+                  <h2 className="text-lg font-heading font-bold text-white">{student.name}</h2>
+                  <p className="text-xs text-gray-500">Daraja {student.level}</p>
+                </div>
+              </div>
+              <button onClick={onClose} className="text-gray-500 hover:text-white p-2">&times;</button>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                <Star size={12} /> Baholar
+              </h3>
+              {grades.length === 0 && <p className="text-xs text-gray-500">Hali baho qo'yilmagan.</p>}
+              {grades.slice(0, 5).map((g) => (
+                <div key={g.id} className="flex justify-between items-center text-xs bg-white/5 rounded-lg px-3 py-2">
+                  <span className="text-gray-300">{g.subject}</span>
+                  <span className="font-mono font-bold text-brand-green">{g.score}/{g.maxScore}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                <CalendarCheck size={12} /> Davomat
+              </h3>
+              {attendance.length === 0 && <p className="text-xs text-gray-500">Hali davomat qayd etilmagan.</p>}
+              {attendance.slice(0, 5).map((a) => (
+                <div key={a.id} className="flex justify-between items-center text-xs bg-white/5 rounded-lg px-3 py-2">
+                  <span className="text-gray-300">{formatDate(a.date)}</span>
+                  <span className="font-mono font-bold text-gray-300">{ATTENDANCE_LABEL[a.status]}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-2 pt-4 border-t border-white/10">
+              <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                <Mail size={12} /> Xabar yuborish
+              </h3>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={3}
+                placeholder="Xabar matnini kiriting..."
+                className="w-full bg-black/30 border border-brand-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-purple resize-none"
+              />
+              <button
+                onClick={() => sendMessage.mutate()}
+                disabled={sendMessage.isPending || !message.trim()}
+                className="flex items-center gap-2 bg-brand-purple/20 hover:bg-brand-purple/30 text-brand-purple border border-brand-purple/50 font-medium px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50"
+              >
+                <Send size={14} /> {sendMessage.isPending ? 'Yuborilmoqda...' : 'Yuborish'}
+              </button>
+              {sendMessage.isSuccess && <p className="text-xs text-brand-green">Xabar yuborildi.</p>}
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 }
 

@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Github, ExternalLink, CheckCircle2, Clock, FileText } from 'lucide-react';
+import { ArrowLeft, Github, ExternalLink, CheckCircle2, Clock, FileText, Star } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { formatRelativeTime } from '../lib/utils';
 
 type SubmissionStatus = 'PENDING' | 'SUBMITTED' | 'GRADED' | 'LATE';
@@ -62,6 +62,14 @@ export function AssignmentSubmissions({ assignmentId, onBack }: AssignmentSubmis
   const updateStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: SubmissionStatus }) =>
       api.patch(`/submissions/${id}`, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assignments', assignmentId, 'submissions'] });
+    },
+  });
+
+  const gradeSubmission = useMutation({
+    mutationFn: ({ id, score }: { id: string; score: number }) =>
+      api.patch(`/submissions/${id}`, { status: 'GRADED', score, maxScore: 100 }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assignments', assignmentId, 'submissions'] });
     },
@@ -164,23 +172,82 @@ export function AssignmentSubmissions({ assignmentId, onBack }: AssignmentSubmis
               <p className="text-gray-400 text-xs whitespace-pre-line border-t border-white/5 pt-3">{s.content}</p>
             )}
 
-            <div className="flex items-center gap-2 pt-2">
-              <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Holatni o'zgartirish:</label>
-              <select
-                value={s.status}
-                onChange={(e) => updateStatus.mutate({ id: s.id, status: e.target.value as SubmissionStatus })}
-                disabled={updateStatus.isPending}
-                className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-brand-purple"
-              >
-                {(Object.keys(STATUS_LABELS) as SubmissionStatus[]).map((status) => (
-                  <option key={status} value={status} className="bg-brand-bg">{STATUS_LABELS[status]}</option>
-                ))}
-              </select>
-              {s.status === 'GRADED' && <CheckCircle2 size={16} className="text-brand-green" />}
+            <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-white/5">
+              <div className="flex items-center gap-2">
+                <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Holat:</label>
+                <select
+                  value={s.status}
+                  onChange={(e) => updateStatus.mutate({ id: s.id, status: e.target.value as SubmissionStatus })}
+                  disabled={updateStatus.isPending}
+                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-brand-purple"
+                >
+                  {(Object.keys(STATUS_LABELS) as SubmissionStatus[])
+                    .filter((status) => status !== 'GRADED')
+                    .map((status) => (
+                      <option key={status} value={status} className="bg-brand-bg">{STATUS_LABELS[status]}</option>
+                    ))}
+                </select>
+                {s.status === 'GRADED' && <CheckCircle2 size={16} className="text-brand-green" />}
+              </div>
+
+              <GradeControl
+                submissionId={s.id}
+                onGrade={(score) => gradeSubmission.mutate({ id: s.id, score })}
+                isPending={gradeSubmission.isPending}
+                error={gradeSubmission.isError && gradeSubmission.variables?.id === s.id ? gradeSubmission.error : null}
+              />
             </div>
           </motion.div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function GradeControl({
+  submissionId,
+  onGrade,
+  isPending,
+  error,
+}: {
+  submissionId: string;
+  onGrade: (score: number) => void;
+  isPending: boolean;
+  error: unknown;
+}) {
+  const [score, setScore] = useState('');
+
+  const handleSubmit = () => {
+    const value = Number(score);
+    if (Number.isFinite(value) && value >= 0) {
+      onGrade(value);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <label htmlFor={`score-${submissionId}`} className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">
+        Ball (100 dan):
+      </label>
+      <input
+        id={`score-${submissionId}`}
+        type="number"
+        min={0}
+        max={100}
+        value={score}
+        onChange={(e) => setScore(e.target.value)}
+        className="w-20 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-brand-green"
+      />
+      <button
+        onClick={handleSubmit}
+        disabled={isPending || score === ''}
+        className="flex items-center gap-1 text-xs bg-brand-green/10 hover:bg-brand-green/20 text-brand-green border border-brand-green/30 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+      >
+        <Star size={12} /> Baholash
+      </button>
+      {Boolean(error) && (
+        <span className="text-[10px] text-brand-red">{error instanceof ApiError ? error.message : 'Xatolik.'}</span>
+      )}
     </div>
   );
 }

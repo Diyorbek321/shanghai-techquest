@@ -120,7 +120,7 @@ export default function App({ user }: { user: User }) {
       case 'robotics_lab':
         return <RoboticsLab />;
       case 'attendance':
-        return <Attendance />;
+        return <Attendance user={mockUser} />;
       case 'homework':
         return <Homework />;
       case 'notifications':
