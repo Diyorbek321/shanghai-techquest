@@ -4,10 +4,13 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: techquest
-      POSTGRES_PASSWORD: techquest
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-techquest}
       POSTGRES_DB: techquest
+    # Bound to loopback only — reachable from the app container via the
+    # compose network, not from the public internet. Put a reverse proxy
+    # in front for a real deployment (see app's COOKIE_SECURE note below).
     ports:
-      - '5435:5432'
+      - '127.0.0.1:5435:5432'
     volumes:
       - techquest_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -27,7 +30,7 @@ services:
       # Override values from .env that must point at the Docker network
       # hostname/internal port rather than the host-mapped ones.
       NODE_ENV: production
-      DATABASE_URL: postgresql://techquest:techquest@postgres:5432/techquest
+      DATABASE_URL: postgresql://techquest:${POSTGRES_PASSWORD:-techquest}@postgres:5432/techquest
       # src/server/env.ts refuses to boot when NODE_ENV=production unless
       # COOKIE_SECURE=true (verified by running the built image). Note this
       # means the login cookie is marked Secure, so it will only be sent by
@@ -36,7 +39,7 @@ services:
       # will not persist the login cookie.
       COOKIE_SECURE: 'true'
     ports:
-      - '3000:3000'
+      - '127.0.0.1:3000:3000'
     volumes:
       - techquest_uploads:/app/uploads
     depends_on:
