@@ -1,42 +1,61 @@
-import React, { useState } from 'react';
-import { motion } from 'motion/react';
-import { 
-  Users, 
-  BookOpen, 
-  BarChart3, 
-  Settings, 
-  Search, 
-  Plus, 
-  ChevronRight, 
-  CheckCircle2, 
-  Clock, 
+import React, { useEffect, useState } from 'react';
+import {
+  Users,
+  BookOpen,
+  Search,
+  ChevronRight,
   AlertCircle,
-  MoreVertical,
   Mail,
   GraduationCap,
-  Calendar,
   LayoutDashboard
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../lib/api';
+import { formatRelativeTime } from '../lib/utils';
+import { Track } from '../types';
 
-interface Student {
+interface ClassGroup {
+  id: string;
+  title: string;
+  track: Track;
+  studentCount: number;
+}
+
+interface StudentRow {
   id: string;
   name: string;
-  avatar: string;
-  lastActive: string;
-  progress: number;
-  grade: string;
-  status: 'online' | 'offline' | 'away';
+  avatar: string | null;
+  xp: number;
+  level: number;
+  averageScore: number | null;
+  lastSubmittedAt: string | null;
 }
 
 export function TeacherPortal() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'curriculum' | 'analytics'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'students'>('overview');
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
-  const students: Student[] = [
-    { id: '1', name: 'Alex Chen', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex', lastActive: '2m ago', progress: 85, grade: 'A', status: 'online' },
-    { id: '2', name: 'Sarah Miller', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah', lastActive: '1h ago', progress: 62, grade: 'B', status: 'away' },
-    { id: '3', name: 'James Wilson', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=James', lastActive: '1d ago', progress: 45, grade: 'C', status: 'offline' },
-    { id: '4', name: 'Emily Davis', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily', lastActive: '5m ago', progress: 92, grade: 'A+', status: 'online' },
-  ];
+  const { data: classes = [] } = useQuery({
+    queryKey: ['classes'],
+    queryFn: () => api.get<ClassGroup[]>('/classes'),
+  });
+
+  useEffect(() => {
+    if (!selectedClassId && classes.length > 0) {
+      setSelectedClassId(classes[0].id);
+    }
+  }, [classes, selectedClassId]);
+
+  const { data: students = [], isLoading: studentsLoading } = useQuery({
+    queryKey: ['classes', selectedClassId, 'students'],
+    queryFn: () => api.get<StudentRow[]>(`/classes/${selectedClassId}/students`),
+    enabled: !!selectedClassId,
+  });
+
+  const visibleStudents = students.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()));
+  const gradedScores = students.map((s) => s.averageScore).filter((s): s is number => s !== null);
+  const averageGrade = gradedScores.length ? Math.round(gradedScores.reduce((a, b) => a + b, 0) / gradedScores.length) : null;
 
   return (
     <div className="max-w-7xl mx-auto py-6 space-y-6">
@@ -47,34 +66,35 @@ export function TeacherPortal() {
             <GraduationCap size={32} className="text-brand-purple" />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-white italic tracking-tighter uppercase">Teacher Portal</h1>
-            <p className="text-xs text-gray-500 font-mono">Hybrid Education Management OS v1.0</p>
+            <h1 className="text-2xl font-black text-white italic tracking-tighter uppercase">O'qituvchi paneli</h1>
+            <p className="text-xs text-gray-500 font-mono">Gibrid ta'lim boshqaruv tizimi</p>
           </div>
         </div>
-        <div className="flex gap-3">
-          <button className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-gray-300 hover:bg-white/10 transition-all flex items-center gap-2">
-            <Calendar size={16} /> Schedule Session
-          </button>
-          <button className="px-6 py-2 bg-brand-purple text-white font-black rounded-xl hover:bg-brand-purple/80 transition-all shadow-[0_0_20px_rgba(176,38,255,0.4)] uppercase text-xs flex items-center gap-2">
-            <Plus size={16} /> New Module
-          </button>
-        </div>
+        {classes.length > 0 && (
+          <select
+            value={selectedClassId ?? ''}
+            onChange={(e) => setSelectedClassId(e.target.value)}
+            className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-brand-purple"
+          >
+            {classes.map((c) => (
+              <option key={c.id} value={c.id} className="bg-brand-bg">{c.title}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Tabs */}
       <div className="flex gap-2 p-1 bg-white/5 border border-white/10 rounded-2xl w-fit">
         {[
-          { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-          { id: 'students', label: 'Students', icon: Users },
-          { id: 'curriculum', label: 'Curriculum', icon: BookOpen },
-          { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+          { id: 'overview', label: 'Umumiy ko\'rinish', icon: LayoutDashboard },
+          { id: 'students', label: 'O\'quvchilar', icon: Users },
         ].map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() => setActiveTab(tab.id as 'overview' | 'students')}
             className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
-              activeTab === tab.id 
-                ? 'bg-brand-purple text-white shadow-lg shadow-brand-purple/20' 
+              activeTab === tab.id
+                ? 'bg-brand-purple text-white shadow-lg shadow-brand-purple/20'
                 : 'text-gray-400 hover:text-white hover:bg-white/5'
             }`}
           >
@@ -84,52 +104,31 @@ export function TeacherPortal() {
       </div>
 
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard title="Active Students" value="24" subValue="+3 from yesterday" icon={Users} color="text-brand-cyan" />
-          <StatCard title="Average Grade" value="84%" subValue="Class Average" icon={GraduationCap} color="text-brand-purple" />
-          <StatCard title="Modules Completed" value="12" subValue="Across all paths" icon={CheckCircle2} color="text-brand-green" />
-          <StatCard title="Pending Submissions" value="8" subValue="Needs Grading" icon={AlertCircle} color="text-brand-orange" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <StatCard title="Ro'yxatdagi o'quvchilar" value={String(students.length)} icon={Users} color="text-brand-cyan" />
+          <StatCard title="O'rtacha baho" value={averageGrade !== null ? `${averageGrade}%` : '—'} icon={GraduationCap} color="text-brand-purple" />
+          <StatCard title="Faol sinflar" value={String(classes.length)} icon={BookOpen} color="text-brand-orange" />
 
-          {/* Recent Activity */}
-          <div className="md:col-span-2 lg:col-span-3 glass-panel p-6 border border-white/10 rounded-2xl bg-black/40">
+          <div className="md:col-span-3 glass-panel p-6 border border-white/10 rounded-2xl bg-black/40">
             <h3 className="text-sm font-bold text-white uppercase tracking-widest mb-6 flex items-center gap-2">
-              <Clock size={16} className="text-brand-purple" /> Recent Student Activity
+              <AlertCircle size={16} className="text-brand-purple" /> So'nggi o'quvchilar faolligi
             </h3>
+            {studentsLoading && <p className="text-sm text-gray-500">Yuklanmoqda...</p>}
             <div className="space-y-4">
-              {students.slice(0, 3).map((student) => (
+              {students.slice(0, 5).map((student) => (
                 <div key={student.id} className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-xl group hover:border-white/10 transition-all">
                   <div className="flex items-center gap-4">
-                    <div className="relative">
-                      <img src={student.avatar} alt="" className="w-10 h-10 rounded-full border border-white/10" />
-                      <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-black ${
-                        student.status === 'online' ? 'bg-brand-green' : student.status === 'away' ? 'bg-brand-orange' : 'bg-gray-600'
-                      }`} />
-                    </div>
+                    <img src={student.avatar ?? undefined} alt="" className="w-10 h-10 rounded-full border border-white/10" />
                     <div>
                       <p className="text-sm font-bold text-white">{student.name}</p>
-                      <p className="text-[10px] text-gray-500 font-mono">Submitted "Intro to Robotics Lab" &bull; {student.lastActive}</p>
+                      <p className="text-[10px] text-gray-500 font-mono">
+                        {student.lastSubmittedAt ? `Oxirgi topshiriq: ${formatRelativeTime(student.lastSubmittedAt)}` : 'Hali topshiriqlar yo\'q'}
+                      </p>
                     </div>
                   </div>
-                  <button className="p-2 text-gray-500 hover:text-white transition-colors">
-                    <ChevronRight size={20} />
-                  </button>
+                  <ChevronRight size={20} className="text-gray-500" />
                 </div>
               ))}
-            </div>
-            <button className="w-full mt-6 py-2 text-xs font-bold text-gray-500 hover:text-white uppercase tracking-widest transition-colors">
-              View All Activity
-            </button>
-          </div>
-
-          {/* Classroom Health */}
-          <div className="glass-panel p-6 border border-white/10 rounded-2xl bg-black/40">
-            <h3 className="text-sm font-bold text-white uppercase tracking-widest mb-6 flex items-center gap-2">
-              <BarChart3 size={16} className="text-brand-cyan" /> Performance Trends
-            </h3>
-            <div className="space-y-6">
-              <TrendItem label="Assignment Completion" value={85} color="bg-brand-cyan" />
-              <TrendItem label="Code Lab Participation" value={72} color="bg-brand-purple" />
-              <TrendItem label="Quiz Performance" value={64} color="bg-brand-orange" />
             </div>
           </div>
         </div>
@@ -140,70 +139,50 @@ export function TeacherPortal() {
           <div className="p-6 border-b border-white/10 flex flex-col md:flex-row justify-between gap-4">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-              <input 
-                type="text" 
-                placeholder="Search students..." 
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="O'quvchilarni qidirish..."
                 className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm text-white focus:outline-none focus:border-brand-purple transition-all"
               />
-            </div>
-            <div className="flex gap-2">
-              <button className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-gray-300">Filter</button>
-              <button className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-gray-300">Export CSV</button>
             </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-white/5 text-[10px] text-gray-500 uppercase tracking-[0.2em]">
-                  <th className="px-6 py-4 font-bold">Student</th>
-                  <th className="px-6 py-4 font-bold">Progress</th>
-                  <th className="px-6 py-4 font-bold">Grade</th>
-                  <th className="px-6 py-4 font-bold">Last Active</th>
-                  <th className="px-6 py-4 font-bold">Actions</th>
+                  <th className="px-6 py-4 font-bold">O'quvchi</th>
+                  <th className="px-6 py-4 font-bold">Daraja</th>
+                  <th className="px-6 py-4 font-bold">O'rtacha baho</th>
+                  <th className="px-6 py-4 font-bold">Oxirgi topshiriq</th>
+                  <th className="px-6 py-4 font-bold">Amallar</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {students.map((student) => (
+                {visibleStudents.map((student) => (
                   <tr key={student.id} className="hover:bg-white/5 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <img src={student.avatar} alt="" className="w-8 h-8 rounded-full border border-white/10" />
-                        <div>
-                          <p className="text-sm font-bold text-white">{student.name}</p>
-                          <p className="text-[10px] text-gray-500">ID: {student.id}0042</p>
-                        </div>
+                        <img src={student.avatar ?? undefined} alt="" className="w-8 h-8 rounded-full border border-white/10" />
+                        <p className="text-sm font-bold text-white">{student.name}</p>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="w-32">
-                        <div className="flex justify-between text-[10px] text-gray-500 mb-1">
-                          <span>{student.progress}%</span>
-                        </div>
-                        <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                          <div className="h-full bg-brand-purple" style={{ width: `${student.progress}%` }} />
-                        </div>
-                      </div>
-                    </td>
+                    <td className="px-6 py-4 text-xs text-gray-300 font-mono">Daraja {student.level}</td>
                     <td className="px-6 py-4">
                       <span className={`text-xs font-black font-mono ${
-                        student.grade.startsWith('A') ? 'text-brand-green' : student.grade.startsWith('B') ? 'text-brand-cyan' : 'text-brand-orange'
+                        student.averageScore === null ? 'text-gray-500' : student.averageScore >= 90 ? 'text-brand-green' : student.averageScore >= 75 ? 'text-brand-cyan' : 'text-brand-orange'
                       }`}>
-                        {student.grade}
+                        {student.averageScore !== null ? `${Math.round(student.averageScore)}%` : 'Mavjud emas'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-xs text-gray-500 font-mono">{student.lastActive}</td>
+                    <td className="px-6 py-4 text-xs text-gray-500 font-mono">
+                      {student.lastSubmittedAt ? formatRelativeTime(student.lastSubmittedAt) : '—'}
+                    </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="p-2 bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors" title="Message">
-                          <Mail size={16} />
-                        </button>
-                        <button className="p-2 bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors" title="Settings">
-                          <Settings size={16} />
-                        </button>
-                        <button className="p-2 bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors">
-                          <MoreVertical size={16} />
-                        </button>
-                      </div>
+                      <button className="p-2 bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors" title="Xabar yuborish">
+                        <Mail size={16} />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -216,7 +195,7 @@ export function TeacherPortal() {
   );
 }
 
-function StatCard({ title, value, subValue, icon: Icon, color }: any) {
+function StatCard({ title, value, icon: Icon, color }: { title: string; value: string; icon: React.ComponentType<{ size?: number }>; color: string }) {
   return (
     <div className="glass-panel p-6 border border-white/10 rounded-2xl bg-black/40">
       <div className="flex justify-between items-start mb-4">
@@ -225,28 +204,7 @@ function StatCard({ title, value, subValue, icon: Icon, color }: any) {
         </div>
       </div>
       <h3 className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">{title}</h3>
-      <div className="flex items-baseline gap-2">
-        <p className="text-3xl font-black text-white italic tracking-tighter">{value}</p>
-        <span className="text-[10px] text-brand-green font-bold">{subValue}</span>
-      </div>
-    </div>
-  );
-}
-
-function TrendItem({ label, value, color }: any) {
-  return (
-    <div className="space-y-2">
-      <div className="flex justify-between items-center">
-        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">{label}</span>
-        <span className="text-xs font-mono text-white">{value}%</span>
-      </div>
-      <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-        <motion.div 
-          initial={{ width: 0 }}
-          animate={{ width: `${value}%` }}
-          className={`h-full ${color}`}
-        />
-      </div>
+      <p className="text-3xl font-black text-white italic tracking-tighter">{value}</p>
     </div>
   );
 }

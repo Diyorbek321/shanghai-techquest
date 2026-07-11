@@ -22,65 +22,289 @@ import {
   Clock,
   QrCode,
   Hand,
-  Info
+  Info,
+  GitBranch,
+  Layers,
+  TestTube,
+  Rocket,
+  Palette,
+  FormInput,
+  Gauge,
+  Boxes,
+  Cpu,
+  Flame,
+  CheckCircle2,
+  Paperclip
 } from 'lucide-react';
 import { User, ViewType } from '../types';
 import { SkillTree } from '../components/SkillTree';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api, ApiError } from '../lib/api';
+
+interface ModuleProgressRow {
+  moduleKey: string;
+  progress: number;
+  unlocked: boolean;
+}
+
+interface DailyExerciseData {
+  id: string;
+  prompt: string;
+  estMinutes: number;
+  xpReward: number;
+  date: string;
+  completed: boolean;
+  fileUrl: string | null;
+  fileName: string | null;
+  streak: number;
+}
+
+const MODULE_CATALOG = [
+  {
+    id: 1,
+    moduleKey: 'html-foundations',
+    title: 'HTML Asoslari',
+    desc: 'Sahifaning strukturaviy to\'rini quring.',
+    icon: BookOpen,
+    xp: 150,
+    type: 'lesson',
+    isHybrid: true
+  },
+  {
+    id: 2,
+    moduleKey: 'css-cyber-styling',
+    title: 'CSS Kiber-Uslub',
+    desc: 'Neon estetika va flex tartiblarni joriy eting.',
+    icon: Code,
+    xp: 200,
+    type: 'lesson',
+    isHybrid: true
+  },
+  {
+    id: 3,
+    moduleKey: 'js-logic-gates',
+    title: 'JS Mantiq Darvozalari',
+    desc: 'DOM\'ni buzib kiring va interaktivlikni ulang.',
+    icon: Terminal,
+    xp: 350,
+    type: 'lesson',
+    isHybrid: false
+  },
+  {
+    id: 4,
+    moduleKey: 'boss-responsive-hydra',
+    title: 'BOSS: Moslashuvchan Gidra',
+    desc: '3 ta qurilma o\'lchamida joylashuv xatolarini yengib chiqing.',
+    icon: ShieldAlert,
+    xp: 1000,
+    type: 'boss',
+    reward: 'Neon Plazma Shisha (Material)'
+  },
+  {
+    id: 5,
+    moduleKey: 'react-components',
+    title: 'React Komponentlari',
+    desc: 'Modulli UI komponentlarini yarating.',
+    icon: Zap,
+    xp: 400,
+    type: 'lesson'
+  },
+  {
+    id: 6,
+    moduleKey: 'react-hooks-state',
+    title: 'React Hooklari va Holat Boshqaruvi',
+    desc: 'useState, useEffect va maxsus hooklar bilan dinamik interfeys quring.',
+    icon: Cpu,
+    xp: 450,
+    type: 'lesson'
+  },
+  {
+    id: 7,
+    moduleKey: 'typescript-types',
+    title: 'TypeScript Turlar Olami',
+    desc: "Interfeyslar, generiklar va turlarni xavfsizligini o'rganing.",
+    icon: FileText,
+    xp: 400,
+    type: 'lesson'
+  },
+  {
+    id: 8,
+    moduleKey: 'git-github-mastery',
+    title: 'Git va GitHub Ustaligi',
+    desc: "Branch, commit va pull request iш jarayonini egallang.",
+    icon: GitBranch,
+    xp: 300,
+    type: 'lesson',
+    isHybrid: true
+  },
+  {
+    id: 9,
+    moduleKey: 'boss-merge-conflict-beast',
+    title: "BOSS: Merge Conflict Yirtqichi",
+    desc: "Murakkab birlashtirish ziddiyatlarini yengib, tarixni saqlab qoling.",
+    icon: ShieldAlert,
+    xp: 900,
+    type: 'boss',
+    reward: 'Kiber Po\'lat (Material)'
+  },
+  {
+    id: 10,
+    moduleKey: 'api-fetch-requests',
+    title: "API va Fetch So'rovlari",
+    desc: "REST API bilan ishlash, async/await va xatoliklarni boshqarish.",
+    icon: MessageSquare,
+    xp: 400,
+    type: 'lesson'
+  },
+  {
+    id: 11,
+    moduleKey: 'tailwind-utility-first',
+    title: 'Tailwind CSS Utility-First Yondashuv',
+    desc: "Tezkor va moslashuvchan uslublashtirish tizimini o'zlashtiring.",
+    icon: Palette,
+    xp: 300,
+    type: 'lesson'
+  },
+  {
+    id: 12,
+    moduleKey: 'react-router-navigation',
+    title: 'React Router Navigatsiyasi',
+    desc: "Ko'p sahifali ilovalar uchun marshrutlashni sozlang.",
+    icon: MapPin,
+    xp: 350,
+    type: 'lesson'
+  },
+  {
+    id: 13,
+    moduleKey: 'forms-validation',
+    title: 'Formalar va Validatsiya',
+    desc: "Foydalanuvchi kiritmalarini tekshirish va xatoliklarni ko'rsatish.",
+    icon: FormInput,
+    xp: 350,
+    type: 'lesson'
+  },
+  {
+    id: 14,
+    moduleKey: 'boss-form-dragon',
+    title: 'BOSS: Forma Ajdahosi',
+    desc: "Ko'p bosqichli, murakkab validatsiyali formani mag'lub eting.",
+    icon: ShieldAlert,
+    xp: 1100,
+    type: 'boss',
+    reward: 'Golografik Panel (Material)'
+  },
+  {
+    id: 15,
+    moduleKey: 'state-management',
+    title: 'Holatni Global Boshqarish',
+    desc: "Context API va Redux yordamida murakkab holatni boshqaring.",
+    icon: Boxes,
+    xp: 500,
+    type: 'lesson'
+  },
+  {
+    id: 16,
+    moduleKey: 'animations-framer-motion',
+    title: 'Animatsiyalar (Framer Motion)',
+    desc: "Silliq o'tishlar va interaktiv animatsiyalar yarating.",
+    icon: Layers,
+    xp: 350,
+    type: 'lesson'
+  },
+  {
+    id: 17,
+    moduleKey: 'web-performance',
+    title: 'Veb Unumdorlikni Optimallashtirish',
+    desc: "Lazy loading, bundle hajmi va renderlash tezligini yaxshilang.",
+    icon: Gauge,
+    xp: 450,
+    type: 'lesson'
+  },
+  {
+    id: 18,
+    moduleKey: 'testing-jest-rtl',
+    title: 'Testlash (Jest va RTL)',
+    desc: "Komponentlaringiz uchun ishonchli avtomatik testlar yozing.",
+    icon: TestTube,
+    xp: 400,
+    type: 'lesson'
+  },
+  {
+    id: 19,
+    moduleKey: 'boss-deploy-gauntlet',
+    title: "BOSS: Ishga Tushirish Sinovi",
+    desc: "Ilovangizni CI/CD orqali ishlab chiqarish muhitiga xavfsiz chiqaring.",
+    icon: ShieldAlert,
+    xp: 1200,
+    type: 'boss',
+    reward: 'Kvant Halo Ramkasi (Frame)'
+  },
+  {
+    id: 20,
+    moduleKey: 'capstone-portfolio',
+    title: 'Yakuniy Loyiha: Portfolio Sayti',
+    desc: "O'rgangan barcha ko'nikmalaringizni birlashtirib, portfolio sayt yarating.",
+    icon: Rocket,
+    xp: 800,
+    type: 'lesson'
+  },
+];
 
 export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (view: ViewType) => void, onTriggerSuccess: () => void }) {
   const [activeTab, setActiveTab] = React.useState<'path' | 'skills' | 'gallery' | 'roadmap' | 'resources' | 'hybrid'>('path');
 
-  const modules = [
-    { 
-      id: 1, 
-      title: 'HTML Foundations', 
-      desc: 'Construct the structural grid.', 
-      status: 'completed', 
-      icon: BookOpen,
-      xp: 150,
-      type: 'lesson',
-      isHybrid: true
+  const { data: progressRows = [] } = useQuery({
+    queryKey: ['progress', 'modules', 'frontend'],
+    queryFn: () => api.get<ModuleProgressRow[]>('/progress/modules?track=frontend'),
+  });
+
+  const progressByKey = new Map(progressRows.map((r) => [r.moduleKey, r]));
+
+  const modules = MODULE_CATALOG.map((m) => {
+    const row = progressByKey.get(m.moduleKey);
+    const progress = row?.progress ?? 0;
+    const unlocked = row?.unlocked ?? false;
+    const status = progress >= 100 ? 'completed' : unlocked ? 'active' : 'locked';
+    return { ...m, status, progress };
+  });
+
+  const campaignProgress = modules.length
+    ? Math.round(modules.reduce((sum, m) => sum + m.progress, 0) / modules.length)
+    : 0;
+
+  const queryClient = useQueryClient();
+
+  const { data: dailyExercise, isLoading: dailyExerciseLoading } = useQuery({
+    queryKey: ['daily-exercise'],
+    queryFn: async (): Promise<DailyExerciseData | null> => {
+      try {
+        return await api.get<DailyExerciseData>('/daily-exercise');
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) return null;
+        throw err;
+      }
     },
-    { 
-      id: 2, 
-      title: 'CSS Cyber-Styling', 
-      desc: 'Inject neon aesthetics and flex layouts.', 
-      status: 'completed', 
-      icon: Code,
-      xp: 200,
-      type: 'lesson',
-      isHybrid: true
+  });
+
+  const [dailyFile, setDailyFile] = React.useState<File | null>(null);
+
+  const completeDailyExercise = useMutation({
+    mutationFn: async (file: File | null) => {
+      let fileUrl: string | undefined;
+      let fileName: string | undefined;
+      if (file) {
+        const uploaded = await api.upload<{ url: string; fileName: string }>('/uploads', file);
+        fileUrl = uploaded.url;
+        fileName = uploaded.fileName;
+      }
+      return api.post<{ xp: number; streak: number }>('/daily-exercise/complete', { fileUrl, fileName });
     },
-    { 
-      id: 3, 
-      title: 'JS Logic Gates', 
-      desc: 'Hack the DOM and wire up interactivity.', 
-      status: 'active', 
-      icon: Terminal,
-      xp: 350,
-      type: 'lesson',
-      isHybrid: false
+    onSuccess: () => {
+      setDailyFile(null);
+      queryClient.invalidateQueries({ queryKey: ['daily-exercise'] });
+      queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
     },
-    { 
-      id: 4, 
-      title: 'BOSS: The Responsive Hydra', 
-      desc: 'Defeat the layout bugs across 3 device breakpoints.', 
-      status: 'locked', 
-      icon: ShieldAlert,
-      xp: 1000,
-      type: 'boss',
-      reward: 'Neon Plasma Glass (Material)'
-    },
-    { 
-      id: 5, 
-      title: 'React Components', 
-      desc: 'Build modular UI components.', 
-      status: 'locked', 
-      icon: Zap,
-      xp: 400,
-      type: 'lesson'
-    },
-  ];
+  });
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-12">
@@ -93,29 +317,29 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
             onClick={() => onNavigate('classes')}
             className="text-brand-cyan text-sm flex items-center gap-1 hover:underline mb-2"
           >
-            &lt; Back to Classes
+            &lt; Darslarga qaytish
           </button>
           <div className="inline-block px-2 py-1 bg-brand-cyan/20 text-brand-cyan text-xs font-bold uppercase tracking-wider rounded border border-brand-cyan/50 mb-2">
-            Active Campaign
+            Faol Kampaniya
           </div>
           <h1 className="font-heading text-4xl font-bold tracking-tight mb-2 text-white drop-shadow-md">
-            Frontend Web Mastery
+            Frontend Veb Mahorati
           </h1>
           <p className="text-gray-300 max-w-xl">
-            Infiltrate the frontend architecture. Master HTML, CSS, and JavaScript to build immersive digital experiences and defeat the layout bosses.
+            Frontend arxitekturasiga kirib boring. Immersiv raqamli tajribalar yaratish va joylashuv boss'larini yengish uchun HTML, CSS va JavaScript'ni egallang.
           </p>
         </div>
 
         <div className="relative z-10 bg-black/50 p-4 rounded-xl border border-white/10 backdrop-blur-sm flex items-center gap-4 min-w-[200px]">
           <div>
-            <div className="text-xs text-gray-400 uppercase tracking-widest mb-1">Campaign Progress</div>
-            <div className="text-2xl font-bold text-brand-cyan font-mono">40%</div>
+            <div className="text-xs text-gray-400 uppercase tracking-widest mb-1">Kampaniya Jarayoni</div>
+            <div className="text-2xl font-bold text-brand-cyan font-mono">{campaignProgress}%</div>
           </div>
           <div className="flex-1">
             <div className="h-2 w-full bg-gray-800 rounded-full overflow-hidden">
-              <motion.div 
+              <motion.div
                 initial={{ width: 0 }}
-                animate={{ width: '40%' }}
+                animate={{ width: `${campaignProgress}%` }}
                 transition={{ duration: 1, ease: 'easeOut' }}
                 className="h-full bg-gradient-to-r from-brand-cyan to-brand-purple shadow-[0_0_10px_rgba(0,217,255,0.8)]"
               ></motion.div>
@@ -124,15 +348,77 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
         </div>
       </div>
 
+      {/* Daily Exercise */}
+      {!dailyExerciseLoading && dailyExercise && (
+        <div className={`p-6 border flex flex-col md:flex-row items-start md:items-center gap-6 rounded-2xl ${
+          dailyExercise.completed ? 'border-green-500/40 bg-green-500/5' : 'border-brand-cyan/30 bg-black/40'
+        }`}>
+          <div className={`shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center border ${
+            dailyExercise.completed ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-brand-cyan/10 border-brand-cyan/30 text-brand-cyan'
+          }`}>
+            {dailyExercise.completed ? <CheckCircle2 size={26} /> : <Zap size={26} />}
+          </div>
+
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-1">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Kunlik Mashq</p>
+              <span className="flex items-center gap-1 text-[10px] font-bold text-orange-400">
+                <Flame size={12} /> {dailyExercise.streak} kunlik seriya
+              </span>
+            </div>
+            <p className="text-sm text-white leading-relaxed">{dailyExercise.prompt}</p>
+            <div className="flex items-center gap-4 mt-2 text-[11px] text-gray-500">
+              <span className="flex items-center gap-1"><Clock size={12} /> ~{dailyExercise.estMinutes} daqiqa</span>
+              <span className="font-mono text-[#FFD700]">+{dailyExercise.xpReward} XP</span>
+            </div>
+
+            {!dailyExercise.completed && (
+              <label className="mt-3 flex items-center gap-2 w-full max-w-sm bg-black/40 border border-dashed border-white/15 rounded-lg py-2 px-3 text-xs text-gray-400 cursor-pointer hover:border-brand-cyan transition-all">
+                <Paperclip size={14} className="text-gray-500 shrink-0" />
+                <span className="flex-1 truncate">{dailyFile ? dailyFile.name : 'Faylni biriktirish (ixtiyoriy)'}</span>
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg,.zip"
+                  onChange={(e) => setDailyFile(e.target.files?.[0] ?? null)}
+                  className="hidden"
+                />
+              </label>
+            )}
+            {dailyExercise.completed && dailyExercise.fileUrl && (
+              <a
+                href={dailyExercise.fileUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="mt-2 flex items-center gap-2 text-xs text-brand-cyan hover:underline w-fit"
+              >
+                <Paperclip size={12} /> {dailyExercise.fileName ?? 'Yuklangan fayl'}
+              </a>
+            )}
+          </div>
+
+          {dailyExercise.completed ? (
+            <div className="shrink-0 text-xs font-bold text-green-400 uppercase tracking-wider">Bugun bajarildi ✓</div>
+          ) : (
+            <button
+              onClick={() => completeDailyExercise.mutate(dailyFile)}
+              disabled={completeDailyExercise.isPending}
+              className="shrink-0 px-6 py-3 bg-brand-cyan text-black font-black rounded-xl text-xs uppercase tracking-wider hover:bg-brand-cyan/80 disabled:opacity-60 transition-all"
+            >
+              {completeDailyExercise.isPending ? 'Yuborilmoqda...' : 'Bajardim'}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex border-b border-white/10 overflow-x-auto hide-scrollbar">
         {[
-          { id: 'path', label: 'Campaign Path' },
-          { id: 'roadmap', label: 'Interactive Roadmap' },
-          { id: 'hybrid', label: 'Hybrid Live Hub' },
-          { id: 'skills', label: 'Skill Tree' },
-          { id: 'resources', label: 'Lesson Resources' },
-          { id: 'gallery', label: 'Student Gallery' },
+          { id: 'path', label: 'Kampaniya Yo\'li' },
+          { id: 'roadmap', label: 'Interaktiv Yo\'l Xaritasi' },
+          { id: 'hybrid', label: 'Gibrid Jonli Markaz' },
+          { id: 'skills', label: 'Ko\'nikmalar daraxti' },
+          { id: 'resources', label: 'Dars Materiallari' },
+          { id: 'gallery', label: 'Talabalar Galereyasi' },
         ].map(tab => (
           <button
             key={tab.id}
@@ -153,20 +439,20 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
         <div className="py-8 space-y-12">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
             {[
-              { id: 'm1', title: 'Phase 1: Foundations', milestones: [
-                { name: 'HTML Structure', progress: 100, dep: null },
-                { name: 'CSS Selectors', progress: 100, dep: 'HTML Structure' },
-                { name: 'Box Model', progress: 100, dep: 'CSS Selectors' }
+              { id: 'm1', title: '1-bosqich: Asoslar', milestones: [
+                { name: 'HTML Struktura', progress: 100, dep: null },
+                { name: 'CSS Selektorlari', progress: 100, dep: 'HTML Struktura' },
+                { name: 'Bloklar Modeli', progress: 100, dep: 'CSS Selektorlari' }
               ]},
-              { id: 'm2', title: 'Phase 2: Logic & Interactivity', milestones: [
-                { name: 'JS Basics', progress: 40, dep: 'Box Model' },
-                { name: 'DOM Manipulation', progress: 10, dep: 'JS Basics' },
-                { name: 'Event Listeners', progress: 0, dep: 'DOM Manipulation' }
+              { id: 'm2', title: '2-bosqich: Mantiq va Interaktivlik', milestones: [
+                { name: 'JS Asoslari', progress: 40, dep: 'Bloklar Modeli' },
+                { name: 'DOM bilan ishlash', progress: 10, dep: 'JS Asoslari' },
+                { name: 'Hodisa Tinglovchilari', progress: 0, dep: 'DOM bilan ishlash' }
               ]},
-              { id: 'm3', title: 'Phase 3: Frameworks', milestones: [
-                { name: 'React Intro', progress: 0, dep: 'JS Basics' },
-                { name: 'Hooks & State', progress: 0, dep: 'React Intro' },
-                { name: 'Advanced API', progress: 0, dep: 'Hooks & State' }
+              { id: 'm3', title: '3-bosqich: Freymvorklar', milestones: [
+                { name: 'React\'ga Kirish', progress: 0, dep: 'JS Asoslari' },
+                { name: 'Hooklar va State', progress: 0, dep: 'React\'ga Kirish' },
+                { name: 'Ilg\'or API', progress: 0, dep: 'Hooklar va State' }
               ]}
             ].map((phase, i) => (
               <motion.div
@@ -197,7 +483,7 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
                       </div>
                       {ms.dep && (
                         <div className="text-[10px] text-gray-500 mt-1 italic flex items-center gap-1">
-                          <Lock size={10} /> Requires: {ms.dep}
+                          <Lock size={10} /> Talab qilinadi: {ms.dep}
                         </div>
                       )}
                     </div>
@@ -212,14 +498,14 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
               <Zap size={32} />
             </div>
             <div>
-              <h4 className="font-bold text-white mb-1 text-lg">Next Critical Milestone: Master JavaScript Basics</h4>
-              <p className="text-gray-400 text-sm">You are currently 40% through Phase 2. Complete the remaining challenges to unlock the React Framework track.</p>
+              <h4 className="font-bold text-white mb-1 text-lg">Keyingi Muhim Bosqich: JavaScript Asoslarini Egallash</h4>
+              <p className="text-gray-400 text-sm">Siz hozir 2-bosqichning 40% qismini bosib o'tdingiz. React Freymvork yo'nalishini ochish uchun qolgan sinovlarni bajaring.</p>
             </div>
-            <button 
+            <button
               onClick={() => onNavigate('codelab')}
               className="ml-auto px-6 py-2 bg-brand-purple text-white font-bold rounded-lg hover:bg-brand-purple/80 transition-colors shadow-[0_0_15px_rgba(176,38,255,0.4)]"
             >
-              Continue Project
+              Loyihani Davom Ettirish
             </button>
           </div>
         </div>
@@ -282,11 +568,11 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
                       <div className={`text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
                         isBoss ? 'bg-red-500/20 text-red-400' : 'bg-white/10 text-gray-300'
                       }`}>
-                        {isBoss ? 'Boss Battle' : `Module ${mod.id}`}
+                        {isBoss ? 'Boss jangi' : `${mod.id}-modul`}
                       </div>
                       {mod.isHybrid && (
                         <div className="text-[10px] bg-brand-cyan/20 text-brand-cyan px-2 py-0.5 rounded border border-brand-cyan/30 flex items-center gap-1 font-bold">
-                          <Users size={10} /> HYBRID
+                          <Users size={10} /> GIBRID
                         </div>
                       )}
                     </div>
@@ -304,7 +590,7 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
 
                   {isBoss && mod.reward && (
                     <div className="mb-4 text-xs bg-brand-green/10 text-brand-green border border-brand-green/30 p-2 rounded flex items-center gap-2">
-                      <Zap size={14} /> Boss Reward: {mod.reward}
+                      <Zap size={14} /> Boss Mukofoti: {mod.reward}
                     </div>
                   )}
 
@@ -313,22 +599,22 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
                       onClick={() => onNavigate('codelab')}
                       className="w-full bg-brand-purple hover:bg-brand-purple/80 text-white font-bold py-2 rounded transition-colors flex items-center justify-center gap-2 shadow-[0_0_10px_rgba(176,38,255,0.3)]"
                     >
-                      <PlayCircle size={18} /> Start Mission
+                      <PlayCircle size={18} /> Missiyani Boshlash
                     </button>
                   )}
-                  
+
                   {isCompleted && (
                     <button className="w-full bg-white/5 hover:bg-white/10 text-gray-300 font-medium py-2 rounded transition-colors flex items-center justify-center gap-2 border border-white/10">
-                      Review Code
+                      Kodni Ko'rib chiqish
                     </button>
                   )}
 
                   {isLocked && (
-                    <button 
+                    <button
                       onClick={onTriggerSuccess}
                       className="w-full bg-gray-900/50 text-gray-500 font-medium py-2 rounded flex items-center justify-center gap-2 border border-gray-800 hover:border-brand-cyan/30 transition-all"
                     >
-                      <Lock size={16} /> Simulate Completion
+                      <Lock size={16} /> Bajarilishni Simulyatsiya qilish
                     </button>
                   )}
                 </motion.div>
@@ -344,8 +630,8 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
       {activeTab === 'skills' && (
         <div className="py-8">
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white mb-2">Technical Mastery Tree</h2>
-            <p className="text-gray-400">Unlock advanced techniques by completing core modules and projects.</p>
+            <h2 className="text-2xl font-bold text-white mb-2">Texnik Mahorat Daraxti</h2>
+            <p className="text-gray-400">Asosiy modullar va loyihalarni bajarib, ilg'or texnikalarni oching.</p>
           </div>
           <SkillTree />
         </div>
@@ -355,16 +641,16 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
       {activeTab === 'gallery' && (
         <div className="py-8">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">Featured Community Projects</h2>
+            <h2 className="text-xl font-bold">Tanlangan Jamoat Loyihalari</h2>
             <button className="bg-brand-cyan hover:bg-brand-cyan/80 text-black font-bold py-2 px-4 rounded transition-colors text-sm">
-              Submit Project
+              Loyiha Yuborish
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
-              { author: 'NeonCoder', title: 'Cyberpunk Portfolio', likes: 142, img: 'bg-brand-purple/20' },
-              { author: 'Sarah.JS', title: 'Weather Dashboard', likes: 98, img: 'bg-brand-cyan/20' },
-              { author: 'Alex_Dev', title: 'React Calculator', likes: 56, img: 'bg-brand-orange/20' },
+              { author: 'NeonCoder', title: 'Kiberpank Portfolio', likes: 142, img: 'bg-brand-purple/20' },
+              { author: 'Sarah.JS', title: 'Ob-havo Paneli', likes: 98, img: 'bg-brand-cyan/20' },
+              { author: 'Alex_Dev', title: 'React Kalkulyator', likes: 56, img: 'bg-brand-orange/20' },
             ].map((proj, i) => (
               <div key={i} className="glass-panel overflow-hidden border border-white/10 hover:border-brand-cyan/30 transition-colors group cursor-pointer">
                 <div className={`h-40 ${proj.img} relative flex items-center justify-center`}>
@@ -374,7 +660,7 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
                 <div className="p-4">
                   <h3 className="font-bold text-lg mb-1 group-hover:text-brand-cyan transition-colors">{proj.title}</h3>
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-400">by {proj.author}</span>
+                    <span className="text-gray-400">{proj.author} tomonidan</span>
                     <span className="text-[#FFD700] font-bold flex items-center gap-1">♥️ {proj.likes}</span>
                   </div>
                 </div>
@@ -397,7 +683,7 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
               >
                 <div className="absolute top-0 right-0 p-4">
                   <div className="flex items-center gap-2 px-3 py-1 bg-brand-red animate-pulse text-white text-[10px] font-black rounded-full shadow-[0_0_15px_rgba(239,68,68,0.5)]">
-                    <div className="w-1.5 h-1.5 rounded-full bg-white"></div> LIVE NOW
+                    <div className="w-1.5 h-1.5 rounded-full bg-white"></div> HOZIR JONLI
                   </div>
                 </div>
 
@@ -407,23 +693,23 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
                   </div>
                   <div className="space-y-4">
                     <div>
-                      <h2 className="text-2xl font-black text-white italic tracking-tight mb-1 uppercase">Advanced JS: Asynchronous Patterns</h2>
-                      <p className="text-gray-400 text-sm">Instructor: <span className="text-brand-cyan font-bold">Dr. Neural_Node</span> | Room 402 & Online</p>
+                      <h2 className="text-2xl font-black text-white italic tracking-tight mb-1 uppercase">Ilg'or JS: Asinxron Naqshlar</h2>
+                      <p className="text-gray-400 text-sm">O'qituvchi: <span className="text-brand-cyan font-bold">Dr. Neural_Node</span> | Xona 402 va Onlayn</p>
                     </div>
                     <div className="flex flex-wrap gap-4">
                       <div className="flex items-center gap-2 text-xs text-gray-300 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
-                        <Calendar size={14} className="text-brand-cyan" /> Today, 10:00 AM
+                        <Calendar size={14} className="text-brand-cyan" /> Bugun, soat 10:00
                       </div>
                       <div className="flex items-center gap-2 text-xs text-gray-300 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
-                        <Users size={14} className="text-brand-purple" /> 24 Students Active
+                        <Users size={14} className="text-brand-purple" /> 24 talaba faol
                       </div>
                     </div>
                     <div className="flex gap-4 pt-2">
                       <button className="px-8 py-3 bg-brand-cyan text-black font-black rounded-xl hover:bg-brand-cyan/80 transition-all shadow-[0_0_20px_rgba(0,217,255,0.4)] uppercase text-sm flex items-center gap-2">
-                        <PlayCircle size={18} /> Join Stream
+                        <PlayCircle size={18} /> Efirga Qo'shilish
                       </button>
                       <button className="px-6 py-3 bg-white/5 text-white font-bold rounded-xl border border-white/10 hover:bg-white/10 transition-all uppercase text-sm">
-                        View Slides
+                        Slaydlarni Ko'rish
                       </button>
                     </div>
                   </div>
@@ -436,15 +722,15 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
                     <div className="p-2 bg-brand-purple/20 rounded-lg text-brand-purple">
                       <Hand size={20} />
                     </div>
-                    <h3 className="font-bold text-white">Live Interaction</h3>
+                    <h3 className="font-bold text-white">Jonli Muloqot</h3>
                   </div>
-                  <p className="text-xs text-gray-400">Feeling lost? Use the buttons below to notify the instructor in real-time.</p>
+                  <p className="text-xs text-gray-400">Adashib qoldingizmi? O'qituvchiga real vaqtda xabar berish uchun quyidagi tugmalardan foydalaning.</p>
                   <div className="grid grid-cols-2 gap-3">
                     <button className="py-3 bg-white/5 border border-white/10 rounded-xl hover:bg-brand-purple/20 hover:border-brand-purple/50 transition-all text-xs font-bold text-gray-300 flex flex-col items-center gap-2">
-                      <Mic size={18} /> Raise Hand
+                      <Mic size={18} /> Qo'l Ko'tarish
                     </button>
                     <button className="py-3 bg-white/5 border border-white/10 rounded-xl hover:bg-brand-cyan/20 hover:border-brand-cyan/50 transition-all text-xs font-bold text-gray-300 flex flex-col items-center gap-2">
-                      <MessageSquare size={18} /> Quick Question
+                      <MessageSquare size={18} /> Tezkor Savol
                     </button>
                   </div>
                 </div>
@@ -454,13 +740,13 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
                     <div className="p-2 bg-brand-orange/20 rounded-lg text-brand-orange">
                       <Clock size={20} />
                     </div>
-                    <h3 className="font-bold text-white">Class Timeline</h3>
+                    <h3 className="font-bold text-white">Dars Jadvali</h3>
                   </div>
                   <div className="space-y-3">
                     {[
-                      { time: '10:00', event: 'Introduction to Promises', status: 'done' },
-                      { time: '10:30', event: 'Async/Await Deep Dive', status: 'active' },
-                      { time: '11:15', event: 'Hands-on Lab: Fetch API', status: 'upcoming' },
+                      { time: '10:00', event: 'Promise\'larga Kirish', status: 'done' },
+                      { time: '10:30', event: 'Async/Await\'ni Chuqur O\'rganish', status: 'active' },
+                      { time: '11:15', event: 'Amaliy Dars: Fetch API', status: 'upcoming' },
                     ].map((item, i) => (
                       <div key={i} className="flex items-center gap-3">
                         <span className="text-[10px] font-mono text-gray-500 w-10">{item.time}</span>
@@ -480,23 +766,23 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
                   <QrCode size={120} />
                 </div>
                 <h3 className="font-bold text-white mb-4 flex items-center gap-2 uppercase tracking-widest text-xs">
-                  <MapPin size={16} className="text-brand-cyan" /> 
-                  Physical Check-in
+                  <MapPin size={16} className="text-brand-cyan" />
+                  Jismoniy Ro'yxatdan O'tish
                 </h3>
                 <p className="text-xs text-gray-400 mb-6 leading-relaxed">
-                  Attending in-person at the <span className="text-white font-bold">Main Tech Hub</span>? Scan the classroom QR code or use the button below.
+                  <span className="text-white font-bold">Asosiy Tech Markazida</span> shaxsan ishtirok etyapsizmi? Sinf QR kodini skanerlang yoki quyidagi tugmadan foydalaning.
                 </p>
                 <button className="w-full py-3 bg-brand-cyan text-black font-black rounded-xl hover:bg-brand-cyan/80 transition-all uppercase text-xs shadow-[0_0_15px_rgba(0,217,255,0.2)]">
-                  Check-in Now
+                  Hozir Ro'yxatdan O'tish
                 </button>
                 <div className="mt-4 p-3 bg-white/5 rounded-lg border border-white/5 flex items-center justify-between">
-                  <span className="text-[10px] text-gray-500 font-mono">Location Status</span>
-                  <span className="text-[10px] text-brand-green font-bold">ON-SITE VALIDATED</span>
+                  <span className="text-[10px] text-gray-500 font-mono">Joylashuv Holati</span>
+                  <span className="text-[10px] text-brand-green font-bold">JOYIDA TASDIQLANDI</span>
                 </div>
               </div>
 
               <div className="glass-panel p-6 border border-white/10 bg-black/40">
-                <h3 className="font-bold text-white mb-4 uppercase tracking-widest text-xs">Hybrid Community</h3>
+                <h3 className="font-bold text-white mb-4 uppercase tracking-widest text-xs">Gibrid Jamoa</h3>
                 <div className="space-y-4">
                   <div className="flex -space-x-3 overflow-hidden">
                     {[1, 2, 3, 4, 5].map(i => (
@@ -506,9 +792,9 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
                       +12
                     </div>
                   </div>
-                  <p className="text-[11px] text-gray-400">Other students are currently active in this hybrid session.</p>
+                  <p className="text-[11px] text-gray-400">Boshqa talabalar hozir ushbu gibrid darsda faol.</p>
                   <button className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs font-bold text-gray-300 transition-colors">
-                    View Live Chat
+                    Jonli Chatni Ko'rish
                   </button>
                 </div>
               </div>
@@ -521,12 +807,12 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
                <Info size={24} />
              </div>
              <div className="flex-1">
-               <h4 className="text-white font-bold">How Hybrid Education Works</h4>
-               <p className="text-gray-400 text-sm">Join via the stream from home, or visit our physical campus. All progress, XP, and materials are synced across both environments in real-time.</p>
+               <h4 className="text-white font-bold">Gibrid Ta'lim Qanday Ishlaydi</h4>
+               <p className="text-gray-400 text-sm">Uydan efir orqali qo'shiling yoki jismoniy kampusimizga tashrif buyuring. Barcha progress, XP va materiallar ikkala muhitda ham real vaqtda sinxronlashadi.</p>
              </div>
              <div className="flex gap-4">
-               <button className="text-xs font-bold text-brand-purple hover:underline">Campus Map</button>
-               <button className="text-xs font-bold text-brand-purple hover:underline">Help Center</button>
+               <button className="text-xs font-bold text-brand-purple hover:underline">Kampus Xaritasi</button>
+               <button className="text-xs font-bold text-brand-purple hover:underline">Yordam Markazi</button>
              </div>
           </div>
         </div>
@@ -537,48 +823,48 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
         <div className="py-8">
           <div className="flex justify-between items-center mb-8">
             <div>
-              <h2 className="text-2xl font-bold text-white mb-2">Lesson PowerPoints & Materials</h2>
-              <p className="text-gray-400">Access exclusive study materials uploaded by your instructors.</p>
+              <h2 className="text-2xl font-bold text-white mb-2">Dars Prezentatsiyalari va Materiallari</h2>
+              <p className="text-gray-400">O'qituvchilaringiz yuklagan maxsus o'quv materiallariga kiring.</p>
             </div>
             <div className="hidden sm:flex items-center gap-3 px-4 py-2 bg-white/5 border border-white/10 rounded-lg">
               <div className="w-2 h-2 rounded-full bg-brand-cyan animate-pulse"></div>
-              <span className="text-xs text-gray-300 font-mono">New Materials Added Today</span>
+              <span className="text-xs text-gray-300 font-mono">Bugun Yangi Materiallar Qo'shildi</span>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[
-              { 
-                title: 'Introduction to Web Architecture', 
-                type: 'PPTX', 
-                size: '4.2 MB', 
-                addedBy: 'Dr. Cyber', 
+              {
+                title: 'Veb Arxitekturaga Kirish',
+                type: 'PPTX',
+                size: '4.2 MB',
+                addedBy: 'Dr. Cyber',
                 date: '2024-05-15',
-                desc: 'Comprehensive overview of how the web works, from DNS to rendering.'
+                desc: 'Veb qanday ishlashi haqida to\'liq ma\'lumot: DNS\'dan renderlashgacha.'
               },
-              { 
-                title: 'Advanced CSS Flexbox & Grid', 
-                type: 'PPTX', 
-                size: '6.8 MB', 
-                addedBy: 'Prof. Neon', 
+              {
+                title: 'Ilg\'or CSS Flexbox va Grid',
+                type: 'PPTX',
+                size: '6.8 MB',
+                addedBy: 'Prof. Neon',
                 date: '2024-05-18',
-                desc: 'Deep dive into modern layout techniques with real-world examples.'
+                desc: 'Zamonaviy joylashuv texnikalarini real misollar bilan chuqur o\'rganish.'
               },
-              { 
-                title: 'JavaScript Logic & DOM Flow', 
-                type: 'PDF', 
-                size: '2.1 MB', 
-                addedBy: 'Dr. Cyber', 
+              {
+                title: 'JavaScript Mantiqi va DOM Oqimi',
+                type: 'PDF',
+                size: '2.1 MB',
+                addedBy: 'Dr. Cyber',
                 date: '2024-05-20',
-                desc: 'Visual diagrams of execution context and DOM event propagation.'
+                desc: 'Bajarilish konteksti va DOM hodisalari tarqalishining vizual diagrammalari.'
               },
-              { 
-                title: 'React Hooks Mastery', 
-                type: 'PPTX', 
-                size: '5.5 MB', 
-                addedBy: 'Prof. Neon', 
+              {
+                title: 'React Hooklarini Egallash',
+                type: 'PPTX',
+                size: '5.5 MB',
+                addedBy: 'Prof. Neon',
                 date: '2024-05-22',
-                desc: 'Step-by-step guide to useState, useEffect, and custom hooks.'
+                desc: 'useState, useEffect va maxsus hooklar bo\'yicha bosqichma-bosqich qo\'llanma.'
               },
             ].map((resource, i) => (
               <motion.div 
@@ -609,12 +895,12 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
                   <div className="flex items-center justify-between mt-auto">
                     <div className="flex items-center gap-3">
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-gray-500 uppercase tracking-tighter">Instructor</span>
+                        <span className="text-[10px] text-gray-500 uppercase tracking-tighter">O'qituvchi</span>
                         <span className="text-xs text-gray-300">{resource.addedBy}</span>
                       </div>
                       <div className="w-px h-6 bg-white/10"></div>
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-gray-500 uppercase tracking-tighter">Size</span>
+                        <span className="text-[10px] text-gray-500 uppercase tracking-tighter">Hajmi</span>
                         <span className="text-xs text-gray-300">{resource.size}</span>
                       </div>
                     </div>
@@ -624,7 +910,7 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
                       </button>
                       <button className="flex items-center gap-2 px-3 py-2 bg-brand-cyan/10 hover:bg-brand-cyan text-brand-cyan hover:text-black font-bold text-xs rounded-lg border border-brand-cyan/30 transition-all">
                         <Download size={14} />
-                        Download
+                        Yuklab olish
                       </button>
                     </div>
                   </div>
@@ -638,11 +924,11 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
               <BookOpen size={32} />
             </div>
             <div className="flex-1 text-center md:text-left">
-              <h4 className="text-white font-bold text-lg mb-1">Missing a Resource?</h4>
-              <p className="text-gray-400 text-sm">If you can't find a specific lesson PowerPoint, please contact your instructor or check the Mission Log for recent updates.</p>
+              <h4 className="text-white font-bold text-lg mb-1">Material topilmadimi?</h4>
+              <p className="text-gray-400 text-sm">Agar kerakli dars prezentatsiyasini topa olmasangiz, o'qituvchingiz bilan bog'laning yoki so'nggi yangilanishlar uchun Missiya Jurnalini tekshiring.</p>
             </div>
             <button className="px-6 py-2 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl border border-white/10 transition-colors">
-              Request Resource
+              Material So'rash
             </button>
           </div>
         </div>

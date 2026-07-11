@@ -1,16 +1,78 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, X, Send, Paperclip, Code, Mic } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '../lib/utils';
+import { api, ApiError } from '../lib/api';
+
+interface ChatMessage {
+  id: string;
+  userId: string;
+  role: 'USER' | 'ASSISTANT';
+  content: string;
+  createdAt: string;
+}
+
+interface SendMessageResponse {
+  userMessage: ChatMessage;
+  assistantMessage: ChatMessage;
+}
+
+const QUICK_ACTIONS = ['Xatoni tushuntir', 'Kodimni ko\'rib chiq', 'Yaxshilash takliflari'];
 
 export function AIMentorChat() {
   const [isOpen, setIsOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [chatError, setChatError] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
 
   React.useEffect(() => {
     const handleToggle = () => setIsOpen(prev => !prev);
     window.addEventListener('toggle-ai-mentor', handleToggle);
     return () => window.removeEventListener('toggle-ai-mentor', handleToggle);
   }, []);
+
+  const { data: messages = [] } = useQuery({
+    queryKey: ['mentor', 'messages'],
+    queryFn: () => api.get<ChatMessage[]>('/mentor/messages'),
+    enabled: isOpen,
+  });
+
+  const sendMessage = useMutation({
+    mutationFn: (content: string) =>
+      api.post<SendMessageResponse>('/mentor/messages', { content }),
+    onSuccess: (data) => {
+      queryClient.setQueryData<ChatMessage[]>(['mentor', 'messages'], (prev) => [
+        ...(prev ?? []),
+        data.userMessage,
+        data.assistantMessage,
+      ]);
+      setDraft('');
+      setChatError(null);
+    },
+    onError: (error) => {
+      queryClient.invalidateQueries({ queryKey: ['mentor', 'messages'] });
+      setChatError(error instanceof ApiError ? error.message : "AI javobini olishning imkoni bo'lmadi.");
+    },
+  });
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, sendMessage.isPending]);
+
+  const handleSend = () => {
+    const trimmed = draft.trim();
+    if (!trimmed || sendMessage.isPending) return;
+    sendMessage.mutate(trimmed);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
   if (!isOpen) {
     return (
@@ -25,7 +87,7 @@ export function AIMentorChat() {
           "absolute right-full mr-4 bg-brand-card border border-brand-purple/50 px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-all duration-300 pointer-events-none text-glow",
           isHovered ? "opacity-100 translate-x-0" : "opacity-0 translate-x-2"
         )}>
-          Ask TechSensei
+          TechSensei'dan So'rang
         </span>
       </button>
     );
@@ -33,7 +95,7 @@ export function AIMentorChat() {
 
   return (
     <div className="fixed bottom-6 right-6 w-80 sm:w-96 h-[500px] max-h-[80vh] bg-brand-card backdrop-blur-xl border border-brand-purple/50 rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden neon-glow-purple flex-shrink-0">
-      
+
       {/* Header */}
       <div className="p-4 border-b border-brand-border bg-gradient-to-r from-brand-purple/20 to-transparent flex justify-between items-center shrink-0">
         <div className="flex items-center gap-3">
@@ -43,10 +105,10 @@ export function AIMentorChat() {
           </div>
           <div>
             <h3 className="font-bold text-white text-glow">TechSensei AI</h3>
-            <p className="text-xs text-brand-green">Online</p>
+            <p className="text-xs text-brand-green">Onlayn</p>
           </div>
         </div>
-        <button 
+        <button
           onClick={() => setIsOpen(false)}
           className="p-2 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition-colors"
         >
@@ -56,41 +118,61 @@ export function AIMentorChat() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-black/20">
-        <div className="flex gap-3 max-w-[85%]">
-          <div className="w-8 h-8 rounded-full bg-brand-purple/20 flex items-center justify-center shrink-0 border border-brand-purple/50">🤖</div>
-          <div className="bg-white/10 rounded-2xl rounded-tl-sm p-3 text-sm text-gray-200 border border-white/5">
-            Hello! I'm TechSensei. I'm here to help you level up your coding skills. What are we working on today?
-          </div>
-        </div>
-
-        <div className="flex gap-3 max-w-[85%] ml-auto justify-end">
-          <div className="bg-brand-cyan/20 rounded-2xl rounded-tr-sm p-3 text-sm text-white border border-brand-cyan/30">
-            Can you explain how CSS Grid areas work?
-          </div>
-        </div>
-
-        <div className="flex gap-3 max-w-[85%]">
-          <div className="w-8 h-8 rounded-full bg-brand-purple/20 flex items-center justify-center shrink-0 border border-brand-purple/50">🤖</div>
-          <div className="bg-white/10 rounded-2xl rounded-tl-sm p-3 text-sm text-gray-200 border border-white/5">
-            <p className="mb-2">Sure! CSS Grid areas let you name sections of your layout and place elements easily.</p>
-            <div className="bg-black/50 p-2 rounded border border-brand-border font-mono text-xs text-brand-cyan my-2 overflow-x-auto">
-              .container {'{'}<br/>
-              &nbsp;&nbsp;display: grid;<br/>
-              &nbsp;&nbsp;grid-template-areas:<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;"header header"<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;"sidebar main"<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;"footer footer";<br/>
-              {'}'}
+        {messages.length === 0 && !sendMessage.isPending && (
+          <div className="flex gap-3 max-w-[85%]">
+            <div className="w-8 h-8 rounded-full bg-brand-purple/20 flex items-center justify-center shrink-0 border border-brand-purple/50">🤖</div>
+            <div className="bg-white/10 rounded-2xl rounded-tl-sm p-3 text-sm text-gray-200 border border-white/5">
+              Salom! Men TechSensei. Dasturlash ko'nikmalaringizni oshirishda yordam berish uchun shu yerdaman. Bugun nima ustida ishlaymiz?
             </div>
-            <p>You then assign items using <code className="bg-black/30 px-1 rounded text-brand-purple">grid-area: header;</code></p>
           </div>
-        </div>
+        )}
+
+        {messages.map((msg) =>
+          msg.role === 'USER' ? (
+            <div key={msg.id} className="flex gap-3 max-w-[85%] ml-auto justify-end">
+              <div className="bg-brand-cyan/20 rounded-2xl rounded-tr-sm p-3 text-sm text-white border border-brand-cyan/30 whitespace-pre-wrap">
+                {msg.content}
+              </div>
+            </div>
+          ) : (
+            <div key={msg.id} className="flex gap-3 max-w-[85%]">
+              <div className="w-8 h-8 rounded-full bg-brand-purple/20 flex items-center justify-center shrink-0 border border-brand-purple/50">🤖</div>
+              <div className="bg-white/10 rounded-2xl rounded-tl-sm p-3 text-sm text-gray-200 border border-white/5 whitespace-pre-wrap">
+                {msg.content}
+              </div>
+            </div>
+          )
+        )}
+
+        {sendMessage.isPending && (
+          <div className="flex gap-3 max-w-[85%]">
+            <div className="w-8 h-8 rounded-full bg-brand-purple/20 flex items-center justify-center shrink-0 border border-brand-purple/50">🤖</div>
+            <div className="bg-white/10 rounded-2xl rounded-tl-sm p-3 text-sm text-gray-400 border border-white/5 italic animate-pulse">
+              TechSensei yozmoqda...
+            </div>
+          </div>
+        )}
+
+        {chatError && (
+          <div className="flex gap-3 max-w-[85%]">
+            <div className="w-8 h-8 rounded-full bg-brand-red/20 flex items-center justify-center shrink-0 border border-brand-red/50">⚠️</div>
+            <div className="bg-brand-red/10 rounded-2xl rounded-tl-sm p-3 text-sm text-brand-red border border-brand-red/30">
+              {chatError}
+            </div>
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Quick Actions */}
       <div className="px-4 py-2 flex gap-2 overflow-x-auto custom-scrollbar no-scrollbar shrink-0 border-t border-white/5">
-        {['Explain error', 'Review my code', 'Suggest improvements'].map(chip => (
-          <button key={chip} className="whitespace-nowrap px-3 py-1.5 rounded-full bg-white/5 hover:bg-brand-purple/20 border border-white/10 hover:border-brand-purple/50 text-xs text-gray-300 transition-colors">
+        {QUICK_ACTIONS.map(chip => (
+          <button
+            key={chip}
+            onClick={() => setDraft(chip)}
+            className="whitespace-nowrap px-3 py-1.5 rounded-full bg-white/5 hover:bg-brand-purple/20 border border-white/10 hover:border-brand-purple/50 text-xs text-gray-300 transition-colors"
+          >
             {chip}
           </button>
         ))}
@@ -103,15 +185,24 @@ export function AIMentorChat() {
             <button className="p-1.5 text-gray-400 hover:text-white rounded-lg"><Paperclip size={18} /></button>
             <button className="p-1.5 text-gray-400 hover:text-brand-cyan rounded-lg"><Code size={18} /></button>
           </div>
-          <textarea 
-            placeholder="Type a message..."
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Xabar yozing..."
             className="w-full bg-transparent text-sm resize-none focus:outline-none py-2 max-h-32 text-white custom-scrollbar"
             rows={1}
             style={{ minHeight: '36px' }}
           ></textarea>
           <div className="flex gap-1 p-1 shrink-0">
             <button className="p-1.5 text-gray-400 hover:text-brand-orange rounded-lg"><Mic size={18} /></button>
-            <button className="p-1.5 bg-brand-purple hover:bg-brand-purple/80 text-white rounded-lg transition-colors"><Send size={16} /></button>
+            <button
+              onClick={handleSend}
+              disabled={sendMessage.isPending || !draft.trim()}
+              className="p-1.5 bg-brand-purple hover:bg-brand-purple/80 text-white rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Send size={16} />
+            </button>
           </div>
         </div>
       </div>

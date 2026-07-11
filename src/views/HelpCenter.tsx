@@ -18,21 +18,21 @@ export function HelpCenter() {
   const [openFaq, setOpenFaq] = React.useState<number | null>(0);
 
   const faqs = [
-    { 
-      q: "How do I earn XP for my city?", 
-      a: "Every time you complete a quest in the Assignments section or solve a problem in the Problem sets, you earn Universal XP. This XP directly powers your city's growth and unlocks new building types."
+    {
+      q: "Shahrim uchun XP'ni qanday to'playman?",
+      a: "Topshiriqlar bo'limida vazifani bajarganingizda yoki Masalalar to'plamida biror masalani yechganingizda, siz Universal XP olasiz. Bu XP bevosita shahringiz rivojlanishini ta'minlaydi va yangi bino turlarini ochadi."
     },
-    { 
-      q: "What are the Arena seasons?", 
-      a: "Seasons last 30 days. During this time, every battle win contributes to your rank. At the end of the season, players in the Top 100 receive exclusive gear and rare city monuments."
+    {
+      q: "Arena mavsumlari nima?",
+      a: "Mavsumlar 30 kun davom etadi. Shu davrda har bir jangdagi g'alaba reytingingizga qo'shiladi. Mavsum yakunida Top 100'ga kirgan o'yinchilar noyob jihozlar va kamyob shahar yodgorliklarini qo'lga kiritadi."
     },
-    { 
-      q: "How do I become a Teacher?", 
-      a: "Teacher status is granted to community contributors who have maintained a Level 50+ profile and passed the 'Core Pedagogical Assessment'. Contact support if you meet these requirements."
+    {
+      q: "O'qituvchi maqomiga qanday erishaman?",
+      a: "O'qituvchi maqomi 50+ darajadagi profilni saqlab kelayotgan va \"Asosiy Pedagogik Baholash\"dan o'tgan jamoa a'zolariga beriladi. Ushbu talablarga javob bersangiz, yordam xizmatiga murojaat qiling."
     },
-    { 
-      q: "Can I use external libraries in Code Lab?", 
-      a: "Yes! Code Lab supports most popular NPM packages. Simply use the package manager interface within the lab to add dependencies to your sandbox."
+    {
+      q: "Code Lab'da tashqi kutubxonalardan foydalansam bo'ladimi?",
+      a: "Ha! Code Lab ko'pgina mashhur NPM paketlarini qo'llab-quvvatlaydi. Sandboxingizga bog'liqliklar qo'shish uchun laboratoriya ichidagi paket menejeri interfeysidan foydalaning."
     }
   ];
 
@@ -42,14 +42,14 @@ export function HelpCenter() {
         <div className="inline-flex p-4 bg-brand-cyan/10 rounded-3xl border border-brand-cyan/20 mb-6">
           <HelpCircle size={48} className="text-brand-cyan" />
         </div>
-        <h1 className="text-4xl font-heading font-bold text-white tracking-tight mb-4">Neural Support Interface</h1>
-        <p className="text-gray-400 max-w-xl mx-auto text-lg">Access the central knowledge base or connect with our support agents for any technical difficulties.</p>
-        
+        <h1 className="text-4xl font-heading font-bold text-white tracking-tight mb-4">Neyro-yordam interfeysi</h1>
+        <p className="text-gray-400 max-w-xl mx-auto text-lg">Har qanday texnik muammo yuzasidan markaziy bilimlar bazasidan foydalaning yoki yordam xizmati xodimlari bilan bog'laning.</p>
+
         <div className="mt-8 relative max-w-2xl mx-auto">
           <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
-          <input 
-            type="text" 
-            placeholder="Search documentation, tutorials, and community fixes..." 
+          <input
+            type="text"
+            placeholder="Hujjatlar, darsliklar va jamoa yechimlarini qidirish..."
             className="w-full bg-black/40 border-2 border-white/10 rounded-2xl pl-12 pr-4 py-4 text-white focus:border-brand-cyan focus:outline-none transition-all shadow-xl"
           />
         </div>
@@ -57,9 +57,9 @@ export function HelpCenter() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         {[
-          { label: 'Documentation', icon: <Book className="text-brand-cyan" />, desc: 'Core platform guides' },
-          { label: 'Community', icon: <MessageSquare className="text-brand-purple" />, desc: 'Discuss with peers' },
-          { label: 'Terminal Logs', icon: <Terminal className="text-brand-orange" />, desc: 'System status & updates' },
+          { label: 'Hujjatlar', icon: <Book className="text-brand-cyan" />, desc: 'Platforma bo\'yicha asosiy qo\'llanmalar' },
+          { label: 'Jamoa', icon: <MessageSquare className="text-brand-purple" />, desc: 'Boshqa foydalanuvchilar bilan muhokama qiling' },
+          { label: 'Terminal jurnali', icon: <Terminal className="text-brand-orange" />, desc: 'Tizim holati va yangilanishlar' },
         ].map((box, i) => (
           <button key={i} className="glass-panel p-6 border border-white/10 rounded-2xl hover:border-brand-cyan/50 transition-all text-left group">
             <div className="p-3 bg-white/5 rounded-xl border border-white/10 w-fit mb-4 group-hover:bg-brand-cyan/10 group-hover:border-brand-cyan/30 transition-all">
@@ -75,7 +75,7 @@ export function HelpCenter() {
         <div>
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
             <ShieldQuestion className="text-brand-purple" />
-            Frequently Asked Questions
+            Tez-tez so'raladigan savollar
           </h2>
           <div className="space-y-3">
             {faqs.map((faq, i) => (
@@ -105,11 +105,11 @@ export function HelpCenter() {
 
         <div className="bg-brand-purple/10 border border-brand-purple/20 p-8 rounded-3xl flex flex-col md:flex-row items-center gap-8">
           <div className="flex-1 text-center md:text-left">
-            <h3 className="text-xl font-bold text-white mb-2">Still stuck in the mainframe?</h3>
-            <p className="text-gray-400 text-sm">Our support agents are available 24/7 to help you resolve any issues with your city, gear, or account.</p>
+            <h3 className="text-xl font-bold text-white mb-2">Hali ham muammoga duch kelyapsizmi?</h3>
+            <p className="text-gray-400 text-sm">Yordam xizmati xodimlari shahringiz, jihozlaringiz yoki hisobingiz bilan bog'liq har qanday muammoni hal qilishda sizga 24/7 yordam berishga tayyor.</p>
           </div>
           <button className="px-8 py-3 bg-brand-purple hover:bg-brand-purple/80 text-white font-bold rounded-2xl transition-all shadow-[0_0_20px_rgba(176,38,255,0.4)] whitespace-nowrap">
-            Open Support Ticket
+            Yordam so'rovini ochish
           </button>
         </div>
 
@@ -121,10 +121,10 @@ export function HelpCenter() {
             <Twitter size={18} /> Twitter
           </button>
           <button className="flex items-center gap-2 text-gray-500 hover:text-white transition-colors text-sm">
-            <Mail size={18} /> Email
+            <Mail size={18} /> Elektron pochta
           </button>
           <button className="flex items-center gap-2 text-gray-500 hover:text-white transition-colors text-sm">
-            <ExternalLink size={18} /> Documentation
+            <ExternalLink size={18} /> Hujjatlar
           </button>
         </div>
       </div>

@@ -44,10 +44,10 @@ export function StudyTimer() {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Timer size={16} className="text-brand-cyan" />
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Deep Focus</span>
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Chuqur Fokus</span>
           </div>
           <div className="flex items-center gap-1 text-[10px] text-brand-purple font-bold">
-            <Zap size={10} /> +50 XP / Session
+            <Zap size={10} /> +50 XP / Seans
           </div>
         </div>
 
@@ -63,7 +63,7 @@ export function StudyTimer() {
             }`}
           >
             {isActive ? <Pause size={14} /> : <Play size={14} fill="currentColor" />}
-            {isActive ? 'Pause' : 'Focus'}
+            {isActive ? 'Pauza' : 'Fokus'}
           </button>
           <button 
             onClick={resetTimer}
@@ -83,8 +83,8 @@ export function StudyTimer() {
             className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/90 rounded-2xl border border-brand-cyan/50 shadow-[0_0_30px_rgba(0,217,255,0.2)]"
           >
             <Trophy className="text-[#FFD700] mb-2" size={32} />
-            <p className="text-xs font-black text-white uppercase italic">Session Complete!</p>
-            <p className="text-[10px] text-brand-cyan font-bold">+50 XP EARNED</p>
+            <p className="text-xs font-black text-white uppercase italic">Seans Yakunlandi!</p>
+            <p className="text-[10px] text-brand-cyan font-bold">+50 XP QO'LGA KIRITILDI</p>
           </motion.div>
         )}
       </AnimatePresence>

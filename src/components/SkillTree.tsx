@@ -16,91 +16,91 @@ interface SkillNodeData {
 
 export function SkillTree() {
   const skills: SkillNodeData[] = [
-    { 
-      id: 'html', 
-      label: 'Semantic HTML', 
-      status: 'completed', 
-      x: 50, 
-      y: 50, 
-      icon: <Globe size={24} />, 
-      desc: 'Master document structure and accessibility standards.',
+    {
+      id: 'html',
+      label: 'Semantik HTML',
+      status: 'completed',
+      x: 50,
+      y: 50,
+      icon: <Globe size={24} />,
+      desc: 'Hujjat strukturasi va foydalanish imkoniyati standartlarini egallang.',
       level: 10
     },
-    { 
-      id: 'css-basics', 
-      label: 'CSS Fundamentals', 
-      status: 'completed', 
-      x: 50, 
-      y: 150, 
-      prerequisites: ['html'], 
-      icon: <Palette size={24} />, 
-      desc: 'The box model, selectors, and cascade logic.',
+    {
+      id: 'css-basics',
+      label: 'CSS Asoslari',
+      status: 'completed',
+      x: 50,
+      y: 150,
+      prerequisites: ['html'],
+      icon: <Palette size={24} />,
+      desc: 'Bloklar modeli, selektorlar va kaskad mantig\'i.',
       level: 8
     },
-    { 
-      id: 'flexbox', 
-      label: 'Flexbox Layouts', 
-      status: 'completed', 
-      x: 30, 
-      y: 250, 
-      prerequisites: ['css-basics'], 
-      icon: <Layout size={24} />, 
-      desc: 'One-dimensional dynamic axis alignment.',
+    {
+      id: 'flexbox',
+      label: 'Flexbox Tartiblar',
+      status: 'completed',
+      x: 30,
+      y: 250,
+      prerequisites: ['css-basics'],
+      icon: <Layout size={24} />,
+      desc: 'Bir o\'lchamli dinamik o\'q bo\'ylab tekislash.',
       level: 7
     },
-    { 
-      id: 'grid', 
-      label: 'CSS Grid', 
-      status: 'unlocked', 
-      x: 70, 
-      y: 250, 
-      prerequisites: ['css-basics'], 
-      icon: <Layout size={24} />, 
-      desc: 'Complex two-dimensional structural grids.',
+    {
+      id: 'grid',
+      label: 'CSS Grid',
+      status: 'unlocked',
+      x: 70,
+      y: 250,
+      prerequisites: ['css-basics'],
+      icon: <Layout size={24} />,
+      desc: 'Murakkab ikki o\'lchamli strukturaviy to\'rlar.',
       level: 4
     },
-    { 
-      id: 'responsive', 
-      label: 'Responsive Design', 
-      status: 'unlocked', 
-      x: 50, 
-      y: 350, 
-      prerequisites: ['flexbox', 'grid'], 
-      icon: <Smartphone size={24} />, 
-      desc: 'Fluid layouts across all device breakpoints.',
+    {
+      id: 'responsive',
+      label: 'Moslashuvchan Dizayn',
+      status: 'unlocked',
+      x: 50,
+      y: 350,
+      prerequisites: ['flexbox', 'grid'],
+      icon: <Smartphone size={24} />,
+      desc: 'Barcha qurilma o\'lchamlarida moslashuvchan tartiblar.',
       level: 2
     },
-    { 
-      id: 'js-core', 
-      label: 'JS Logic', 
-      status: 'unlocked', 
-      x: 20, 
-      y: 450, 
-      prerequisites: ['responsive'], 
-      icon: <Zap size={24} />, 
-      desc: 'Variables, loops, and functional programming.',
+    {
+      id: 'js-core',
+      label: 'JS Mantiq',
+      status: 'unlocked',
+      x: 20,
+      y: 450,
+      prerequisites: ['responsive'],
+      icon: <Zap size={24} />,
+      desc: 'O\'zgaruvchilar, sikllar va funksional dasturlash.',
       level: 1
     },
-    { 
-      id: 'dom-hack', 
-      label: 'DOM Infiltration', 
-      status: 'locked', 
-      x: 50, 
-      y: 450, 
-      prerequisites: ['js-core'], 
-      icon: <Monitor size={24} />, 
-      desc: 'Dynamic node manipulation and events.',
+    {
+      id: 'dom-hack',
+      label: 'DOM Infiltratsiyasi',
+      status: 'locked',
+      x: 50,
+      y: 450,
+      prerequisites: ['js-core'],
+      icon: <Monitor size={24} />,
+      desc: 'Dinamik tugun boshqaruvi va hodisalar.',
       level: 0
     },
-    { 
-      id: 'react-nexus', 
-      label: 'React Framework', 
-      status: 'locked', 
-      x: 80, 
-      y: 450, 
-      prerequisites: ['dom-hack'], 
-      icon: <Database size={24} />, 
-      desc: 'Component architecture and state nexus.',
+    {
+      id: 'react-nexus',
+      label: 'React Freymvork',
+      status: 'locked',
+      x: 80,
+      y: 450,
+      prerequisites: ['dom-hack'],
+      icon: <Database size={24} />,
+      desc: 'Komponent arxitekturasi va state nexusi.',
       level: 0
     },
   ];
@@ -156,15 +156,15 @@ export function SkillTree() {
       <div className="absolute bottom-8 right-8 flex flex-col gap-3">
         <div className="flex items-center gap-3 bg-black/60 px-4 py-2 rounded-xl border border-white/5">
           <div className="w-2.5 h-2.5 rounded-full bg-brand-cyan shadow-[0_0_8px_#00D9FF]" />
-          <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Mastered</span>
+          <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Egallangan</span>
         </div>
         <div className="flex items-center gap-3 bg-black/60 px-4 py-2 rounded-xl border border-white/5">
           <div className="w-2.5 h-2.5 rounded-full bg-brand-purple shadow-[0_0_8px_#B026FF]" />
-          <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Unlocked</span>
+          <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Ochilgan</span>
         </div>
         <div className="flex items-center gap-3 bg-black/60 px-4 py-2 rounded-xl border border-white/5">
           <div className="w-2.5 h-2.5 rounded-full bg-gray-700" />
-          <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Encrypted</span>
+          <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Yopiq</span>
         </div>
       </div>
     </div>
@@ -213,7 +213,7 @@ function SkillTreeNode({ skill }: { skill: SkillNodeData }) {
         {!isLocked && (
           <div className="space-y-1.5">
             <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-gray-500">
-              <span>Mastery</span>
+              <span>Mahorat</span>
               <span>{skill.level * 10}%</span>
             </div>
             <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
@@ -224,7 +224,7 @@ function SkillTreeNode({ skill }: { skill: SkillNodeData }) {
 
         {isLocked && (
           <div className="flex items-center gap-1.5 text-[8px] font-black text-red-500 uppercase tracking-widest mt-2">
-            <Lock size={10} /> Pre-requisites Missing
+            <Lock size={10} /> Talab qilinadigan ko'nikmalar yo'q
           </div>
         )}
       </div>

@@ -24,8 +24,8 @@ export function RoboticsLab() {
   const [connectedComponents, setConnectedComponents] = useState<string[]>(['Internal LED']);
   const [isRunning, setIsRunning] = useState(false);
   const [logs, setLogs] = useState<{msg: string, type: 'info' | 'error' | 'success' | 'warn'}[]>([
-    { msg: "Neural Link Established with Hardware Emulator", type: 'success' },
-    { msg: "Select components and language to begin protocol design.", type: 'info' }
+    { msg: "Apparat Emulyatori bilan Neyro-aloqa O'rnatildi", type: 'success' },
+    { msg: "Protokol dizaynini boshlash uchun komponentlar va tilni tanlang.", type: 'info' }
   ]);
   const [sensors, setSensors] = useState({ distance: 45, light: 12, voltage: 12.4 });
   
@@ -42,19 +42,19 @@ export function RoboticsLab() {
   }, [selectedLanguage]);
 
   const components = [
-    { id: 'ultrasonic', name: 'Ultrasonic Sensor', icon: <Eye size={14} />, pins: 'VCC, GND, TRIG(9), ECHO(10)' },
-    { id: 'pir', name: 'PIR Motion', icon: <Activity size={14} />, pins: 'VCC, GND, OUT(2)' },
+    { id: 'ultrasonic', name: 'Ultratovush Sensori', icon: <Eye size={14} />, pins: 'VCC, GND, TRIG(9), ECHO(10)' },
+    { id: 'pir', name: 'PIR Harakat Sensori', icon: <Activity size={14} />, pins: 'VCC, GND, OUT(2)' },
     { id: 'led', name: 'RGB LED', icon: <Zap size={14} />, pins: 'R(3), G(5), B(6)' },
-    { id: 'servo', name: 'Micro Servo', icon: <RefreshCcw size={14} />, pins: 'VCC, GND, PWM(11)' },
+    { id: 'servo', name: 'Mikro Servo', icon: <RefreshCcw size={14} />, pins: 'VCC, GND, PWM(11)' },
   ];
 
   const toggleComponent = (compId: string) => {
     if (connectedComponents.includes(compId)) {
       setConnectedComponents(prev => prev.filter(id => id !== compId));
-      addLog(`Disconnected: ${compId}`, 'warn');
+      addLog(`Uzildi: ${compId}`, 'warn');
     } else {
       setConnectedComponents(prev => [...prev, compId]);
-      addLog(`Connected ${compId} to Breadboard`, 'success');
+      addLog(`${compId} Breadboard'ga ulandi`, 'success');
     }
   };
 
@@ -79,16 +79,16 @@ export function RoboticsLab() {
 
   const runSimulation = () => {
     setIsRunning(true);
-    addLog("Compiling Logic...", "info");
+    addLog("Mantiq kompilyatsiya qilinmoqda...", "info");
     setTimeout(() => {
-      addLog("Deployment Successful.", "success");
-      addLog("Rover Executing Protocol: 'moveForward(50)'", "info");
+      addLog("Joylashtirish muvaffaqiyatli yakunlandi.", "success");
+      addLog("Rover Protokolni Bajarmoqda: 'moveForward(50)'", "info");
     }, 1500);
   };
 
   const stopSimulation = () => {
     setIsRunning(false);
-    addLog("Emergency Halt Triggered.", "warn");
+    addLog("Favqulodda To'xtatish Ishga Tushirildi.", "warn");
   };
 
   const addLog = (msg: string, type: 'info' | 'error' | 'success' | 'warn') => {
@@ -106,7 +106,7 @@ export function RoboticsLab() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-black text-white italic tracking-tighter uppercase">Circuit Designer</h1>
+                <h1 className="text-2xl font-black text-white italic tracking-tighter uppercase">Sxema Dizayneri</h1>
                 <span className="text-[10px] bg-brand-cyan/20 text-brand-cyan px-2 py-0.5 rounded border border-brand-cyan/30 font-mono">BETA</span>
               </div>
               <div className="flex gap-4 mt-2">
@@ -133,11 +133,11 @@ export function RoboticsLab() {
           <div className="flex gap-3">
             {!isRunning ? (
               <button onClick={runSimulation} className="flex items-center gap-2 px-6 py-3 bg-brand-cyan text-black font-black rounded-xl hover:bg-brand-cyan/80 shadow-[0_0_20px_rgba(0,217,255,0.4)] uppercase text-xs">
-                <Play size={16} fill="currentColor" /> Deploy Code
+                <Play size={16} fill="currentColor" /> Kodni Joylashtirish
               </button>
             ) : (
               <button onClick={stopSimulation} className="flex items-center gap-2 px-6 py-3 bg-brand-red text-white font-black rounded-xl hover:bg-brand-red/80 shadow-[0_0_20px_rgba(239,68,68,0.4)] uppercase text-xs">
-                <Square size={16} fill="currentColor" /> Stop Simulation
+                <Square size={16} fill="currentColor" /> Simulyatsiyani To'xtatish
               </button>
             )}
           </div>
@@ -146,13 +146,13 @@ export function RoboticsLab() {
         <div className="glass-panel p-6 border border-white/10 rounded-2xl bg-black/40">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Signal Health</p>
+              <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Signal Sog'lig'i</p>
               <div className="flex gap-1">
                 {[1, 2, 3, 4, 5].map(i => <div key={i} className={`w-1 h-4 rounded-full ${i <= 4 ? 'bg-brand-cyan shadow-[0_0_5px_#00D9FF]' : 'bg-white/10'}`} />)}
               </div>
             </div>
             <div className="text-right">
-              <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Latency</p>
+              <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Kechikish</p>
               <p className="text-xl font-mono text-white">24<span className="text-xs text-gray-500">ms</span></p>
             </div>
           </div>
@@ -165,8 +165,8 @@ export function RoboticsLab() {
         <div className="lg:col-span-3 space-y-6">
           <div className="glass-panel p-5 border border-white/10 rounded-2xl bg-black/40">
             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-              <Settings size={14} className="text-brand-cyan" /> 
-              Hardware Inventory
+              <Settings size={14} className="text-brand-cyan" />
+              Apparat Inventari
             </h3>
             <div className="space-y-3">
               {components.map((comp) => (
@@ -196,8 +196,8 @@ export function RoboticsLab() {
 
           <div className="glass-panel p-5 border border-white/10 rounded-2xl bg-black/40">
             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-              <Radio size={14} className="text-brand-purple" /> 
-              Pinout Mapping
+              <Radio size={14} className="text-brand-purple" />
+              Pin Xaritasi
             </h3>
             <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
               {connectedComponents.map(id => {
@@ -209,19 +209,19 @@ export function RoboticsLab() {
                   </div>
                 );
               })}
-              {connectedComponents.length === 0 && <p className="text-[10px] text-gray-600 italic">No hardware connected.</p>}
+              {connectedComponents.length === 0 && <p className="text-[10px] text-gray-600 italic">Hech qanday apparat ulanmagan.</p>}
             </div>
           </div>
 
           <div className="glass-panel p-5 border border-white/10 rounded-2xl bg-brand-purple/5">
             <h3 className="text-xs font-bold text-brand-purple uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-              <Info size={14} /> 
-              Mission Log
+              <Info size={14} />
+              Missiya Jurnali
             </h3>
             <div className="p-3 bg-black/40 border border-brand-purple/20 rounded-xl">
-              <p className="text-xs text-white font-bold mb-1">Task: Perimeter Patrol</p>
+              <p className="text-xs text-white font-bold mb-1">Vazifa: Perimetr Patruli</p>
               <p className="text-[10px] text-gray-500 leading-relaxed">
-                Configure the rover to navigate the obstacle course without colliding with red barriers. Use readSensor() to monitor proximity.
+                Roverni qizil to'siqlarga urilmasdan to'siqlar trassasi bo'ylab harakatlantirishga sozlang. Yaqinlikni kuzatish uchun readSensor() dan foydalaning.
               </p>
             </div>
           </div>
@@ -261,7 +261,7 @@ export function RoboticsLab() {
                 onClick={() => setCode(`// Resetting to base protocol...\nfunction onUpdate() {\n  moveForward(100);\n}`)}
                 className="text-[10px] text-gray-500 hover:text-white flex items-center gap-1 transition-colors"
               >
-                <RefreshCcw size={10} /> Reset Logic
+                <RefreshCcw size={10} /> Mantiqni Tiklash
               </button>
             </div>
           </div>
@@ -269,7 +269,7 @@ export function RoboticsLab() {
           {/* Live Output Terminal */}
           <div className="glass-panel border border-white/10 rounded-2xl overflow-hidden bg-black/80 h-[200px] flex flex-col">
             <div className="px-4 py-1 bg-white/5 border-b border-white/10 text-[10px] text-gray-500 uppercase tracking-widest flex items-center gap-2">
-              <Activity size={10} /> Live Diagnostic Output
+              <Activity size={10} /> Jonli Diagnostika Chiqishi
             </div>
             <div className="flex-1 p-4 overflow-y-auto font-mono text-xs space-y-1">
               {logs.map((log, i) => (
@@ -292,11 +292,11 @@ export function RoboticsLab() {
           <div className="glass-panel border border-white/10 rounded-2xl overflow-hidden flex flex-col bg-black/40 h-full min-h-[400px]">
             <div className="px-4 py-2 bg-white/5 border-b border-white/10 flex justify-between items-center">
               <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                <Maximize2 size={12} /> Test Bench
+                <Maximize2 size={12} /> Sinov Stendi
               </h3>
               <div className="flex gap-2">
                 <div className="w-2 h-2 rounded-full bg-brand-cyan animate-ping" />
-                <span className="text-[10px] text-brand-cyan font-bold">LIVE_FEED</span>
+                <span className="text-[10px] text-brand-cyan font-bold">JONLI_OQIM</span>
               </div>
             </div>
             
@@ -360,8 +360,8 @@ export function RoboticsLab() {
 
             <div className="p-4 bg-white/5 border-t border-white/10">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-[10px] text-gray-500">Core Performance</span>
-                <span className="text-[10px] text-brand-cyan">98.2% Efficiency</span>
+                <span className="text-[10px] text-gray-500">Yadro Unumdorligi</span>
+                <span className="text-[10px] text-brand-cyan">98.2% Samaradorlik</span>
               </div>
               <div className="w-full h-1 bg-white/5 rounded-full">
                 <div className="w-4/5 h-full bg-brand-cyan shadow-[0_0_10px_#00D9FF]" />
@@ -371,19 +371,19 @@ export function RoboticsLab() {
 
           {/* Real-World Bridge */}
           <div className="glass-panel p-6 border border-white/10 rounded-2xl bg-black/40">
-            <h3 className="text-xs font-bold text-white uppercase tracking-[0.2em] mb-4">Export Protocol</h3>
+            <h3 className="text-xs font-bold text-white uppercase tracking-[0.2em] mb-4">Eksport Protokoli</h3>
             <div className="space-y-4">
               <div className="flex gap-4">
                 <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
                   <span className="text-xs font-bold text-brand-cyan">1</span>
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs font-bold text-gray-200 uppercase">Generate Binary</p>
-                  <p className="text-[10px] text-gray-500">Compiles for {selectedBoard.toUpperCase()} via {selectedLanguage.toUpperCase()} toolchain.</p>
+                  <p className="text-xs font-bold text-gray-200 uppercase">Ikkilik Faylni Yaratish</p>
+                  <p className="text-[10px] text-gray-500">{selectedBoard.toUpperCase()} uchun {selectedLanguage.toUpperCase()} asboblar to'plami orqali kompilyatsiya qiladi.</p>
                 </div>
               </div>
               <button className="w-full py-3 bg-brand-purple/20 hover:bg-brand-purple/30 border border-brand-purple/40 rounded-xl text-[10px] font-black text-brand-purple transition-all uppercase tracking-[0.2em] flex items-center justify-center gap-2">
-                <TerminalIcon size={12} /> Download .hex file
+                <TerminalIcon size={12} /> .hex faylni yuklab olish
               </button>
               <div className="h-px bg-white/5" />
               <div className="flex gap-4">
@@ -391,12 +391,12 @@ export function RoboticsLab() {
                   <span className="text-xs font-bold text-brand-cyan">2</span>
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs font-bold text-gray-200">Wiring Schematic</p>
-                  <p className="text-[10px] text-gray-500">PDF map of all {connectedComponents.length} connections.</p>
+                  <p className="text-xs font-bold text-gray-200">Ulanish Sxemasi</p>
+                  <p className="text-[10px] text-gray-500">Barcha {connectedComponents.length} ta ulanishning PDF xaritasi.</p>
                 </div>
               </div>
               <button className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-bold text-white transition-all uppercase tracking-widest">
-                Export Wiring Diagram
+                Ulanish Diagrammasini Eksport qilish
               </button>
             </div>
           </div>

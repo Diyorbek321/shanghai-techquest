@@ -40,11 +40,11 @@ export function ShortcutManager() {
   }, []);
 
   const shortcuts = [
-    { keys: ['Ctrl', 'Space'], label: 'Summon AI Mentor', icon: MessageSquare },
-    { keys: ['Ctrl', 'Enter'], label: 'Execute Neural Code', icon: Play },
-    { keys: ['G'], label: 'Go to MyWorld', icon: Zap },
-    { keys: ['L'], label: 'View Leaderboard', icon: HelpCircle },
-    { keys: ['?'], label: 'Hold for Shortcut Matrix', icon: Keyboard },
+    { keys: ['Ctrl', 'Space'], label: 'AI Murabbiyni Chaqirish', icon: MessageSquare },
+    { keys: ['Ctrl', 'Enter'], label: 'Neyron Kodni Ishga Tushirish', icon: Play },
+    { keys: ['G'], label: 'Mening Shahrimga O\'tish', icon: Zap },
+    { keys: ['L'], label: 'Reytingni Ko\'rish', icon: HelpCircle },
+    { keys: ['?'], label: 'Yorliqlar Matritsasi uchun Bosib Turing', icon: Keyboard },
   ];
 
   return (
@@ -67,8 +67,8 @@ export function ShortcutManager() {
                 <Command size={24} />
               </div>
               <div>
-                <h2 className="text-xl font-heading font-bold text-white uppercase tracking-wider">Neural Interface Shortcuts</h2>
-                <p className="text-xs text-brand-cyan/60 font-mono uppercase tracking-widest">Global Command Matrix v1.0.4</p>
+                <h2 className="text-xl font-heading font-bold text-white uppercase tracking-wider">Neyron Interfeys Yorliqlari</h2>
+                <p className="text-xs text-brand-cyan/60 font-mono uppercase tracking-widest">Global Buyruqlar Matritsasi v1.0.4</p>
               </div>
             </div>
 
@@ -94,7 +94,7 @@ export function ShortcutManager() {
 
             <div className="mt-8 pt-4 border-t border-brand-cyan/10 flex items-center justify-center gap-2">
               <BrainCircuit size={14} className="text-brand-cyan animate-pulse" />
-              <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Matrix Active • Awaiting Input</span>
+              <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Matritsa Faol • Kiritish Kutilmoqda</span>
             </div>
           </motion.div>
         </motion.div>

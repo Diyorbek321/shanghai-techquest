@@ -7,12 +7,12 @@ export function Companion() {
   const [isVisible, setIsVisible] = useState(true);
 
   const messages = [
-    "Ready to code? 🚀",
-    "Don't forget to check the shop!",
-    "Your XP is looking good! ✨",
-    "Time for a coding battle? ⚔️",
-    "Keep up the streak! 🔥",
-    "Need help? Ask the AI Mentor!"
+    "Kodlashga tayyormisiz? 🚀",
+    "Do'konni tekshirishni unutmang!",
+    "XP'ingiz yaxshi ko'rinmoqda! ✨",
+    "Dasturlash jangi vaqti keldimi? ⚔️",
+    "Ketma-ketlikni davom ettiring! 🔥",
+    "Yordam kerakmi? AI Murabbiydan so'rang!"
   ];
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export function Companion() {
         animate={{ y: [0, -10, 0] }}
         transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
         className="relative pointer-events-auto cursor-pointer"
-        onClick={() => setMessage("I'm here to help! 🤖")}
+        onClick={() => setMessage("Men yordam berish uchun shu yerdaman! 🤖")}
       >
         {/* Simple 3D-ish Drone/Bot using CSS */}
         <div className="w-16 h-16 relative">

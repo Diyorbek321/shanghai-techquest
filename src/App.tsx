@@ -29,6 +29,7 @@ import { Homework } from './views/Homework';
 import { Attendance } from './views/Attendance';
 import { OfficeCourse } from './views/OfficeCourse';
 import { AssignmentDetail } from './views/AssignmentDetail';
+import { AssignmentSubmissions } from './views/AssignmentSubmissions';
 import { Notifications } from './views/Notifications';
 import { Grades } from './views/Grades';
 import { Calendar } from './views/Calendar';
@@ -39,41 +40,25 @@ import { ShortcutManager } from './components/ShortcutManager';
 import { SocialMatrix } from './components/SocialMatrix';
 import { ViewType, User } from './types';
 import { audioManager } from './lib/audio';
-import { useQuestManager } from './lib/QuestManager';
 
 // Initialize audio manager
 audioManager.init();
 
-export default function App() {
+export default function App({ user }: { user: User }) {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [showSuccess, setShowSuccess] = useState(false);
-  const { universalXp } = useQuestManager();
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
+  const [selectedBattleId, setSelectedBattleId] = useState<string | null>(null);
 
   const triggerSuccess = () => {
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 3000);
   };
 
-  // Mock user data dynamically merged with context XP
-  const [mockUser, setMockUser] = useState<User>({
-    name: 'Alex Chen',
-    avatar: 'https://i.pravatar.cc/150?u=13',
-    level: Math.floor(universalXp / 500) + 10,
-    title: 'Full Stack Apprentice',
-    xp: universalXp,
-    nextLevelXp: Math.floor(universalXp / 500) * 500 + 500,
-    streak: 12,
-    coins: 1250,
-    avatarGear: ['neon_visor', universalXp > 3000 ? 'shoulder_armor' : ''],
-    role: 'student'
-  });
-
-  const toggleRole = () => {
-    setMockUser(prev => ({
-      ...prev,
-      role: prev.role === 'student' ? 'teacher' : 'student'
-    }));
-    triggerSuccess();
+  // Cosmetic gear derived client-side from XP thresholds; not persisted server-side.
+  const mockUser: User = {
+    ...user,
+    avatarGear: ['neon_visor', user.xp > 3000 ? 'shoulder_armor' : ''],
   };
 
   const renderView = () => {
@@ -83,13 +68,26 @@ export default function App() {
       case 'classes':
         return <Classes onNavigate={setCurrentView} />;
       case 'assignments':
-        return <Assignments onNavigate={setCurrentView} />;
+        return <Assignments user={mockUser} onNavigate={setCurrentView} onSelectAssignment={setSelectedAssignmentId} />;
       case 'assignment_detail':
-        return <AssignmentDetail onBack={() => setCurrentView('assignments')} onTriggerSuccess={triggerSuccess} />;
+        return (
+          <AssignmentDetail
+            assignmentId={selectedAssignmentId}
+            onBack={() => setCurrentView('assignments')}
+            onTriggerSuccess={triggerSuccess}
+          />
+        );
+      case 'assignment_submissions':
+        return (
+          <AssignmentSubmissions
+            assignmentId={selectedAssignmentId}
+            onBack={() => setCurrentView('assignments')}
+          />
+        );
       case 'codelab':
         return <CodeLab />;
       case 'arena':
-        return <Arena user={mockUser} onNavigate={setCurrentView} />;
+        return <Arena user={mockUser} onNavigate={setCurrentView} onSelectBattle={setSelectedBattleId} />;
       case 'shop':
         return <Shop user={mockUser} />;
       case 'myworld':
@@ -101,23 +99,23 @@ export default function App() {
       case 'problems':
         return <Problems />;
       case 'leaderboard':
-        return <Leaderboard user={mockUser} onNavigate={setCurrentView} />;
+        return <Leaderboard user={mockUser} onNavigate={setCurrentView} onSelectBattle={setSelectedBattleId} />;
       case 'mission_log':
         return <MissionLog />;
       case 'achievements':
         return <Achievements />;
       case 'profile':
-        return <Profile user={mockUser} onRoleToggle={toggleRole} />;
+        return <Profile user={mockUser} />;
       case 'settings':
-        return <Settings />;
+        return <Settings user={mockUser} />;
       case 'teacher_portal':
         return <TeacherPortal />;
       case 'teams':
-        return <Teams />;
+        return <Teams user={mockUser} />;
       case 'help':
         return <HelpCenter />;
       case 'battle':
-        return <Battle user={mockUser} onNavigate={setCurrentView} />;
+        return <Battle user={mockUser} onNavigate={setCurrentView} battleId={selectedBattleId} />;
       case 'robotics_lab':
         return <RoboticsLab />;
       case 'attendance':
@@ -141,7 +139,7 @@ export default function App() {
       <SuccessParticles active={showSuccess} />
       <ShortcutManager />
       <Companion />
-      <SocialMatrix user={mockUser} />
+      <SocialMatrix user={mockUser} onNavigate={setCurrentView} onSelectBattle={setSelectedBattleId} />
       <AnimatePresence mode="wait">
         <motion.div
           key={currentView}

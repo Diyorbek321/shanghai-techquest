@@ -13,24 +13,25 @@ import {
   Bell,
   Calendar
 } from 'lucide-react';
-import { ViewType } from '../types';
+import { ViewType, Track } from '../types';
 
 interface QuickActionsProps {
   onNavigate: (view: ViewType) => void;
+  userTrack: Track | null;
 }
 
-export function QuickActions({ onNavigate }: QuickActionsProps) {
+export function QuickActions({ onNavigate, userTrack }: QuickActionsProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const actions = [
-    { id: 'codelab', label: 'Resume Code Lab', icon: <Code size={18} />, color: 'bg-brand-cyan', view: 'codelab' as ViewType },
-    { id: 'assignment', label: 'Latest Assignment', icon: <Target size={18} />, color: 'bg-brand-purple', view: 'assignments' as ViewType },
-    { id: 'homework', label: 'Daily Homework', icon: <BookText size={18} />, color: 'bg-brand-orange', view: 'homework' as ViewType },
-    { id: 'signals', label: 'Check Signals', icon: <Bell size={18} />, color: 'bg-brand-purple', view: 'notifications' as ViewType },
-    { id: 'schedule', label: 'View Schedule', icon: <Calendar size={18} />, color: 'bg-brand-cyan', view: 'calendar' as ViewType },
-    { id: 'office', label: 'Office Suite', icon: <Presentation size={18} />, color: 'bg-blue-600', view: 'office_course' as ViewType },
-    { id: 'course', label: 'Continue Frontend', icon: <BookOpen size={18} />, color: 'bg-brand-orange', view: 'frontend_course' as ViewType },
-  ];
+    { id: 'codelab', label: 'Kod Laboratoriyasi', icon: <Code size={18} />, color: 'bg-brand-cyan', view: 'codelab' as ViewType },
+    { id: 'assignment', label: "So'nggi vazifa", icon: <Target size={18} />, color: 'bg-brand-purple', view: 'assignments' as ViewType },
+    { id: 'homework', label: 'Kunlik uy vazifasi', icon: <BookText size={18} />, color: 'bg-brand-orange', view: 'homework' as ViewType },
+    { id: 'signals', label: 'Bildirishnomalar', icon: <Bell size={18} />, color: 'bg-brand-purple', view: 'notifications' as ViewType },
+    { id: 'schedule', label: "Jadvalni ko'rish", icon: <Calendar size={18} />, color: 'bg-brand-cyan', view: 'calendar' as ViewType },
+    { id: 'office', label: 'Ofis Dasturlari', icon: <Presentation size={18} />, color: 'bg-blue-600', view: 'office_course' as ViewType, trackRequirement: 'office' as Track },
+    { id: 'course', label: 'Frontendni davom ettirish', icon: <BookOpen size={18} />, color: 'bg-brand-orange', view: 'frontend_course' as ViewType, trackRequirement: 'frontend' as Track },
+  ].filter(action => !action.trackRequirement || userTrack === action.trackRequirement);
 
   return (
     <div className="fixed bottom-6 right-6 z-50">

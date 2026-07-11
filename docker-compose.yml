@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: techquest
+      POSTGRES_PASSWORD: techquest
+      POSTGRES_DB: techquest
+    ports:
+      - '5435:5432'
+    volumes:
+      - techquest_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U techquest -d techquest']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Override values from .env that must point at the Docker network
+      # hostname/internal port rather than the host-mapped ones.
+      NODE_ENV: production
+      DATABASE_URL: postgresql://techquest:techquest@postgres:5432/techquest
+      # src/server/env.ts refuses to boot when NODE_ENV=production unless
+      # COOKIE_SECURE=true (verified by running the built image). Note this
+      # means the login cookie is marked Secure, so it will only be sent by
+      # browsers over HTTPS -- put a TLS-terminating reverse proxy in front
+      # of this container for a real deployment; plain http://localhost:3000
+      # will not persist the login cookie.
+      COOKIE_SECURE: 'true'
+    ports:
+      - '3000:3000'
+    volumes:
+      - techquest_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  techquest_postgres_data:
+  techquest_uploads:

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { 
-  LayoutDashboard, 
-  BookOpen, 
-  CheckSquare, 
-  Code, 
-  Trophy, 
-  Medal, 
-  User as UserIcon, 
+import {
+  LayoutDashboard,
+  BookOpen,
+  CheckSquare,
+  Code,
+  Trophy,
+  Medal,
+  User as UserIcon,
   Settings as SettingsIcon,
   Bell,
   Search,
@@ -25,11 +25,13 @@ import {
   CalendarDays,
   Presentation,
   GraduationCap,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  LogOut
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { ViewType, User } from '../types';
+import { ViewType, User, Track } from '../types';
 import { audioManager } from '../lib/audio';
+import { useAuth } from '../lib/AuthContext';
 
 import { StudyTimer } from './StudyTimer';
 import { QuickActions } from './QuickActions';
@@ -43,31 +45,40 @@ interface LayoutProps {
 
 export function Layout({ children, currentView, onNavigate, user }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const { logout } = useAuth();
 
-  const navItems: { id: ViewType; label: string; icon: React.ReactNode; customColor?: string }[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
-    { id: 'mission_log', label: 'Mission Log', icon: <ScrollText size={20} />, customColor: 'text-brand-cyan shadow-[0_0_10px_rgba(0,217,255,0.5)]' },
-    { id: 'myworld', label: 'My City', icon: <Globe size={20} />, customColor: 'text-brand-purple shadow-[0_0_10px_rgba(176,38,255,0.5)]' },
-    { id: 'classes', label: 'My Classes', icon: <BookOpen size={20} /> },
-    { id: 'frontend_course', label: 'Frontend Dev', icon: <Code size={20} />, customColor: 'text-brand-cyan' },
-    { id: 'office_course', label: 'Office Suite', icon: <Presentation size={20} />, customColor: 'text-blue-500' },
-    { id: 'assignments', label: 'Quests', icon: <CheckSquare size={20} /> },
-    { id: 'homework', label: 'Homework', icon: <BookText size={20} />, customColor: 'text-brand-orange' },
-    { id: 'attendance', label: 'Attendance', icon: <CalendarDays size={20} /> },
-    { id: 'notifications', label: 'Signals', icon: <Bell size={20} />, customColor: 'text-brand-purple' },
-    { id: 'grades', label: 'Performance', icon: <GraduationCap size={20} /> },
-    { id: 'calendar', label: 'Schedule', icon: <CalendarIcon size={20} /> },
-    { id: 'problems', label: 'Problems', icon: <BrainCircuit size={20} /> },
-    { id: 'codelab', label: 'Code Lab', icon: <Code size={20} /> },
-    { id: 'robotics_lab', label: 'Robotics Lab', icon: <Cpu size={20} />, customColor: 'text-brand-cyan shadow-[0_0_10px_rgba(0,217,255,0.3)]' },
+  type NavItem = { id: ViewType; label: string; icon: React.ReactNode; customColor?: string; trackRequirement?: Track };
+
+  const allNavItems: NavItem[] = [
+    { id: 'dashboard', label: 'Boshqaruv paneli', icon: <LayoutDashboard size={20} /> },
+    { id: 'mission_log', label: 'Missiyalar jurnali', icon: <ScrollText size={20} />, customColor: 'text-brand-cyan shadow-[0_0_10px_rgba(0,217,255,0.5)]' },
+    { id: 'myworld', label: 'Mening Shahrim', icon: <Globe size={20} />, customColor: 'text-brand-purple shadow-[0_0_10px_rgba(176,38,255,0.5)]' },
+    { id: 'classes', label: 'Mening Sinflarim', icon: <BookOpen size={20} /> },
+    { id: 'frontend_course', label: 'Frontend Dasturlash', icon: <Code size={20} />, customColor: 'text-brand-cyan', trackRequirement: 'frontend' },
+    { id: 'office_course', label: 'Ofis Dasturlari', icon: <Presentation size={20} />, customColor: 'text-blue-500', trackRequirement: 'office' },
+    { id: 'assignments', label: 'Vazifalar', icon: <CheckSquare size={20} /> },
+    { id: 'homework', label: 'Uy vazifasi', icon: <BookText size={20} />, customColor: 'text-brand-orange' },
+    { id: 'attendance', label: 'Davomat', icon: <CalendarDays size={20} /> },
+    { id: 'notifications', label: 'Bildirishnomalar', icon: <Bell size={20} />, customColor: 'text-brand-purple' },
+    { id: 'grades', label: 'Baholar', icon: <GraduationCap size={20} /> },
+    { id: 'calendar', label: 'Jadval', icon: <CalendarIcon size={20} /> },
+    { id: 'problems', label: 'Masalalar', icon: <BrainCircuit size={20} /> },
+    { id: 'codelab', label: 'Kod Laboratoriyasi', icon: <Code size={20} /> },
+    { id: 'robotics_lab', label: 'Robototexnika', icon: <Cpu size={20} />, customColor: 'text-brand-cyan shadow-[0_0_10px_rgba(0,217,255,0.3)]', trackRequirement: 'robotics' },
     { id: 'arena', label: 'Arena', icon: <Swords size={20} />, customColor: 'text-brand-red shadow-[0_0_10px_rgba(239,68,68,0.5)]' },
-    { id: 'leaderboard', label: 'Leaderboard', icon: <Trophy size={20} /> },
-    { id: 'teams', label: 'Guilds', icon: <Users size={20} />, customColor: 'text-brand-orange' },
-    { id: 'achievements', label: 'Achievements', icon: <Medal size={20} /> },
-    ...(user.role === 'teacher' || user.role === 'admin' ? [{ id: 'teacher_portal' as ViewType, label: 'Teacher Portal', icon: <ShieldCheck size={20} />, customColor: 'text-brand-purple' }] : []),
-    { id: 'shop', label: 'Item Shop', icon: <Store size={20} />, customColor: 'text-[#FFD700]' },
-    { id: 'profile', label: 'Profile', icon: <UserIcon size={20} /> },
+    { id: 'leaderboard', label: 'Reyting', icon: <Trophy size={20} /> },
+    { id: 'teams', label: 'Jamoalar', icon: <Users size={20} />, customColor: 'text-brand-orange' },
+    { id: 'achievements', label: 'Yutuqlar', icon: <Medal size={20} /> },
+    ...(user.role === 'teacher' || user.role === 'admin' ? [{ id: 'teacher_portal' as ViewType, label: "O'qituvchi paneli", icon: <ShieldCheck size={20} />, customColor: 'text-brand-purple' }] : []),
+    { id: 'shop', label: "Do'kon", icon: <Store size={20} />, customColor: 'text-[#FFD700]' },
+    { id: 'profile', label: 'Profil', icon: <UserIcon size={20} /> },
   ];
+
+  const navItems = allNavItems.filter(item => {
+    // Staff (null track) see every course track; students only see their own.
+    if (!item.trackRequirement) return true;
+    return user.role !== 'student' || user.track === item.trackRequirement;
+  });
 
   const handleNavigate = (id: ViewType) => {
     audioManager.playClick();
@@ -182,9 +193,9 @@ export function Layout({ children, currentView, onNavigate, user }: LayoutProps)
             )}
           >
             <HelpCircle size={20} />
-            {sidebarOpen && <span className="text-sm">Help Center</span>}
+            {sidebarOpen && <span className="text-sm">Yordam markazi</span>}
           </button>
-          <button 
+          <button
             onClick={() => handleNavigate('settings')}
             className={cn(
               "flex items-center gap-3 px-3 py-2 text-gray-400 hover:text-white w-full rounded-lg transition-colors",
@@ -192,7 +203,14 @@ export function Layout({ children, currentView, onNavigate, user }: LayoutProps)
             )}
           >
             <SettingsIcon size={20} />
-            {sidebarOpen && <span className="text-sm">Settings</span>}
+            {sidebarOpen && <span className="text-sm">Sozlamalar</span>}
+          </button>
+          <button
+            onClick={() => logout()}
+            className="flex items-center gap-3 px-3 py-2 text-gray-400 hover:text-brand-red w-full rounded-lg transition-colors"
+          >
+            <LogOut size={20} />
+            {sidebarOpen && <span className="text-sm">Chiqish</span>}
           </button>
         </div>
       </aside>
@@ -212,9 +230,9 @@ export function Layout({ children, currentView, onNavigate, user }: LayoutProps)
             
             <div className="relative hidden sm:block">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-              <input 
-                type="text" 
-                placeholder="Search quests, code, peers..." 
+              <input
+                type="text"
+                placeholder="Vazifa, kod, do'stlarni qidirish..."
                 className="bg-black/30 border border-brand-border rounded-full pl-9 pr-4 py-1.5 text-sm focus:outline-none focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan transition-all w-64"
               />
             </div>
@@ -239,7 +257,7 @@ export function Layout({ children, currentView, onNavigate, user }: LayoutProps)
             </button>
 
             <div className="relative h-8 w-8 rounded-full overflow-hidden border border-brand-cyan sm:hidden">
-              <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
+              <img src={user.avatar} alt="Profil" className="w-full h-full object-cover" />
               {user.avatarGear?.includes('neon_visor') && (
                 <div className="absolute top-[30%] left-[10%] w-[80%] h-[20%] bg-brand-cyan/80 rounded-full blur-[1px] shadow-[0_0_10px_#00D9FF] z-10" />
               )}
@@ -255,7 +273,7 @@ export function Layout({ children, currentView, onNavigate, user }: LayoutProps)
           {/* Subtle grid background effect */}
           <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none -z-10"></div>
           {children}
-          <QuickActions onNavigate={onNavigate} />
+          <QuickActions onNavigate={onNavigate} userTrack={user.track} />
         </main>
       </div>
     </div>
