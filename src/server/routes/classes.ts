@@ -1,11 +1,15 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import bcrypt from 'bcryptjs';
 import { Role } from '@prisma/client';
 import { prisma } from '../db';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { resolveTrackFilter } from '../utils/trackScope';
+import { teacherOwnsClass } from '../utils/teacherScope';
 import { TRACK_VALUES, toClientTrack, toPrismaTrack } from '../serializers/track';
 import { syncLessonAssignments } from '../lessons/syncAssignments';
+import { STUDENT_LOGIN_DOMAIN, buildLogin, generatePassword } from '../users/credentials';
+import { avatarUrlForEmail } from '../avatar';
 
 export const classesRouter = Router();
 
@@ -13,8 +17,13 @@ classesRouter.use(requireAuth);
 
 classesRouter.get('/', async (req, res) => {
   const track = resolveTrackFilter(req);
+  // A teacher manages only the cohorts they own, so the list they act from must
+  // not include a colleague's — every per-class route below refuses those
+  // anyway, and showing them would just produce 403s. Students keep the
+  // track-wide view, admins keep everything.
+  const ownedByMe = req.user!.role === Role.TEACHER ? { teacherId: req.user!.id } : {};
   const classes = await prisma.classGroup.findMany({
-    where: track ? { track } : undefined,
+    where: { ...(track ? { track } : {}), ...ownedByMe },
     include: { teacher: { select: { name: true } }, _count: { select: { enrollments: true } } },
     orderBy: { title: 'asc' },
   });
@@ -96,6 +105,9 @@ classesRouter.patch('/:id', requireRole(Role.TEACHER, Role.ADMIN), async (req, r
 });
 
 classesRouter.get('/:id/students', requireRole(Role.TEACHER, Role.ADMIN), async (req, res) => {
+  if (!(await teacherOwnsClass(req.user!, req.params.id))) {
+    return res.status(403).json({ error: "Bu sinfga kirish huquqingiz yo'q." });
+  }
   const enrollments = await prisma.enrollment.findMany({
     where: { classId: req.params.id },
     include: {
@@ -136,4 +148,71 @@ classesRouter.get('/:id/students', requireRole(Role.TEACHER, Role.ADMIN), async 
       };
     })
   );
+});
+
+const addStudentsSchema = z.object({
+  // A teacher enrolling a cohort pastes the register in one go, so the endpoint
+  // is a batch by default; the UI sends a single-element list for one student.
+  names: z.array(z.string().min(1).max(100)).min(1).max(60),
+});
+
+/**
+ * Create accounts for students who have none and enrol them in the class.
+ *
+ * Logins are generated from the names (see users/credentials.ts) because
+ * students at this age usually have no email address, and the passwords are
+ * returned in the response — this is the ONLY time the plaintext exists. The
+ * teacher is expected to hand them out; afterwards only a reset can recover
+ * access (POST /api/users/:id/reset-password).
+ */
+classesRouter.post('/:id/students', requireRole(Role.TEACHER, Role.ADMIN), async (req, res) => {
+  const parsed = addStudentsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Noto'g'ri ma'lumot kiritildi." });
+  }
+
+  const group = await prisma.classGroup.findUnique({ where: { id: req.params.id } });
+  if (!group) {
+    return res.status(404).json({ error: 'Sinf topilmadi.' });
+  }
+  if (req.user!.role === Role.TEACHER && group.teacherId !== req.user!.id) {
+    return res.status(403).json({ error: "Bu sinfga o'quvchi qo'shish huquqingiz yo'q." });
+  }
+
+  // Seed the taken-set from every existing login on the domain so a generated
+  // address never collides, then keep adding to it as the batch is built —
+  // two students named the same in one request must not both get slug@domain.
+  const existing = await prisma.user.findMany({
+    where: { email: { endsWith: `@${STUDENT_LOGIN_DOMAIN}` } },
+    select: { email: true },
+  });
+  const taken = new Set(existing.map((u) => u.email));
+
+  const pending = parsed.data.names.map((rawName) => {
+    const name = rawName.trim();
+    const login = buildLogin(name, taken);
+    taken.add(login);
+    return { name, login, password: generatePassword() };
+  });
+
+  const created = [];
+  for (const student of pending) {
+    const user = await prisma.user.create({
+      data: {
+        email: student.login,
+        passwordHash: await bcrypt.hash(student.password, 10),
+        name: student.name,
+        role: Role.STUDENT,
+        // Inheriting the class track is what puts the right course in their
+        // menu; a student with a null track sees no curriculum at all.
+        track: group.track,
+        title: 'New Recruit',
+        avatarUrl: avatarUrlForEmail(student.login),
+        enrollments: { create: { classId: group.id } },
+      },
+    });
+    created.push({ id: user.id, name: user.name, login: user.email, password: student.password });
+  }
+
+  res.status(201).json({ created });
 });

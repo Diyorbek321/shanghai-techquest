@@ -208,6 +208,7 @@ model ClassGroup {
   assignments Assignment[]
   events      CalendarEvent[]
   attendances Attendance[]
+  homework    Homework[]
 
   @@index([teacherId])
 }
@@ -386,8 +387,17 @@ model Homework {
   course    String
   dueDate   DateTime
   completed Boolean  @default(false)
+  /// Set when a teacher assigned this to one of their classes; null for the
+  /// older track-wide broadcasts, which stay readable.
+  classId   String?
+  class     ClassGroup? @relation(fields: [classId], references: [id], onDelete: Cascade)
+  /// Groups the per-student rows created by one assignment action, so the
+  /// teacher's completion view can roll them up without matching on title.
+  batchId   String?
 
   @@index([userId])
+  @@index([classId])
+  @@index([batchId])
 }
 
 model Attendance {

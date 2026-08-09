@@ -8,6 +8,8 @@ import { serializeUser } from '../serializers/user';
 import { checkAchievements } from '../achievements/check';
 import { TRACK_VALUES, toClientTrack, toPrismaTrack } from '../serializers/track';
 import { avatarUrlForEmail } from '../avatar';
+import { teacherManagesStudent } from '../utils/teacherScope';
+import { generatePassword } from '../users/credentials';
 
 export const usersRouter = Router();
 
@@ -180,4 +182,27 @@ usersRouter.delete('/:id', requireRole(Role.ADMIN), async (req, res) => {
   }
   await prisma.user.delete({ where: { id: req.params.id } });
   res.status(204).send();
+});
+
+/**
+ * Issue a new password for a student who has lost theirs, and return it once —
+ * the stored hash is one-way, so there is nothing to "look up" and a reset is
+ * the only way back in.
+ *
+ * teacherManagesStudent() refuses any target that is not a STUDENT, which is
+ * what stops a teacher from taking over a colleague's or an admin's account by
+ * passing their id here.
+ */
+usersRouter.post('/:id/reset-password', requireRole(Role.TEACHER, Role.ADMIN), async (req, res) => {
+  if (!(await teacherManagesStudent(req.user!, req.params.id))) {
+    return res.status(403).json({ error: "Bu o'quvchining parolini tiklash huquqingiz yo'q." });
+  }
+
+  const password = generatePassword();
+  const user = await prisma.user.update({
+    where: { id: req.params.id },
+    data: { passwordHash: await bcrypt.hash(password, 10) },
+  });
+
+  res.json({ id: user.id, name: user.name, login: user.email, password });
 });

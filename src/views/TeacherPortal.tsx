@@ -11,12 +11,16 @@ import {
   LayoutDashboard,
   Send,
   Star,
-  CalendarCheck
+  CalendarCheck,
+  BookText,
+  KeyRound
 } from 'lucide-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { formatRelativeTime, formatDate } from '../lib/utils';
 import { Track } from '../types';
+import { StudentAccountsPanel } from '../components/teacher/StudentAccountsPanel';
+import { HomeworkPanel } from '../components/teacher/HomeworkPanel';
 
 interface ClassGroup {
   id: string;
@@ -35,8 +39,10 @@ interface StudentRow {
   lastSubmittedAt: string | null;
 }
 
+type TeacherTab = 'overview' | 'students' | 'accounts' | 'homework';
+
 export function TeacherPortal() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'students'>('overview');
+  const [activeTab, setActiveTab] = useState<TeacherTab>('overview');
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [detailStudent, setDetailStudent] = useState<StudentRow | null>(null);
@@ -93,10 +99,12 @@ export function TeacherPortal() {
         {[
           { id: 'overview', label: 'Umumiy ko\'rinish', icon: LayoutDashboard },
           { id: 'students', label: 'O\'quvchilar', icon: Users },
+          { id: 'accounts', label: 'Login/parol', icon: KeyRound },
+          { id: 'homework', label: 'Uy vazifasi', icon: BookText },
         ].map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as 'overview' | 'students')}
+            onClick={() => setActiveTab(tab.id as TeacherTab)}
             className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
               activeTab === tab.id
                 ? 'bg-brand-purple text-white shadow-lg shadow-brand-purple/20'
@@ -207,6 +215,15 @@ export function TeacherPortal() {
             </table>
           </div>
         </div>
+      )}
+
+      {activeTab === 'accounts' && <StudentAccountsPanel classId={selectedClassId} />}
+
+      {activeTab === 'homework' && (
+        <HomeworkPanel
+          classId={selectedClassId}
+          track={classes.find((c) => c.id === selectedClassId)?.track ?? null}
+        />
       )}
 
       <StudentDetailModal student={detailStudent} onClose={() => setDetailStudent(null)} />
