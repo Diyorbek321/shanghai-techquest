@@ -17,6 +17,7 @@ enum Track {
   FRONTEND
   ROBOTICS
   OFFICE
+  BACKEND
 }
 
 enum SubmissionStatus {
@@ -185,6 +186,7 @@ model User {
   sentMessages         DirectMessage[]   @relation("DMSender")
   receivedMessages     DirectMessage[]   @relation("DMRecipient")
   dailyExerciseLogs    DailyExerciseLog[]
+  quizAttempts         QuizAttempt[]
 
   @@index([teamId])
 }
@@ -196,6 +198,10 @@ model ClassGroup {
   teacherId   String
   teacher     User     @relation("ClassTeacher", fields: [teacherId], references: [id], onDelete: Restrict)
   schedule    String?
+  /// First lesson date. Lesson N's deadline is derived from this plus lessonDays.
+  startDate   DateTime?
+  /// Weekdays lessons are held on (0 = Sunday). Defaults to Mon/Wed/Fri.
+  lessonDays  Int[]    @default([1, 3, 5])
   createdAt   DateTime @default(now())
 
   enrollments Enrollment[]
@@ -225,14 +231,113 @@ model Assignment {
   track       Track
   classId     String?
   class       ClassGroup? @relation(fields: [classId], references: [id], onDelete: SetNull)
+  lessonId    String?
+  lesson      Lesson?  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   dueDate     DateTime
   xpReward    Int      @default(0)
+  moduleKey   String?
   createdAt   DateTime @default(now())
 
   submissions Submission[]
   grades      Grade[]
 
   @@index([classId])
+  @@index([lessonId])
+  // Class-scoped: each cohort gets its own copy of a lesson's homework with a
+  // deadline derived from that cohort's start date. Self-paced module tasks keep
+  // classId = null, which Postgres treats as distinct — seeding those goes
+  // through an explicit moduleKey lookup instead of relying on this constraint.
+  @@unique([track, classId, moduleKey])
+}
+
+/// One session of a taught curriculum, extracted from its slide deck by
+/// scripts/extractLessons.ts. Track-agnostic so other tracks can adopt it later.
+model Lesson {
+  id             String   @id @default(cuid())
+  key            String   @unique
+  track          Track
+  order          Int
+  month          Int
+  week           Int
+  title          String
+  section        String
+  summary        String
+  objectives     String[]
+  homeworkMain   String
+  homeworkReview String[]
+  homeworkNote   String   @default("")
+  makeEasy       String
+  makeMedium     String
+  makeHard       String
+  quiz           String[]
+  nextTopic      String?
+  nextPrompt     String?
+  /// File name inside lesson-assets/<track>/ — served by GET /api/lessons/:key/slides.
+  slideFile      String?
+  /// 'lesson' | 'project'
+  kind           String   @default("lesson")
+  xpReward       Int      @default(0)
+
+  assignments   Assignment[]
+  problems      Problem[]
+  quizQuestions QuizQuestion[]
+  projectRubric ProjectRubric?
+
+  @@unique([track, order])
+  @@index([track, month])
+}
+
+/// One multiple-choice retrieval-practice question attached to a lesson.
+/// `choices` must hold exactly 4 options; that invariant is enforced in
+/// application code (Prisma cannot express array length constraints).
+model QuizQuestion {
+  id           String @id @default(cuid())
+  lessonId     String
+  lesson       Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  order        Int
+  prompt       String
+  /// Exactly 4 options.
+  choices      String[]
+  /// Index into `choices` of the correct option (0..3).
+  correctIndex Int
+  /// Short Uzbek explanation shown to the student after answering.
+  explanation  String
+
+  attempts QuizAttempt[]
+
+  @@unique([lessonId, order])
+  @@index([lessonId])
+}
+
+/// Spaced-repetition state: exactly one row per (user, question), updated in
+/// place every time the student reviews that question.
+model QuizAttempt {
+  id         String       @id @default(cuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId String
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  /// Outcome of the most recent answer.
+  correct    Boolean
+  /// Consecutive correct answers; drives the next review interval.
+  streak     Int          @default(0)
+  timesSeen  Int          @default(0)
+  timesCorrect Int        @default(0)
+  answeredAt DateTime     @default(now())
+  /// When this question should resurface for review.
+  dueAt      DateTime
+
+  @@unique([userId, questionId])
+  @@index([userId, dueAt])
+}
+
+/// Grading criteria for a project lesson (Lesson.kind === 'project').
+model ProjectRubric {
+  id       String @id @default(cuid())
+  lessonId String @unique
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  /// [{ "label": string, "maxPoints": number, "hint": string }]
+  criteria Json   @default("[]")
 }
 
 model Submission {
@@ -248,6 +353,10 @@ model Submission {
   fileName     String?
   status       SubmissionStatus @default(PENDING)
   submittedAt  DateTime?
+  /// [{ "label": string, "points": number, "note": string }] — per-criterion rubric marks.
+  rubricScores Json     @default("[]")
+  /// Student's short written defense of their own project.
+  defense      String   @default("")
 
   @@unique([assignmentId, userId])
   @@index([userId])
@@ -441,12 +550,21 @@ model Problem {
   points         Int
   tags           String[]
   description    String
-  starterCodeJs  String
-  starterCodePy  String
-  starterCodeCpp String
+  // Nullable: lesson-linked practice problems are Python-only, so the UI offers
+  // just the languages that actually have starter code.
+  starterCodeJs  String?
+  starterCodePy  String?
+  starterCodeCpp String?
+  /// Set for bonus practice attached to a taught lesson; null for the general pool.
+  lessonId       String?
+  lesson         Lesson?    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  /// [{ "stdin": string, "expectedStdout": string, "hidden": boolean, "label": string }]
+  testCases      Json       @default("[]")
 
   submissions ProblemSubmission[]
   battles     BattleChallenge[]
+
+  @@index([lessonId])
 }
 
 model ProblemSubmission {
@@ -460,6 +578,9 @@ model ProblemSubmission {
   passed        Boolean
   feedback      String
   pointsAwarded Int
+  /// How many of `testsTotal` test cases the run passed; 0/0 for legacy rows.
+  testsPassed   Int      @default(0)
+  testsTotal    Int      @default(0)
   submittedAt   DateTime @default(now())
 
   @@index([userId])

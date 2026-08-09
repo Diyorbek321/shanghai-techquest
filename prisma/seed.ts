@@ -1,4 +1,4 @@
-import { PrismaClient, Track, Role, Difficulty } from '@prisma/client';
+import { PrismaClient, Prisma, Track, Role, Difficulty } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { problems as easyA } from './problemsData/easy-a';
 import { problems as easyB } from './problemsData/easy-b';
@@ -19,6 +19,12 @@ import { problems as expertD } from './problemsData/expert-d';
 import { problems as masterA } from './problemsData/master-a';
 import { problems as masterB } from './problemsData/master-b';
 import { problems as masterC } from './problemsData/master-c';
+import { backendLessons } from './lessonsData/backend';
+import { backendLessonProblems } from './lessonsData/backendProblems';
+import { backendLessonQuiz } from './lessonsData/backendQuiz';
+import { syncLessonAssignments } from '../src/server/lessons/syncAssignments';
+import { DEFAULT_PROJECT_RUBRIC } from '../src/server/lessons/rubric';
+import { avatarUrlForEmail } from '../src/server/avatar';
 
 const generatedProblems = [
   ...easyA, ...easyB, ...easyC, ...easyD,
@@ -31,6 +37,89 @@ const generatedProblems = [
 const prisma = new PrismaClient();
 
 const DEMO_PASSWORD = 'password123';
+
+// Real per-module mission content, mirrored 1:1 against the moduleKeys in
+// FrontendCourse.tsx / OfficeCourse.tsx / RoboticsLab.tsx so every campaign-path
+// node has a real Assignment (instructions + requirements + submission + grading)
+// instead of dumping students into an unrelated generic CodeLab.
+type FrontendModuleTask = { moduleKey: string; title: string; desc: string; xp: number; kind: 'lesson' | 'boss' };
+
+const FRONTEND_MODULE_TASKS: FrontendModuleTask[] = [
+  { moduleKey: 'html-foundations', title: 'HTML Asoslari', desc: "Sahifaning strukturaviy to'rini quring.", xp: 150, kind: 'lesson' },
+  { moduleKey: 'css-cyber-styling', title: 'CSS Kiber-Uslub', desc: 'Neon estetika va flex tartiblarni joriy eting.', xp: 200, kind: 'lesson' },
+  { moduleKey: 'js-logic-gates', title: 'JS Mantiq Darvozalari', desc: "DOM'ni buzib kiring va interaktivlikni ulang.", xp: 350, kind: 'lesson' },
+  { moduleKey: 'boss-responsive-hydra', title: 'BOSS: Moslashuvchan Gidra', desc: "3 ta qurilma o'lchamida joylashuv xatolarini yengib chiqing.", xp: 1000, kind: 'boss' },
+  { moduleKey: 'react-components', title: 'React Komponentlari', desc: 'Modulli UI komponentlarini yarating.', xp: 400, kind: 'lesson' },
+  { moduleKey: 'react-hooks-state', title: 'React Hooklari va Holat Boshqaruvi', desc: "useState, useEffect va maxsus hooklar bilan dinamik interfeys quring.", xp: 450, kind: 'lesson' },
+  { moduleKey: 'typescript-types', title: 'TypeScript Turlar Olami', desc: "Interfeyslar, generiklar va turlar xavfsizligini o'rganing.", xp: 400, kind: 'lesson' },
+  { moduleKey: 'git-github-mastery', title: 'Git va GitHub Ustaligi', desc: "Branch, commit va pull request ish jarayonini egallang.", xp: 300, kind: 'lesson' },
+  { moduleKey: 'boss-merge-conflict-beast', title: "BOSS: Merge Conflict Yirtqichi", desc: "Murakkab birlashtirish ziddiyatlarini yengib, tarixni saqlab qoling.", xp: 900, kind: 'boss' },
+  { moduleKey: 'api-fetch-requests', title: "API va Fetch So'rovlari", desc: "REST API bilan ishlash, async/await va xatoliklarni boshqarish.", xp: 400, kind: 'lesson' },
+  { moduleKey: 'tailwind-utility-first', title: 'Tailwind CSS Utility-First Yondashuv', desc: "Tezkor va moslashuvchan uslublashtirish tizimini o'zlashtiring.", xp: 300, kind: 'lesson' },
+  { moduleKey: 'react-router-navigation', title: 'React Router Navigatsiyasi', desc: "Ko'p sahifali ilovalar uchun marshrutlashni sozlang.", xp: 350, kind: 'lesson' },
+  { moduleKey: 'forms-validation', title: 'Formalar va Validatsiya', desc: "Foydalanuvchi kiritmalarini tekshirish va xatoliklarni ko'rsatish.", xp: 350, kind: 'lesson' },
+  { moduleKey: 'boss-form-dragon', title: 'BOSS: Forma Ajdahosi', desc: "Ko'p bosqichli, murakkab validatsiyali formani mag'lub eting.", xp: 1100, kind: 'boss' },
+  { moduleKey: 'state-management', title: 'Holatni Global Boshqarish', desc: "Context API va Redux yordamida murakkab holatni boshqaring.", xp: 500, kind: 'lesson' },
+  { moduleKey: 'animations-framer-motion', title: 'Animatsiyalar (Framer Motion)', desc: "Silliq o'tishlar va interaktiv animatsiyalar yarating.", xp: 350, kind: 'lesson' },
+  { moduleKey: 'web-performance', title: 'Veb Unumdorlikni Optimallashtirish', desc: "Lazy loading, bundle hajmi va renderlash tezligini yaxshilang.", xp: 450, kind: 'lesson' },
+  { moduleKey: 'testing-jest-rtl', title: 'Testlash (Jest va RTL)', desc: "Komponentlaringiz uchun ishonchli avtomatik testlar yozing.", xp: 400, kind: 'lesson' },
+  { moduleKey: 'boss-deploy-gauntlet', title: "BOSS: Ishga Tushirish Sinovi", desc: "Ilovangizni CI/CD orqali ishlab chiqarish muhitiga xavfsiz chiqaring.", xp: 1200, kind: 'boss' },
+  { moduleKey: 'capstone-portfolio', title: 'Yakuniy Loyiha: Portfolio Sayti', desc: "O'rgangan barcha ko'nikmalaringizni birlashtirib, portfolio sayt yarating.", xp: 800, kind: 'lesson' },
+];
+
+function frontendTaskDescription(desc: string, kind: 'lesson' | 'boss'): string {
+  if (kind === 'boss') {
+    return `${desc}\n\nMaqsad: Boss jangi — oldingi bir necha modulda o'rgangan barcha ko'nikmalaringizni birlashtirib, murakkab, ko'p bosqichli muammoni hal qiling.\n\nTalablar:\n- Barcha asosiy stsenariylarni va chekka holatlarni qamrab oling.\n- Kodni tushunarli tuzilishga solib chiqing, konsolda xatolik qoldirmang.\n- Duch kelgan qiyinchilik va uni qanday yechganingizni qisqacha yozing.\n\nTopshirish: GitHub repo havolasi va jonli demo (Vercel/Netlify) havolasi majburiy.`;
+  }
+  return `${desc}\n\nMaqsad: Ushbu mavzuni amaliyotda qo'llab, kamida bitta ishlaydigan komponent yoki sahifa yarating.\n\nTalablar:\n- Mavzuga oid asosiy texnikalarni real kodda qo'llang.\n- Kodni GitHub repozitoriyga joylashtiring, tushunarli commit tarixini saqlang.\n- README faylida nima qilinganini 3-5 gapda tushuntiring.\n\nTopshirish: GitHub repo havolasini yuboring, ixtiyoriy ravishda jonli demo havolasini ham qo'shishingiz mumkin.`;
+}
+
+type OfficeModuleTask = { moduleKey: string; title: string; desc: string; xp: number; kind: 'foundation' | 'word' | 'excel' | 'excel_boss' | 'ppt' | 'outlook' | 'access' | 'capstone' };
+
+const OFFICE_MODULE_TASKS: OfficeModuleTask[] = [
+  { moduleKey: 'os-basics', title: 'Kompyuter va Operatsion Tizim Asoslari', desc: "Kompyuterni yoqish, ish stoli, oynalar va asosiy klaviatura/sichqoncha ko'nikmalarini o'rganing.", xp: 100, kind: 'foundation' },
+  { moduleKey: 'files-folders', title: 'Fayllar va Papkalar Bilan Ishlash', desc: "Fayl va papkalarni yaratish, nomlash, ko'chirish va arxivlashni mashq qiling.", xp: 100, kind: 'foundation' },
+  { moduleKey: 'internet-browser-basics', title: 'Internet va Brauzer Asoslari', desc: "Brauzerda xavfsiz va samarali qidirish, ko'p tab bilan ishlashni o'rganing.", xp: 100, kind: 'foundation' },
+  { moduleKey: 'digital-safety', title: 'Raqamli Xavfsizlik va Gigiyena', desc: "Kuchli parollar, fishingni aniqlash va shaxsiy ma'lumotlaringizni himoya qilishni o'rganing.", xp: 120, kind: 'foundation' },
+  { moduleKey: 'cloud-storage-basics', title: 'Bulutli Xotira va Fayl Almashish', desc: "Google Drive/OneDrive'da fayl saqlash, yuklash va ulashishni mashq qiling.", xp: 100, kind: 'foundation' },
+  { moduleKey: 'word-basics', title: 'Word: Birinchi Hujjat', desc: "Word'ni ochish, matn kiritish, saqlash va asosiy formatlashni o'rganing.", xp: 150, kind: 'word' },
+  { moduleKey: 'word-doc-design', title: 'Word: Professional Hujjat Dizayni', desc: "Uslublar, bo'limlar va avtomatik jadvallarni egallang.", xp: 250, kind: 'word' },
+  { moduleKey: 'word-long-documents', title: 'Word: Uzun Hujjatlar va Tarkib Jadvali', desc: "Sarlavhalar, havolalar va avtomatik tarkib jadvalini boshqaring.", xp: 350, kind: 'word' },
+  { moduleKey: 'word-mail-merge', title: "Word: Pochta Birlashtirish", desc: "Ko'plab hujjatlarni bitta shablondan avtomatik yarating.", xp: 300, kind: 'word' },
+  { moduleKey: 'word-collaboration-review', title: "Word: Hamkorlikda Ishlash va Tekshirish", desc: "O'zgarishlarni kuzatish, sharhlar va hamkorlikda tahrirlashni o'zlashtiring.", xp: 300, kind: 'word' },
+  { moduleKey: 'excel-basics', title: 'Excel: Birinchi Jadval', desc: "Katakchalar, formulalar (SUM, AVERAGE) va oddiy formatlashdan boshlang.", xp: 150, kind: 'excel' },
+  { moduleKey: 'excel-data-mastery', title: "Excel: Ma'lumotlar va Mantiqni Egallash", desc: 'Formulalar, VLOOKUP va mantiqiy funksiyalar.', xp: 400, kind: 'excel' },
+  { moduleKey: 'excel-formulas-deep-dive', title: 'Excel: Chuqurlashtirilgan Formulalar', desc: "INDEX/MATCH, massiv formulalar va shartli mantiqni egallang.", xp: 450, kind: 'excel' },
+  { moduleKey: 'excel-pivot-charts', title: 'Excel: Pivot Jadvallar va Diagrammalar', desc: "Katta ma'lumotlar to'plamlarini vizual hisobotlarga aylantiring.", xp: 500, kind: 'excel' },
+  { moduleKey: 'excel-advanced-analytics', title: "Excel: Ilg'or Ma'lumotlar Tahlili", desc: "Pivot jadvallar, Power Query va boshqaruv panellari.", xp: 600, kind: 'excel_boss' },
+  { moduleKey: 'excel-power-query-dashboards', title: "Excel: Power Query va Boshqaruv Panellari", desc: "Turli manbalardagi ma'lumotlarni birlashtirib, jonli panel yarating.", xp: 650, kind: 'excel_boss' },
+  { moduleKey: 'excel-macros-automation', title: 'Excel: Makrolar va Avtomatlashtirish', desc: "VBA makrolar yordamida takroriy vazifalarni avtomatlashtiring.", xp: 550, kind: 'excel' },
+  { moduleKey: 'ppt-basics', title: 'PowerPoint: Birinchi Slayd', desc: "Birinchi slaydlaringizni yarating: matn, rasm va oddiy dizayn asoslari.", xp: 150, kind: 'ppt' },
+  { moduleKey: 'ppt-narrative-design', title: 'PowerPoint: Naratsiya va Dizayn', desc: "Yuqori ta'sirli rahbariyat taqdimotlarini yarating.", xp: 300, kind: 'ppt' },
+  { moduleKey: 'ppt-animations-transitions', title: "PowerPoint: Animatsiya va O'tishlar", desc: "Professional animatsiyalar bilan taqdimotni jonlantiring.", xp: 350, kind: 'ppt' },
+  { moduleKey: 'ppt-infographics', title: 'PowerPoint: Infografika va Vizual Hikoyalar', desc: "Murakkab ma'lumotlarni oddiy va ta'sirli vizuallarga aylantiring.", xp: 400, kind: 'ppt' },
+  { moduleKey: 'outlook-email-calendar', title: "Outlook: Elektron Pochta va Kalendar Boshqaruvi", desc: "Xat qutisi, uchrashuvlar va vazifalarni samarali boshqaring.", xp: 300, kind: 'outlook' },
+  { moduleKey: 'access-database-basics', title: "Access: Ma'lumotlar Bazasi Asoslari", desc: "Jadvallar, so'rovlar va formalar yordamida ma'lumotlarni tashkil eting.", xp: 450, kind: 'access' },
+  { moduleKey: 'office-capstone-certificate', title: 'Yakuniy Sertifikat Loyihasi', desc: "Barcha Ofis dasturlarini birlashtirgan yakuniy ish topshirig'ini bajaring.", xp: 800, kind: 'capstone' },
+];
+
+function officeTaskDescription(desc: string, kind: OfficeModuleTask['kind']): string {
+  const talablar =
+    kind === 'capstone'
+      ? "- Word, Excel va PowerPoint'dan kamida ikkitasini birlashtirgan yakuniy ishni tayyorlang.\n- Format, dizayn va tarkib professional darajada bo'lishi kerak.\n- Ishingizni qisqa taqdimot yoki hisobot ko'rinishida rasmiylashtiring."
+      : kind === 'excel_boss'
+        ? "- Berilgan (yoki o'zingiz tanlagan) ma'lumotlar asosida tahliliy hisobot yoki boshqaruv paneli yarating.\n- Kamida 2 xil vositadan (masalan Pivot Table + formula) foydalaning.\n- Natijani tushunarli va vizual jihatdan tartibli qiling."
+        : "- Tayyor faylni (.docx, .xlsx yoki .pptx) yarating va mavzuga oid asosiy vositalardan foydalaning.\n- Fayl nomi va ichki tuzilishi tushunarli bo'lishi kerak.\n- Ishingizni topshirishdan oldin xatoliklarga tekshirib chiqing.";
+  return `${desc}\n\nMaqsad: Ushbu ko'nikmani amaliy topshiriq orqali mustahkamlang.\n\nTalablar:\n${talablar}\n\nTopshirish: Tayyor faylni yuklang (.docx/.xlsx/.pptx/.pdf) yoki fayl bulutda bo'lsa, uning havolasini "Demo manzili" maydoniga qo'shing.`;
+}
+
+const ROBOTICS_MISSION = {
+  moduleKey: 'robotics-perimeter-patrol',
+  title: 'Missiya: Perimetr Patruli',
+  xp: 150,
+  description:
+    "Roverni qizil to'siqlarga urilmasdan to'siqlar trassasi bo'ylab harakatlantirishga sozlang. Yaqinlikni kuzatish uchun ultratovush sensoridan (readSensor()) foydalaning.\n\nMaqsad: Simulyatorda to'liq bir aylanani to'siqlarga urilmasdan yakunlaydigan protokol yozing.\n\nTalablar:\n- Ultratovush sensoridan foydalanib to'siqqa yaqinlashganda tezlikni kamaytiring yoki yo'nalishni o'zgartiring.\n- Kodni Sxema Dizayneri'da sinab, jurnalda xatoliklar qolmasligiga ishonch hosil qiling.\n- Loyiha faylini eksport qilib, qisqacha izoh bilan topshiring.\n\nTopshirish: Eksport qilingan loyiha faylini yuklang yoki GitHub repo havolasini yuboring.",
+};
 
 async function upsertUser(params: {
   email: string;
@@ -58,7 +147,7 @@ async function upsertUser(params: {
       level: params.level ?? 1,
       title: params.title,
       streak: params.streak ?? 0,
-      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(params.email)}`,
+      avatarUrl: avatarUrlForEmail(params.email),
     },
   });
 }
@@ -116,29 +205,27 @@ async function main() {
     streak: 2,
   });
 
-  const frontendClass = await prisma.classGroup.create({
-    data: {
-      title: 'Frontend Veb Ustaligi',
-      track: Track.FRONTEND,
-      teacherId: teacher.id,
-      schedule: 'Dush/Chor soat 10:00',
-    },
+  // ClassGroup has no natural unique key, so re-seeding is guarded by title —
+  // without this every `npm run db:seed` stacks another copy of every class.
+  async function upsertClass(data: { title: string; track: Track; schedule: string }) {
+    const existing = await prisma.classGroup.findFirst({ where: { title: data.title, track: data.track } });
+    return existing ?? prisma.classGroup.create({ data: { ...data, teacherId: teacher.id } });
+  }
+
+  const frontendClass = await upsertClass({
+    title: 'Frontend Veb Ustaligi',
+    track: Track.FRONTEND,
+    schedule: 'Dush/Chor soat 10:00',
   });
-  const roboticsClass = await prisma.classGroup.create({
-    data: {
-      title: 'Robototexnika Muhandisligi 101',
-      track: Track.ROBOTICS,
-      teacherId: teacher.id,
-      schedule: 'Sesh/Pay soat 14:00',
-    },
+  const roboticsClass = await upsertClass({
+    title: 'Robototexnika Muhandisligi 101',
+    track: Track.ROBOTICS,
+    schedule: 'Sesh/Pay soat 14:00',
   });
-  const officeClass = await prisma.classGroup.create({
-    data: {
-      title: 'Ofis Unumdorligi',
-      track: Track.OFFICE,
-      teacherId: teacher.id,
-      schedule: 'Juma soat 13:00',
-    },
+  const officeClass = await upsertClass({
+    title: 'Ofis Unumdorligi',
+    track: Track.OFFICE,
+    schedule: 'Juma soat 13:00',
   });
 
   await prisma.enrollment.createMany({
@@ -148,8 +235,194 @@ async function main() {
       { userId: officeStudent.id, classId: officeClass.id },
     ],
     skipDuplicates: true,
-  
+
   });
+
+  // Python Backend: the 96 taught lessons extracted from the slide decks by
+  // scripts/extractLessons.ts. Homework comes from each deck's UY VAZIFASI
+  // slide, so it matches exactly what the teacher presents in class.
+  for (const lesson of backendLessons) {
+    const { key, ...fields } = lesson;
+    const data = { ...fields, track: Track.BACKEND };
+    await prisma.lesson.upsert({ where: { key }, update: data, create: { key, ...data } });
+  }
+
+  // Bonus practice attached to each backend lesson's MAKE tiers. Python-only, so
+  // starterCodeJs/Cpp stay null and the API's computed `languages` array offers
+  // just Python. Upserted on the unique `key`, so re-running the seed updates the
+  // rows in place and never duplicates them.
+  //
+  // A malformed test case is worse than a missing one: a case with no
+  // `expectedStdout` field would grade every submission against `undefined`, and
+  // a problem with only hidden cases gives the student nothing to check against
+  // before submitting. Both are validated BEFORE anything is written, and a bad
+  // record aborts the whole seed rather than being skipped quietly.
+  for (const problem of backendLessonProblems) {
+    if (!Array.isArray(problem.testCases) || problem.testCases.length === 0) {
+      throw new Error(`Masala "${problem.key}": kamida bitta test case bo'lishi kerak.`);
+    }
+    problem.testCases.forEach((testCase, index) => {
+      const where = `Masala "${problem.key}" test #${index + 1}`;
+      if (typeof testCase.stdin !== 'string') {
+        throw new Error(`${where}: "stdin" matn bo'lishi kerak.`);
+      }
+      if (typeof testCase.expectedStdout !== 'string') {
+        throw new Error(`${where}: "expectedStdout" matn bo'lishi kerak.`);
+      }
+      if (typeof testCase.hidden !== 'boolean') {
+        throw new Error(`${where}: "hidden" true yoki false bo'lishi kerak.`);
+      }
+      if (typeof testCase.label !== 'string' || testCase.label.trim() === '') {
+        throw new Error(`${where}: "label" bo'sh bo'lmagan matn bo'lishi kerak.`);
+      }
+    });
+    if (!problem.testCases.some((testCase) => !testCase.hidden)) {
+      throw new Error(
+        `Masala "${problem.key}": kamida bitta ochiq (hidden: false) test case bo'lishi kerak.`
+      );
+    }
+  }
+
+  let lessonProblemsSynced = 0;
+  if (backendLessonProblems.length > 0) {
+    const lessonIdByKey = new Map(
+      (await prisma.lesson.findMany({ where: { track: Track.BACKEND }, select: { id: true, key: true } })).map(
+        (lesson) => [lesson.key, lesson.id]
+      )
+    );
+    for (const problem of backendLessonProblems) {
+      const lessonId = lessonIdByKey.get(problem.lessonKey);
+      if (!lessonId) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `Lesson problem "${problem.key}" references unknown lesson "${problem.lessonKey}" — skipped.`
+        );
+        continue;
+      }
+      const data = {
+        lessonId,
+        title: problem.title,
+        description: problem.description,
+        difficulty: problem.difficulty as Difficulty,
+        points: problem.points,
+        tags: problem.tags,
+        starterCodePy: problem.starterCodePy,
+        starterCodeJs: null,
+        starterCodeCpp: null,
+        // Prisma types Json input as an index-signature value; the typed
+        // ProblemTestCase[] is structurally compatible but needs the cast.
+        testCases: problem.testCases as unknown as Prisma.InputJsonValue,
+      };
+      await prisma.problem.upsert({ where: { key: problem.key }, update: data, create: { key: problem.key, ...data } });
+      lessonProblemsSynced += 1;
+    }
+  }
+
+  // Backend lesson keys, reused by the quiz and the project-rubric sync below.
+  const backendLessonIdByKey = new Map(
+    (await prisma.lesson.findMany({ where: { track: Track.BACKEND }, select: { id: true, key: true } })).map(
+      (lesson) => [lesson.key, lesson.id] as const
+    )
+  );
+
+  // TEKSHIRUV recap questions, turned into auto-gradable multiple choice.
+  // Upserted on the unique (lessonId, order) pair, so re-running the seed
+  // updates each question in place and never duplicates it.
+  //
+  // A wrong `correctIndex` would silently teach students the wrong answer, so
+  // the shape is validated BEFORE anything is written and a bad record aborts
+  // the whole seed rather than being skipped quietly.
+  for (const question of backendLessonQuiz) {
+    const where = `${question.lessonKey} #${question.order}`;
+    if (question.choices.length !== 4) {
+      throw new Error(
+        `Quiz savoli ${where}: 4 ta variant kutilgan edi, ${question.choices.length} ta topildi.`
+      );
+    }
+    if (!Number.isInteger(question.correctIndex) || question.correctIndex < 0 || question.correctIndex > 3) {
+      throw new Error(
+        `Quiz savoli ${where}: correctIndex 0..3 oralig'ida bo'lishi kerak, ${question.correctIndex} topildi.`
+      );
+    }
+    if (!backendLessonIdByKey.has(question.lessonKey)) {
+      throw new Error(`Quiz savoli ${where}: "${question.lessonKey}" darsi topilmadi.`);
+    }
+  }
+
+  let quizQuestionsSynced = 0;
+  for (const question of backendLessonQuiz) {
+    const lessonId = backendLessonIdByKey.get(question.lessonKey);
+    if (!lessonId) continue; // unreachable — validated above; keeps the type narrow.
+    const data = {
+      lessonId,
+      order: question.order,
+      prompt: question.prompt,
+      choices: [...question.choices],
+      correctIndex: question.correctIndex,
+      explanation: question.explanation,
+    };
+    await prisma.quizQuestion.upsert({
+      where: { lessonId_order: { lessonId, order: question.order } },
+      update: data,
+      create: data,
+    });
+    quizQuestionsSynced += 1;
+  }
+
+  // Every project lesson gets the shared default grading rubric so the teacher
+  // portal always has criteria to score against. Upserted on the unique
+  // lessonId; a lesson-specific rubric edited later is overwritten on re-seed,
+  // which is the same in-place-update contract as the lessons themselves.
+  const projectLessons = await prisma.lesson.findMany({ where: { kind: 'project' }, select: { id: true } });
+  const rubricCriteria = DEFAULT_PROJECT_RUBRIC.map((criterion) => ({ ...criterion })) as unknown as Prisma.InputJsonValue;
+  for (const lesson of projectLessons) {
+    await prisma.projectRubric.upsert({
+      where: { lessonId: lesson.id },
+      update: { criteria: rubricCriteria },
+      create: { lessonId: lesson.id, criteria: rubricCriteria },
+    });
+  }
+  const projectRubricsSynced = projectLessons.length;
+
+  const backendStudent = await upsertUser({
+    email: 'backend@techquest.dev',
+    name: 'Nodira Karimova',
+    role: Role.STUDENT,
+    track: Track.BACKEND,
+    xp: 1500,
+    coins: 900,
+    level: 9,
+    title: 'Backend kursanti',
+    streak: 6,
+  });
+
+  // Started four weeks ago so the demo account has both past and future deadlines.
+  const backendStart = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000);
+  backendStart.setUTCHours(0, 0, 0, 0);
+
+  const backendClass =
+    (await prisma.classGroup.findFirst({ where: { track: Track.BACKEND, title: 'Python Backend Dasturlash' } })) ??
+    (await prisma.classGroup.create({
+      data: {
+        title: 'Python Backend Dasturlash',
+        track: Track.BACKEND,
+        teacherId: teacher.id,
+        schedule: 'Dush/Chor/Juma soat 16:00',
+        startDate: backendStart,
+        lessonDays: [1, 3, 5],
+      },
+    }));
+
+  await prisma.enrollment.createMany({
+    data: [{ userId: backendStudent.id, classId: backendClass.id }],
+    skipDuplicates: true,
+  });
+
+  const backendSync = await syncLessonAssignments(prisma, backendClass.id);
+  // eslint-disable-next-line no-console
+  console.log(
+    `Backend darslari: ${backendLessons.length} ta dars, ${backendSync.created} ta yangi / ${backendSync.updated} ta yangilangan uy vazifasi.`
+  );
 
   const inDays = (n: number) => new Date(Date.now() + n * 24 * 60 * 60 * 1000);
 
@@ -316,6 +589,41 @@ async function main() {
     ],
     skipDuplicates: true,
 
+  });
+
+  // Real per-module missions: every campaign-path node (frontend, office, robotics)
+  // gets a real Assignment with instructions/requirements, so "Missiyani boshlash"
+  // opens a real task instead of a disconnected generic CodeLab. Self-paced, so the
+  // due date is set far out rather than tied to a class deadline.
+  const selfPacedDueDate = inDays(365);
+  await prisma.assignment.createMany({
+    data: [
+      ...FRONTEND_MODULE_TASKS.map((m) => ({
+        title: m.title,
+        description: frontendTaskDescription(m.desc, m.kind),
+        track: Track.FRONTEND,
+        dueDate: selfPacedDueDate,
+        xpReward: m.xp,
+        moduleKey: m.moduleKey,
+      })),
+      ...OFFICE_MODULE_TASKS.map((m) => ({
+        title: m.title,
+        description: officeTaskDescription(m.desc, m.kind),
+        track: Track.OFFICE,
+        dueDate: selfPacedDueDate,
+        xpReward: m.xp,
+        moduleKey: m.moduleKey,
+      })),
+      {
+        title: ROBOTICS_MISSION.title,
+        description: ROBOTICS_MISSION.description,
+        track: Track.ROBOTICS,
+        dueDate: selfPacedDueDate,
+        xpReward: ROBOTICS_MISSION.xp,
+        moduleKey: ROBOTICS_MISSION.moduleKey,
+      },
+    ],
+    skipDuplicates: true,
   });
 
   await prisma.building.createMany({
@@ -587,6 +895,27 @@ async function main() {
   console.log('  teacher@techquest.dev / admin@techquest.dev');
   // eslint-disable-next-line no-console
   console.log('  frontend@techquest.dev (FRONTEND) / robotics@techquest.dev (ROBOTICS) / office@techquest.dev (OFFICE)');
+  // eslint-disable-next-line no-console
+  console.log('  backend@techquest.dev (BACKEND)');
+  const problemLessonsCovered = new Set(backendLessonProblems.map((problem) => problem.lessonKey)).size;
+  const testCaseCount = backendLessonProblems.reduce((total, problem) => total + problem.testCases.length, 0);
+  const quizLessonsCovered = new Set(backendLessonQuiz.map((question) => question.lessonKey)).size;
+  // eslint-disable-next-line no-console
+  console.log(
+    '  Backend lesson practice problems synced: %d (%d ta darsda, %d ta test case)',
+    lessonProblemsSynced,
+    problemLessonsCovered,
+    testCaseCount
+  );
+  // eslint-disable-next-line no-console
+  console.log(
+    '  Backend lesson quiz questions synced: %d (%d / %d ta dars qamrab olingan)',
+    quizQuestionsSynced,
+    quizLessonsCovered,
+    backendLessons.length
+  );
+  // eslint-disable-next-line no-console
+  console.log('  Project rubrics synced: %d', projectRubricsSynced);
 }
 
 main()

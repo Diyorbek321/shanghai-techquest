@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db';
 import { requireAuth, requireRole } from '../middleware/auth';
-import { toClientTrack, toPrismaTrack } from '../serializers/track';
+import { TRACK_VALUES, toClientTrack, toPrismaTrack } from '../serializers/track';
 import { resolveTrackFilter } from '../utils/trackScope';
 import { Role } from '@prisma/client';
 import { checkAchievements } from '../achievements/check';
@@ -28,7 +28,7 @@ homeworkRouter.get('/', async (req, res) => {
 const createSchema = z.object({
   title: z.string().min(1).max(200),
   course: z.string().min(1).max(200),
-  track: z.enum(['frontend', 'robotics', 'office']),
+  track: z.enum(TRACK_VALUES),
   dueDate: z.coerce.date(),
 });
 

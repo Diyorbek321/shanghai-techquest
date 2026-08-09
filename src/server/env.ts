@@ -18,6 +18,7 @@ export const env = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   cookieSecure,
   geminiApiKey: process.env.GEMINI_API_KEY,
+  pistonUrl: process.env.PISTON_URL || 'http://localhost:2000',
 };
 
 export function expiresInToMs(expiresIn: string): number {

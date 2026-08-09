@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BookOpen, Users, Clock, PlayCircle, Plus } from 'lucide-react';
 import { ViewType, Track, User } from '../types';
 import { api, ApiError } from '../lib/api';
+import { TRACK_LABEL, TRACK_STYLE } from '../lib/tracks';
 
 interface ClassGroup {
   id: string;
@@ -14,17 +15,6 @@ interface ClassGroup {
   studentCount: number;
 }
 
-const TRACK_STYLE: Record<Track, { bg: string; text: string; badge: string; view: ViewType }> = {
-  frontend: { bg: 'bg-brand-cyan/10', text: 'text-brand-cyan', badge: 'bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/30', view: 'frontend_course' },
-  robotics: { bg: 'bg-brand-purple/10', text: 'text-brand-purple', badge: 'bg-brand-purple/20 text-brand-purple border border-brand-purple/30', view: 'robotics_lab' },
-  office: { bg: 'bg-blue-500/10', text: 'text-blue-500', badge: 'bg-blue-500/20 text-blue-500 border border-blue-500/30', view: 'office_course' },
-};
-
-const TRACK_LABEL: Record<Track, string> = {
-  frontend: 'Frontend',
-  robotics: 'Robototexnika',
-  office: 'Ofis',
-};
 
 export function Classes({ user, onNavigate }: { user: User; onNavigate: (view: ViewType) => void }) {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -166,9 +156,9 @@ function CreateClassModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
                   onChange={(e) => setTrack(e.target.value as Track)}
                   className="w-full bg-black/30 border border-brand-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-cyan"
                 >
-                  <option value="frontend" className="bg-brand-bg">Frontend</option>
-                  <option value="robotics" className="bg-brand-bg">Robototexnika</option>
-                  <option value="office" className="bg-brand-bg">Ofis</option>
+                  {Object.entries(TRACK_LABEL).map(([value, label]) => (
+                    <option key={value} value={value} className="bg-brand-bg">{label}</option>
+                  ))}
                 </select>
               </div>
               <div>

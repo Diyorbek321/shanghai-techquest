@@ -65,6 +65,12 @@ interface CalendarEventData {
   endsAt: string | null;
 }
 
+interface ModuleAssignment {
+  id: string;
+  moduleKey: string | null;
+  submission: { status: string } | null;
+}
+
 function formatEventDate(iso: string) {
   return new Date(iso).toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long' });
 }
@@ -264,7 +270,13 @@ const MODULE_CATALOG = [
   },
 ];
 
-export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (view: ViewType) => void, onTriggerSuccess: () => void }) {
+interface FrontendCourseProps {
+  onNavigate: (view: ViewType) => void;
+  onTriggerSuccess: () => void;
+  onSelectAssignment: (assignmentId: string) => void;
+}
+
+export function FrontendCourse({ onNavigate, onTriggerSuccess, onSelectAssignment }: FrontendCourseProps) {
   const [activeTab, setActiveTab] = React.useState<'path' | 'skills' | 'gallery' | 'roadmap' | 'resources' | 'hybrid'>('path');
 
   const { data: progressRows = [] } = useQuery({
@@ -272,15 +284,32 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
     queryFn: () => api.get<ModuleProgressRow[]>('/progress/modules?track=frontend'),
   });
 
+  const { data: moduleAssignments = [] } = useQuery({
+    queryKey: ['assignments', 'frontend'],
+    queryFn: () => api.get<ModuleAssignment[]>('/assignments?track=frontend'),
+  });
+
+  const assignmentByModuleKey = new Map(
+    moduleAssignments.filter((a) => a.moduleKey).map((a) => [a.moduleKey as string, a])
+  );
+
   const progressByKey = new Map(progressRows.map((r) => [r.moduleKey, r]));
 
+  let previousModuleCompleted = true;
   const modules = MODULE_CATALOG.map((m) => {
     const row = progressByKey.get(m.moduleKey);
     const progress = row?.progress ?? 0;
-    const unlocked = row?.unlocked ?? false;
+    const unlocked = previousModuleCompleted || (row?.unlocked ?? false);
     const status = progress >= 100 ? 'completed' : unlocked ? 'active' : 'locked';
-    return { ...m, status, progress };
+    previousModuleCompleted = progress >= 100;
+    return { ...m, status, progress, assignment: assignmentByModuleKey.get(m.moduleKey) ?? null };
   });
+
+  const goToMission = (assignment: ModuleAssignment | null) => {
+    if (!assignment) return;
+    onSelectAssignment(assignment.id);
+    onNavigate('assignment_detail');
+  };
 
   const campaignProgress = modules.length
     ? Math.round(modules.reduce((sum, m) => sum + m.progress, 0) / modules.length)
@@ -636,17 +665,31 @@ export function FrontendCourse({ onNavigate, onTriggerSuccess }: { onNavigate: (
                   )}
 
                   {isActive && (
-                    <button 
-                      onClick={() => onNavigate('codelab')}
-                      className="w-full bg-brand-purple hover:bg-brand-purple/80 text-white font-bold py-2 rounded transition-colors flex items-center justify-center gap-2 shadow-[0_0_10px_rgba(176,38,255,0.3)]"
-                    >
-                      <PlayCircle size={18} /> Missiyani Boshlash
-                    </button>
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => goToMission(mod.assignment)}
+                        disabled={!mod.assignment}
+                        className="w-full bg-brand-purple hover:bg-brand-purple/80 text-white font-bold py-2 rounded transition-colors flex items-center justify-center gap-2 shadow-[0_0_10px_rgba(176,38,255,0.3)] disabled:opacity-50"
+                      >
+                        <PlayCircle size={18} />
+                        {mod.assignment?.submission ? 'Missiyani Ko\'rish' : 'Missiyani Boshlash'}
+                      </button>
+                      <button
+                        onClick={() => onNavigate('codelab')}
+                        className="w-full text-[11px] text-gray-500 hover:text-brand-cyan transition-colors py-1"
+                      >
+                        CodeLab'da mashq qilish &rarr;
+                      </button>
+                    </div>
                   )}
 
                   {isCompleted && (
-                    <button className="w-full bg-white/5 hover:bg-white/10 text-gray-300 font-medium py-2 rounded transition-colors flex items-center justify-center gap-2 border border-white/10">
-                      Kodni Ko'rib chiqish
+                    <button
+                      onClick={() => goToMission(mod.assignment)}
+                      disabled={!mod.assignment}
+                      className="w-full bg-white/5 hover:bg-white/10 text-gray-300 font-medium py-2 rounded transition-colors flex items-center justify-center gap-2 border border-white/10 disabled:opacity-50"
+                    >
+                      Topshiriqni Ko'rib chiqish
                     </button>
                   )}
 

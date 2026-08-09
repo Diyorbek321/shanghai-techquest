@@ -4,7 +4,7 @@ import { Role } from '@prisma/client';
 import { prisma } from '../db';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { resolveTrackFilter } from '../utils/trackScope';
-import { toClientTrack, toPrismaTrack } from '../serializers/track';
+import { TRACK_VALUES, toClientTrack, toPrismaTrack } from '../serializers/track';
 import { notifyMany } from '../notifications/notify';
 import { checkAchievements } from '../achievements/check';
 
@@ -20,6 +20,7 @@ function serializeAssignment(a: {
   classId: string | null;
   dueDate: Date;
   xpReward: number;
+  moduleKey: string | null;
 }) {
   return {
     id: a.id,
@@ -29,13 +30,15 @@ function serializeAssignment(a: {
     classId: a.classId,
     dueDate: a.dueDate,
     xpReward: a.xpReward,
+    moduleKey: a.moduleKey,
   };
 }
 
 assignmentsRouter.get('/', async (req, res) => {
   const track = resolveTrackFilter(req);
+  const moduleKey = typeof req.query.moduleKey === 'string' ? req.query.moduleKey : undefined;
   const assignments = await prisma.assignment.findMany({
-    where: track ? { track } : undefined,
+    where: { ...(track ? { track } : undefined), ...(moduleKey ? { moduleKey } : undefined) },
     orderBy: { dueDate: 'asc' },
   });
 
@@ -69,7 +72,7 @@ assignmentsRouter.get('/:id', async (req, res) => {
 const createSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().min(1),
-  track: z.enum(['frontend', 'robotics', 'office']),
+  track: z.enum(TRACK_VALUES),
   classId: z.string().optional(),
   dueDate: z.coerce.date(),
   xpReward: z.coerce.number().int().min(0).default(0),
@@ -155,6 +158,17 @@ assignmentsRouter.post('/:id/submissions', requireRole(Role.STUDENT), async (req
       submittedAt: new Date(),
     },
   });
+
+  if (assignment.moduleKey) {
+    const existingProgress = await prisma.moduleProgress.findUnique({
+      where: { userId_moduleKey: { userId: req.user!.id, moduleKey: assignment.moduleKey } },
+    });
+    await prisma.moduleProgress.upsert({
+      where: { userId_moduleKey: { userId: req.user!.id, moduleKey: assignment.moduleKey } },
+      update: { progress: Math.max(existingProgress?.progress ?? 0, 50), unlocked: true },
+      create: { userId: req.user!.id, track: assignment.track, moduleKey: assignment.moduleKey, progress: 50, unlocked: true },
+    });
+  }
 
   await checkAchievements(req.user!.id);
 

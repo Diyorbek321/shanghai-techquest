@@ -28,8 +28,14 @@ interface ModuleProgressRow {
   unlocked: boolean;
 }
 
+interface MissionAssignment {
+  title: string;
+  description: string;
+  xpReward: number;
+}
+
 const MISSION_KEY = 'robotics-perimeter-patrol';
-const MISSION_XP = 150;
+const FALLBACK_MISSION_XP = 150;
 
 function downloadTextFile(filename: string, content: string) {
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
@@ -61,6 +67,13 @@ export function RoboticsLab() {
     queryKey: ['progress', 'modules', 'robotics'],
     queryFn: () => api.get<ModuleProgressRow[]>('/progress/modules?track=robotics'),
   });
+
+  const { data: missionAssignments = [] } = useQuery({
+    queryKey: ['assignments', 'robotics', MISSION_KEY],
+    queryFn: () => api.get<MissionAssignment[]>(`/assignments?track=robotics&moduleKey=${MISSION_KEY}`),
+  });
+  const mission = missionAssignments[0];
+  const missionXp = mission?.xpReward ?? FALLBACK_MISSION_XP;
 
   const missionCompleted = (progressRows.find((r) => r.moduleKey === MISSION_KEY)?.progress ?? 0) >= 100;
 
@@ -126,9 +139,9 @@ export function RoboticsLab() {
       addLog("Joylashtirish muvaffaqiyatli yakunlandi.", "success");
       addLog("Rover Protokolni Bajarmoqda: 'moveForward(50)'", "info");
       if (!missionCompleted && !completeMission.isPending) {
-        addXp(MISSION_XP, "Robotics: Perimetr Patruli missiyasi");
+        addXp(missionXp, mission?.title ?? "Robotics: Perimetr Patruli missiyasi");
         completeMission.mutate();
-        addLog(`Missiya yakunlandi: Perimetr Patruli! +${MISSION_XP} XP qo'lga kiritildi.`, "success");
+        addLog(`Missiya yakunlandi: ${mission?.title ?? 'Perimetr Patruli'}! +${missionXp} XP qo'lga kiritildi.`, "success");
       }
     }, 1500);
   };
@@ -293,10 +306,11 @@ export function RoboticsLab() {
               Missiya Jurnali
             </h3>
             <div className="p-3 bg-black/40 border border-brand-purple/20 rounded-xl">
-              <p className="text-xs text-white font-bold mb-1">Vazifa: Perimetr Patruli</p>
-              <p className="text-[10px] text-gray-500 leading-relaxed">
-                Roverni qizil to'siqlarga urilmasdan to'siqlar trassasi bo'ylab harakatlantirishga sozlang. Yaqinlikni kuzatish uchun readSensor() dan foydalaning.
+              <p className="text-xs text-white font-bold mb-1">{mission?.title ?? 'Vazifa: Perimetr Patruli'}</p>
+              <p className="text-[10px] text-gray-500 leading-relaxed whitespace-pre-line">
+                {mission?.description ?? "Roverni qizil to'siqlarga urilmasdan to'siqlar trassasi bo'ylab harakatlantirishga sozlang. Yaqinlikni kuzatish uchun readSensor() dan foydalaning."}
               </p>
+              <p className="text-[9px] text-brand-purple font-mono mt-2">+{missionXp} XP</p>
             </div>
           </div>
         </div>

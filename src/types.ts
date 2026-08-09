@@ -1,8 +1,8 @@
-export type ViewType = 'dashboard' | 'classes' | 'assignments' | 'codelab' | 'leaderboard' | 'achievements' | 'profile' | 'shop' | 'arena' | 'myworld' | 'frontend_course' | 'problems' | 'mission_log' | 'settings' | 'teacher_portal' | 'teams' | 'help' | 'battle' | 'robotics_lab' | 'skill_tree' | 'assignment_detail' | 'assignment_submissions' | 'attendance' | 'homework' | 'office_course' | 'notifications' | 'grades' | 'calendar' | 'user_management';
+export type ViewType = 'dashboard' | 'classes' | 'assignments' | 'codelab' | 'leaderboard' | 'achievements' | 'profile' | 'shop' | 'arena' | 'myworld' | 'frontend_course' | 'problems' | 'mission_log' | 'settings' | 'teacher_portal' | 'teams' | 'help' | 'battle' | 'robotics_lab' | 'skill_tree' | 'assignment_detail' | 'assignment_submissions' | 'attendance' | 'homework' | 'office_course' | 'backend_course' | 'notifications' | 'grades' | 'calendar' | 'user_management';
 
 export type UserRole = 'student' | 'teacher' | 'admin';
 
-export type Track = 'frontend' | 'robotics' | 'office';
+export type Track = 'frontend' | 'robotics' | 'office' | 'backend';
 
 export interface User {
   id: string;

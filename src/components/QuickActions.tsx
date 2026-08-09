@@ -8,6 +8,7 @@ import {
   ChevronRight, 
   X,
   Plus,
+  Server,
   BookText,
   Presentation,
   Bell,
@@ -31,6 +32,7 @@ export function QuickActions({ onNavigate, userTrack }: QuickActionsProps) {
     { id: 'schedule', label: "Jadvalni ko'rish", icon: <Calendar size={18} />, color: 'bg-brand-cyan', view: 'calendar' as ViewType },
     { id: 'office', label: 'Ofis Dasturlari', icon: <Presentation size={18} />, color: 'bg-blue-600', view: 'office_course' as ViewType, trackRequirement: 'office' as Track },
     { id: 'course', label: 'Frontendni davom ettirish', icon: <BookOpen size={18} />, color: 'bg-brand-orange', view: 'frontend_course' as ViewType, trackRequirement: 'frontend' as Track },
+    { id: 'backend', label: 'Backendni davom ettirish', icon: <Server size={18} />, color: 'bg-emerald-600', view: 'backend_course' as ViewType, trackRequirement: 'backend' as Track },
   ].filter(action => !action.trackRequirement || userTrack === action.trackRequirement);
 
   return (

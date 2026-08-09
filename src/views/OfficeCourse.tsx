@@ -55,6 +55,12 @@ interface DailyExerciseData {
   streak: number;
 }
 
+interface ModuleAssignment {
+  id: string;
+  moduleKey: string | null;
+  submission: { status: string } | null;
+}
+
 const STAGE_FOUNDATIONS = 'Bosqich 0: Kompyuter Savodxonligi Asoslari';
 const STAGE_WORD = "Bosqich 1: Word — Asoslardan Ustalikkacha";
 const STAGE_EXCEL = "Bosqich 2: Excel — Asoslardan Tahlilgacha";
@@ -348,7 +354,12 @@ const OFFICE_PROJECTS = [
   },
 ];
 
-export function OfficeCourse({ onNavigate }: { onNavigate: (view: ViewType) => void }) {
+interface OfficeCourseProps {
+  onNavigate: (view: ViewType) => void;
+  onSelectAssignment: (assignmentId: string) => void;
+}
+
+export function OfficeCourse({ onNavigate, onSelectAssignment }: OfficeCourseProps) {
   const [activeTab, setActiveTab] = useState<'modules' | 'skills' | 'projects'>('modules');
 
   const { data: progressRows = [] } = useQuery({
@@ -356,14 +367,31 @@ export function OfficeCourse({ onNavigate }: { onNavigate: (view: ViewType) => v
     queryFn: () => api.get<ModuleProgressRow[]>('/progress/modules?track=office'),
   });
 
+  const { data: moduleAssignments = [] } = useQuery({
+    queryKey: ['assignments', 'office'],
+    queryFn: () => api.get<ModuleAssignment[]>('/assignments?track=office'),
+  });
+
+  const assignmentByModuleKey = new Map(
+    moduleAssignments.filter((a) => a.moduleKey).map((a) => [a.moduleKey as string, a])
+  );
+
   const progressByKey = new Map(progressRows.map((r) => [r.moduleKey, r]));
 
+  const goToMission = (assignment: ModuleAssignment | null | undefined) => {
+    if (!assignment) return;
+    onSelectAssignment(assignment.id);
+    onNavigate('assignment_detail');
+  };
+
+  let previousModuleCompleted = true;
   const officeModules = OFFICE_MODULE_CATALOG.map((m) => {
     const row = progressByKey.get(m.moduleKey);
     const progress = row?.progress ?? 0;
-    const unlocked = row?.unlocked ?? false;
+    const unlocked = previousModuleCompleted || (row?.unlocked ?? false);
     const status = progress >= 100 ? 'completed' : unlocked ? 'active' : 'locked';
-    return { ...m, status, progress };
+    previousModuleCompleted = progress >= 100;
+    return { ...m, status, progress, assignment: assignmentByModuleKey.get(m.moduleKey) ?? null };
   });
 
   const completionPct = officeModules.length
@@ -386,7 +414,10 @@ export function OfficeCourse({ onNavigate }: { onNavigate: (view: ViewType) => v
     const missingModules = project.requiredModules
       .filter((key) => !isModuleComplete(key))
       .map((key) => OFFICE_MODULE_CATALOG.find((m) => m.moduleKey === key)?.title ?? key);
-    return { ...project, unlocked: missingModules.length === 0, missingModules };
+    // Only the capstone project has a real 1:1 graded assignment behind it; the other
+    // synthesis projects are self-directed practice combining already-completed modules.
+    const assignment = project.requiredModules.length === 1 ? assignmentByModuleKey.get(project.requiredModules[0]) ?? null : null;
+    return { ...project, unlocked: missingModules.length === 0, missingModules, assignment };
   });
 
   const skillNodes = SKILL_NODE_CONFIG.map((cfg) => {
@@ -600,12 +631,13 @@ export function OfficeCourse({ onNavigate }: { onNavigate: (view: ViewType) => v
                         </div>
                       ) : (
                         <button
-                          onClick={() => onNavigate('codelab')}
-                          className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all flex items-center gap-2 ${
+                          onClick={() => goToMission(mod.assignment)}
+                          disabled={!mod.assignment}
+                          className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all flex items-center gap-2 disabled:opacity-50 ${
                             mod.status === 'completed' ? 'bg-white/5 text-gray-400 hover:text-white' : 'bg-blue-600 text-white shadow-xl shadow-blue-900/20'
                           }`}
                         >
-                          {mod.status === 'completed' ? 'Qayta ko\'rish' : 'Missiyani Davom Ettirish'}
+                          {mod.status === 'completed' ? 'Topshiriqni ko\'rib chiqish' : mod.assignment?.submission ? 'Missiyani ko\'rish' : 'Topshiriqni boshlash'}
                           <ChevronRight size={14} />
                         </button>
                       )}
@@ -751,13 +783,17 @@ export function OfficeCourse({ onNavigate }: { onNavigate: (view: ViewType) => v
               <p className="text-sm text-gray-400 mb-8 leading-relaxed">{project.desc}</p>
 
               <div className="pt-6 border-t border-white/5">
-                {project.unlocked ? (
+                {project.unlocked && project.assignment ? (
                   <button
-                    onClick={() => onNavigate('codelab')}
+                    onClick={() => goToMission(project.assignment)}
                     className="px-6 py-2 rounded-xl text-xs font-black uppercase transition-all flex items-center gap-2 bg-brand-purple text-white shadow-xl shadow-brand-purple/20"
                   >
                     Loyihani Boshlash <ChevronRight size={14} />
                   </button>
+                ) : project.unlocked ? (
+                  <p className="text-xs text-gray-500 italic">
+                    Talab qilingan barcha modullarni tugatdingiz — bu loyihani mustaqil mashq sifatida bajarib, natijangizni o'qituvchingiz bilan ulashing. Rasmiy topshirish tez orada qo'shiladi.
+                  </p>
                 ) : (
                   <div className="text-xs text-gray-500">
                     <div className="flex items-center gap-2 font-bold uppercase text-gray-600 mb-2">

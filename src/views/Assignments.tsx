@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ViewType, Track, User } from '../types';
 import { api, ApiError } from '../lib/api';
 import { formatRelativeTime } from '../lib/utils';
+import { TRACK_BADGE, TRACK_LABEL } from '../lib/tracks';
 
 interface Assignment {
   id: string;
@@ -15,17 +16,6 @@ interface Assignment {
   submission: { status: 'PENDING' | 'SUBMITTED' | 'GRADED' | 'LATE' } | null;
 }
 
-const TRACK_BADGE: Record<Track, string> = {
-  frontend: 'bg-brand-cyan/20 text-brand-cyan',
-  robotics: 'bg-brand-purple/20 text-brand-purple',
-  office: 'bg-blue-500/20 text-blue-400',
-};
-
-const TRACK_LABEL: Record<Track, string> = {
-  frontend: 'Frontend',
-  robotics: 'Robototexnika',
-  office: 'Ofis',
-};
 
 type Column = 'todo' | 'submitted' | 'graded';
 

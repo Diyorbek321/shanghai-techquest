@@ -19,6 +19,46 @@ services:
       timeout: 5s
       retries: 10
 
+  # Sandboxed code execution engine for the "Run" button in Masalalar/CodeLab
+  # (src/server/code/piston.ts). Piston compiles/runs arbitrary student-submitted
+  # code, so it needs a real process/syscall sandbox (isolate) — hence
+  # `privileged: true` below. That is a materially larger blast radius than a
+  # normal container, so:
+  #   - it is NOT exposed publicly; only bound to loopback, and only the `app`
+  #     container talks to it over the compose network (piston:2000).
+  #   - the app's /api/problems/run route sits behind requireAuth + a
+  #     dedicated tight rate limit (runCodeRateLimiter) specifically because
+  #     this endpoint is more expensive/abusable than a normal API call.
+  #   - runtime packages (this compose file installs Node, Python, and C++)
+  #     are pinned to known versions on first boot; review before adding more.
+  piston:
+    image: ghcr.io/engineer-man/piston
+    restart: unless-stopped
+    privileged: true
+    security_opt:
+      - label:disable
+    ports:
+      - '127.0.0.1:2000:2000'
+    volumes:
+      - techquest_piston_packages:/piston/packages
+
+  # One-shot: waits for piston to come up, then installs the language
+  # runtimes src/server/code/piston.ts expects (javascript/python/c++).
+  # Re-running `docker compose up` after the first boot is a fast no-op
+  # (Piston's install endpoint is idempotent once a package is installed).
+  piston-init:
+    image: curlimages/curl:8.10.1
+    restart: 'no'
+    depends_on:
+      - piston
+    entrypoint: >-
+      sh -c "
+        until curl -sf http://piston:2000/api/v2/runtimes >/dev/null; do sleep 2; done;
+        curl -sf -X POST -H 'Content-Type: application/json' -d '{\"language\":\"javascript\",\"version\":\"18.15.0\"}' http://piston:2000/api/v2/packages || true;
+        curl -sf -X POST -H 'Content-Type: application/json' -d '{\"language\":\"python\",\"version\":\"3.10.0\"}' http://piston:2000/api/v2/packages || true;
+        curl -sf -X POST -H 'Content-Type: application/json' -d '{\"language\":\"gcc\",\"version\":\"10.2.0\"}' http://piston:2000/api/v2/packages || true;
+      "
+
   app:
     build:
       context: .
@@ -31,6 +71,7 @@ services:
       # hostname/internal port rather than the host-mapped ones.
       NODE_ENV: production
       DATABASE_URL: postgresql://techquest:${POSTGRES_PASSWORD:-techquest}@postgres:5432/techquest
+      PISTON_URL: http://piston:2000
       # src/server/env.ts refuses to boot when NODE_ENV=production unless
       # COOKIE_SECURE=true (verified by running the built image). Note this
       # means the login cookie is marked Secure, so it will only be sent by
@@ -45,7 +86,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      piston:
+        condition: service_started
 
 volumes:
   techquest_postgres_data:
   techquest_uploads:
+  techquest_piston_packages:

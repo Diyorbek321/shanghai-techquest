@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { UserPlus, Trash2, Shield, Search } from 'lucide-react';
 import { UserRole, Track } from '../types';
 import { api, ApiError } from '../lib/api';
+import { TRACK_LABEL } from '../lib/tracks';
 
 interface DirectoryUser {
   id: string;
@@ -27,11 +28,6 @@ const ROLE_BADGE: Record<UserRole, string> = {
   admin: 'bg-brand-purple/20 text-brand-purple border-brand-purple/30',
 };
 
-const TRACK_LABEL: Record<Track, string> = {
-  frontend: 'Frontend',
-  robotics: 'Robototexnika',
-  office: 'Ofis',
-};
 
 export function UserManagement() {
   const queryClient = useQueryClient();
@@ -255,9 +251,9 @@ function CreateUserModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
                     className="w-full bg-black/30 border border-brand-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-cyan"
                   >
                     <option value="" className="bg-brand-bg">—</option>
-                    <option value="frontend" className="bg-brand-bg">Frontend</option>
-                    <option value="robotics" className="bg-brand-bg">Robototexnika</option>
-                    <option value="office" className="bg-brand-bg">Ofis</option>
+                    {Object.entries(TRACK_LABEL).map(([value, label]) => (
+                      <option key={value} value={value} className="bg-brand-bg">{label}</option>
+                    ))}
                   </select>
                 </div>
               </div>

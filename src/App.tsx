@@ -28,6 +28,7 @@ import { RoboticsLab } from './views/RoboticsLab';
 import { Homework } from './views/Homework';
 import { Attendance } from './views/Attendance';
 import { OfficeCourse } from './views/OfficeCourse';
+import { BackendCourse } from './views/BackendCourse';
 import { AssignmentDetail } from './views/AssignmentDetail';
 import { AssignmentSubmissions } from './views/AssignmentSubmissions';
 import { Notifications } from './views/Notifications';
@@ -94,9 +95,17 @@ export default function App({ user }: { user: User }) {
       case 'myworld':
         return <MyWorld user={mockUser} onNavigate={setCurrentView} />;
       case 'frontend_course':
-        return <FrontendCourse onNavigate={setCurrentView} onTriggerSuccess={triggerSuccess} />;
+        return (
+          <FrontendCourse
+            onNavigate={setCurrentView}
+            onTriggerSuccess={triggerSuccess}
+            onSelectAssignment={setSelectedAssignmentId}
+          />
+        );
       case 'office_course':
-        return <OfficeCourse onNavigate={setCurrentView} />;
+        return <OfficeCourse onNavigate={setCurrentView} onSelectAssignment={setSelectedAssignmentId} />;
+      case 'backend_course':
+        return <BackendCourse onNavigate={setCurrentView} onSelectAssignment={setSelectedAssignmentId} />;
       case 'problems':
         return <Problems />;
       case 'leaderboard':

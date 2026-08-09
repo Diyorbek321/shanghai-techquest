@@ -4,10 +4,14 @@ import { createApp } from '../index';
 import { prisma } from '../db';
 
 const app = createApp();
-const testEmail = (label: string) => `${label}-${Date.now()}-${Math.random().toString(36).slice(2)}@vitest.local`;
+// A domain unique to this file, not the shared "@vitest.local" every other
+// test file uses — vitest runs test files concurrently against the same
+// real database, so a blanket "@vitest.local" cleanup here would delete
+// other files' in-flight test users out from under them.
+const testEmail = (label: string) => `${label}-${Date.now()}-${Math.random().toString(36).slice(2)}@auth.vitest.test`;
 
 afterAll(async () => {
-  await prisma.user.deleteMany({ where: { email: { contains: '@vitest.local' } } });
+  await prisma.user.deleteMany({ where: { email: { contains: '@auth.vitest.test' } } });
   await prisma.$disconnect();
 });
 

@@ -2,9 +2,12 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db';
 import { requireAuth } from '../middleware/auth';
-import { askGeminiJson, GeminiNotConfiguredError } from '../ai/gemini';
+import { runCodeRateLimiter } from '../middleware/rateLimit';
+import { askGeminiText } from '../ai/gemini';
 import { checkAchievements } from '../achievements/check';
 import { notify } from '../notifications/notify';
+import { executeCode, PistonUnavailableError } from '../code/piston';
+import { judgeSubmission, parseTestCases, type JudgeResult, type TestCaseResult } from '../code/judge';
 
 export const problemsRouter = Router();
 
@@ -78,19 +81,113 @@ problemsRouter.get('/:id', async (req, res) => {
     tags: problem.tags,
     description: problem.description,
     starterCode: { javascript: problem.starterCodeJs, python: problem.starterCodePy, cpp: problem.starterCodeCpp },
+    // Lesson-linked practice is Python-only, so the client offers exactly the
+    // languages this problem actually ships starter code for.
+    languages: (
+      [
+        ['javascript', problem.starterCodeJs],
+        ['python', problem.starterCodePy],
+        ['cpp', problem.starterCodeCpp],
+      ] as const
+    )
+      .filter(([, starter]) => starter !== null)
+      .map(([language]) => language),
     solved: !!latestSubmission,
   });
 });
 
-interface JudgeResult {
-  passed: boolean;
-  feedback: string;
-}
+const runSchema = z.object({
+  code: z.string().min(1).max(20_000),
+  language: z.enum(['javascript', 'python', 'cpp']),
+  stdin: z.string().max(5_000).optional(),
+});
+
+problemsRouter.post('/run', runCodeRateLimiter, async (req, res) => {
+  const parsed = runSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Noto'g'ri ma'lumot kiritildi." });
+  }
+
+  try {
+    const result = await executeCode(parsed.data.language, parsed.data.code, parsed.data.stdin ?? '');
+    res.json(result);
+  } catch (err) {
+    if (err instanceof PistonUnavailableError) {
+      return res.status(503).json({ error: err.message });
+    }
+    console.error('Code execution error:', err);
+    res.status(500).json({ error: "Kodni ishga tushirib bo'lmadi." });
+  }
+});
 
 const submitSchema = z.object({
-  code: z.string().min(1),
+  code: z.string().min(1).max(20_000),
   language: z.enum(['javascript', 'python', 'cpp']),
 });
+
+/**
+ * Shown when a problem has no stored test cases at all. We deliberately do NOT
+ * pass the student in that case: an unverifiable problem must never grant XP,
+ * and pretending it was graded would hide the content gap from everyone.
+ */
+const NO_TEST_CASES_FEEDBACK =
+  "Bu masala uchun hali avtomatik tekshiruv testlari qo'shilmagan, shuning uchun yechimingiz baholanmadi va XP berilmadi. Iltimos, o'qituvchingizga xabar bering.";
+
+const MAX_LISTED_FAILURES = 3;
+
+/** Deterministic Uzbek summary — always available, even with Gemini offline. */
+function buildDeterministicFeedback(judged: JudgeResult, alreadySolved: boolean): string {
+  if (judged.passed) {
+    const base = `Barakalla! Barcha ${judged.testsTotal} ta test muvaffaqiyatli o'tdi.`;
+    return alreadySolved ? `${base} Bu masalani avval yechganingiz uchun qayta XP berilmadi.` : base;
+  }
+
+  const failedLabels = judged.results
+    .filter((result) => !result.passed)
+    .map((result) => result.label)
+    .filter((label) => label.trim().length > 0);
+
+  const listed = failedLabels.slice(0, MAX_LISTED_FAILURES).join(', ');
+  const rest = failedLabels.length - MAX_LISTED_FAILURES;
+  const detail = listed.length === 0 ? '' : ` O'tmagan testlar: ${listed}${rest > 0 ? ` va yana ${rest} ta` : ''}.`;
+
+  return `${judged.testsPassed}/${judged.testsTotal} ta test o'tdi.${detail} Kodingizni qayta ko'rib chiqing.`;
+}
+
+/**
+ * Gemini is optional colour only: a short Uzbek hint for a failing run. It can
+ * never change the verdict, and any failure (unconfigured key, network, quota)
+ * silently degrades to the deterministic summary above.
+ */
+async function buildFailureHint(
+  problemTitle: string,
+  language: string,
+  code: string,
+  judged: JudgeResult,
+  fallback: string
+): Promise<string> {
+  const visibleFailure = judged.results.find((result) => !result.passed && !result.hidden);
+  if (!visibleFailure) {
+    return fallback;
+  }
+
+  const prompt = `Siz o'zbek tilida gapiradigan dasturlash o'qituvchisisiz. Talaba "${problemTitle}" masalasini ${language} tilida yechdi, lekin test o'tmadi.
+Kod:
+\`\`\`${language}
+${code}
+\`\`\`
+Test "${visibleFailure.label}": kutilgan natija ${JSON.stringify(visibleFailure.expected ?? '')}, olingan natija ${JSON.stringify(visibleFailure.actual ?? '')}.
+Faqat 1-2 gapdan iborat o'zbekcha maslahat bering. Tayyor yechimni yozmang.`;
+
+  try {
+    const hint = (await askGeminiText(prompt)).trim();
+    return hint.length > 0 ? `${fallback} ${hint}` : fallback;
+  } catch (err) {
+    // Unconfigured or failing Gemini is expected here — log and move on.
+    console.warn('Gemini hint unavailable, using deterministic feedback:', err);
+    return fallback;
+  }
+}
 
 problemsRouter.post('/:id/submit', async (req, res) => {
   const parsed = submitSchema.safeParse(req.body);
@@ -102,39 +199,48 @@ problemsRouter.post('/:id/submit', async (req, res) => {
     return res.status(404).json({ error: 'Masala topilmadi.' });
   }
 
-  const prompt = `
-    Siz qattiqqo'l lekin adolatli dasturlash o'qituvchisisiz. Quyidagi ${parsed.data.language} kodi berilgan masalani to'g'ri yechayotganini baholang.
+  const testCases = parseTestCases(problem.testCases);
 
-    Masala: ${problem.title}
-    ${problem.description}
+  // XP is granted once per problem. Without this check a student could resubmit
+  // the same accepted solution forever and farm unlimited XP.
+  const previousPass = await prisma.problemSubmission.findFirst({
+    where: { problemId: problem.id, userId: req.user!.id, passed: true },
+    select: { id: true },
+  });
+  const alreadySolved = previousPass !== null;
 
-    Talabaning kodi:
-    \`\`\`${parsed.data.language}
-    ${parsed.data.code}
-    \`\`\`
-
-    Javobni quyidagi JSON formatida bering:
-    {
-      "passed": boolean,
-      "feedback": string (o'zbek tilida, qisqa va tushunarli, nima uchun o'tgani yoki o'tmaganini tushuntiring)
+  let judged: JudgeResult;
+  if (testCases.length === 0) {
+    // Honest failure path: no automatic check exists for this problem yet.
+    // Logged so the content gap is visible in server logs instead of silently
+    // turning into free XP for every student who submits anything.
+    console.warn(`Problem ${problem.key} (${problem.id}) has no test cases — submission cannot be graded.`);
+    judged = { passed: false, testsPassed: 0, testsTotal: 0, results: [] };
+  } else {
+    try {
+      judged = await judgeSubmission(parsed.data.language, parsed.data.code, testCases);
+    } catch (err) {
+      if (err instanceof PistonUnavailableError) {
+        return res
+          .status(503)
+          .json({ error: "Kod ishga tushirish xizmati mavjud emas. Birozdan keyin qayta urinib ko'ring." });
+      }
+      console.error('Problem judging error:', err);
+      return res.status(500).json({ error: "Yechimni tekshirib bo'lmadi." });
     }
-  `;
-
-  let judgement: JudgeResult;
-  try {
-    judgement = await askGeminiJson<JudgeResult>(prompt, {
-      passed: false,
-      feedback: "AI javobini tahlil qilib bo'lmadi. Qaytadan urinib ko'ring.",
-    });
-  } catch (err) {
-    if (err instanceof GeminiNotConfiguredError) {
-      return res.status(500).json({ error: 'GEMINI_API_KEY sozlanmagan.' });
-    }
-    console.error('Problem judging error:', err);
-    return res.status(500).json({ error: "AI tekshiruvini bajarib bo'lmadi." });
   }
 
-  const pointsAwarded = judgement.passed ? problem.points : 0;
+  const deterministicFeedback =
+    testCases.length === 0 ? NO_TEST_CASES_FEEDBACK : buildDeterministicFeedback(judged, alreadySolved);
+
+  // Gemini only ever decorates a failure message; the verdict above is final.
+  const feedback =
+    judged.passed || testCases.length === 0
+      ? deterministicFeedback
+      : await buildFailureHint(problem.title, parsed.data.language, parsed.data.code, judged, deterministicFeedback);
+
+  // Full points or nothing — no partial credit, and nothing for a re-solve.
+  const pointsAwarded = judged.passed && !alreadySolved ? problem.points : 0;
 
   await prisma.$transaction([
     prisma.problemSubmission.create({
@@ -143,9 +249,11 @@ problemsRouter.post('/:id/submit', async (req, res) => {
         userId: req.user!.id,
         code: parsed.data.code,
         language: parsed.data.language,
-        passed: judgement.passed,
-        feedback: judgement.feedback,
+        passed: judged.passed,
+        feedback,
         pointsAwarded,
+        testsPassed: judged.testsPassed,
+        testsTotal: judged.testsTotal,
       },
     }),
     ...(pointsAwarded > 0
@@ -153,7 +261,7 @@ problemsRouter.post('/:id/submit', async (req, res) => {
       : []),
   ]);
 
-  if (judgement.passed) {
+  if (judged.passed && pointsAwarded > 0) {
     await notify(prisma, {
       userId: req.user!.id,
       type: 'SUCCESS',
@@ -164,5 +272,14 @@ problemsRouter.post('/:id/submit', async (req, res) => {
 
   await checkAchievements(req.user!.id);
 
-  res.status(201).json({ passed: judgement.passed, feedback: judgement.feedback, pointsAwarded });
+  const results: TestCaseResult[] = judged.results;
+
+  res.status(201).json({
+    passed: judged.passed,
+    testsPassed: judged.testsPassed,
+    testsTotal: judged.testsTotal,
+    pointsAwarded,
+    feedback,
+    results,
+  });
 });

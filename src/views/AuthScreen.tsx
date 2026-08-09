@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Code, Loader2, Cpu, Presentation } from 'lucide-react';
+import { Code, Loader2, Cpu, Presentation, Server } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { Track } from '../types';
 import { ApiError } from '../lib/api';
@@ -9,6 +9,7 @@ const TRACK_OPTIONS: { id: Track; label: string; desc: string; icon: React.React
   { id: 'frontend', label: 'Frontend Dasturlash', desc: 'HTML, CSS, JS va React', icon: <Code size={20} /> },
   { id: 'robotics', label: 'Robototexnika', desc: 'Arduino va apparat qismlar', icon: <Cpu size={20} /> },
   { id: 'office', label: 'Ofis Dasturlari', desc: 'Word, Excel, PowerPoint', icon: <Presentation size={20} /> },
+  { id: 'backend', label: 'Python Backend', desc: 'Python, SQL, Django va DRF', icon: <Server size={20} /> },
 ];
 
 export function AuthScreen() {

@@ -6,6 +6,7 @@ import { User } from '../types';
 import { TaskSequencer } from '../components/TaskSequencer';
 import { api } from '../lib/api';
 import { formatRelativeTime } from '../lib/utils';
+import { trackLabel } from '../lib/tracks';
 
 interface DashboardProps {
   user: User;
@@ -52,15 +53,6 @@ function moduleTitle(moduleKey: string): string {
   return moduleKey.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
 }
 
-const TRACK_LABEL: Record<string, string> = {
-  frontend: 'Frontend',
-  robotics: 'Robototexnika',
-  office: 'Ofis',
-};
-
-function trackLabel(track: string): string {
-  return TRACK_LABEL[track] ?? track;
-}
 
 export function Dashboard({ user, onNavigate, onTriggerSuccess }: DashboardProps) {
   const [claimed, setClaimed] = useState(false);

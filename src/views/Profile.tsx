@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useQuery } from '@tanstack/react-query';
-import { Github, Linkedin, Globe, Calendar, Award, Zap, Shield, Star, Medal, Lock, Activity as ActivityIcon } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Github, Linkedin, Globe, Calendar, Award, Zap, Shield, Star, Medal, Lock, Activity as ActivityIcon, Briefcase, CheckCircle2, FileText, Loader2, EyeOff } from 'lucide-react';
 import { User } from '../types';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { formatDate, formatRelativeTime } from '../lib/utils';
+import { trackLabel } from '../lib/tracks';
 
 const ROLE_LABELS: Record<User['role'], string> = {
   student: "O'quvchi",
@@ -12,15 +13,6 @@ const ROLE_LABELS: Record<User['role'], string> = {
   admin: 'Administrator',
 };
 
-const TRACK_LABEL: Record<string, string> = {
-  frontend: 'Frontend',
-  robotics: 'Robototexnika',
-  office: 'Ofis',
-};
-
-function trackLabel(track: string): string {
-  return TRACK_LABEL[track] ?? track;
-}
 
 function moduleTitle(moduleKey: string): string {
   return moduleKey.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
@@ -235,6 +227,347 @@ function BadgeCaseOverlay({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
   );
 }
 
+/* ---------------------------------------------------------------------------
+ * Portfolio — the public record of what a student actually built and solved.
+ * Served by GET /api/portfolio/:userId (see src/server/routes/portfolio.ts).
+ * ------------------------------------------------------------------------- */
+
+type ProblemDifficulty = 'EASY' | 'MEDIUM' | 'HARD' | 'EXPERT' | 'MASTER';
+
+const PORTFOLIO_DIFFICULTY_STYLE: Record<ProblemDifficulty, string> = {
+  EASY: 'bg-brand-green/20 text-brand-green',
+  MEDIUM: 'bg-yellow-500/20 text-yellow-500',
+  HARD: 'bg-red-500/20 text-red-500',
+  EXPERT: 'bg-brand-purple/20 text-brand-purple',
+  MASTER: 'bg-[#FFD700]/20 text-[#FFD700]',
+};
+
+const PORTFOLIO_DIFFICULTY_LABEL: Record<ProblemDifficulty, string> = {
+  EASY: 'Oson',
+  MEDIUM: "O'rta",
+  HARD: 'Qiyin',
+  EXPERT: 'Ekspert',
+  MASTER: 'Master',
+};
+
+interface PortfolioSolvedProblem {
+  problemId: string;
+  title: string;
+  difficulty: ProblemDifficulty;
+  points: number;
+  tags: string[];
+  solvedAt: string | null;
+}
+
+interface PortfolioRubricScore {
+  label: string;
+  points: number;
+  note?: string;
+}
+
+interface PortfolioProject {
+  submissionId: string;
+  lessonKey: string | null;
+  title: string;
+  status: string;
+  submittedAt: string | null;
+  githubUrl: string | null;
+  demoUrl: string | null;
+  defense: string | null;
+  rubricTotal: number | null;
+  rubricMax: number;
+  rubricScores: PortfolioRubricScore[];
+}
+
+interface PortfolioResponse {
+  user: {
+    id: string;
+    name: string;
+    avatarUrl: string | null;
+    level: number;
+    xp: number;
+    title: string | null;
+    track: string | null;
+    profilePublic: boolean;
+  };
+  solvedCount: number;
+  solved: PortfolioSolvedProblem[];
+  projects: PortfolioProject[];
+}
+
+const DEFENSE_MAX_CHARS = 2000;
+
+function difficultyStyle(difficulty: ProblemDifficulty): string {
+  return PORTFOLIO_DIFFICULTY_STYLE[difficulty] ?? 'bg-white/10 text-gray-300';
+}
+
+function difficultyLabel(difficulty: ProblemDifficulty): string {
+  return PORTFOLIO_DIFFICULTY_LABEL[difficulty] ?? difficulty;
+}
+
+function SolvedProblemRow({ problem }: { problem: PortfolioSolvedProblem }) {
+  return (
+    <div className="flex items-center gap-3 bg-black/20 px-3 py-2 rounded-lg border border-brand-border">
+      <CheckCircle2 size={14} className="text-brand-green shrink-0" />
+      <span className="flex-1 text-sm text-white truncate">{problem.title}</span>
+      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${difficultyStyle(problem.difficulty)}`}>
+        {difficultyLabel(problem.difficulty)}
+      </span>
+      <span className="text-xs font-mono text-brand-purple shrink-0">+{problem.points} XP</span>
+    </div>
+  );
+}
+
+interface DefenseEditorProps {
+  submissionId: string;
+  initialValue: string;
+  onSaved: () => void;
+}
+
+/**
+ * Inline defense editor. Only rendered for the portfolio owner — a defense
+ * written by anyone else is worthless when an employer starts asking questions.
+ */
+function DefenseEditor({ submissionId, initialValue, onSaved }: DefenseEditorProps) {
+  const [text, setText] = useState(initialValue);
+
+  const mutation = useMutation({
+    mutationFn: (defense: string) =>
+      api.post<{ id: string; defense: string }>(`/portfolio/projects/${submissionId}/defense`, { defense }),
+    onSuccess: () => onSaved(),
+  });
+
+  const trimmed = text.trim();
+  const errorMessage =
+    mutation.error instanceof ApiError
+      ? mutation.error.message
+      : mutation.error
+        ? "Himoya matnini saqlab bo'lmadi. Qaytadan urinib ko'ring."
+        : null;
+
+  return (
+    <div className="mt-3 space-y-2">
+      <p className="text-xs text-gray-400 leading-relaxed">
+        Loyihangizni o'z so'zlaringiz bilan himoya qiling: qanday muammoni yechdingiz, qanday texnologiyalarni
+        tanladingiz va nima uchun. Ish beruvchilar suhbatda aynan shuni so'raydi — kod emas, uning ortidagi qaror.
+      </p>
+      <textarea
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        maxLength={DEFENSE_MAX_CHARS}
+        rows={4}
+        placeholder="Masalan: Bu API'ni Express va Prisma'da yozdim, chunki..."
+        className="w-full bg-black/40 border border-brand-border rounded-lg p-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-brand-cyan/60 transition-colors resize-y"
+      />
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[10px] text-gray-500 font-mono">
+          {trimmed.length}/{DEFENSE_MAX_CHARS}
+        </span>
+        <button
+          type="button"
+          disabled={trimmed.length === 0 || mutation.isPending}
+          onClick={() => mutation.mutate(trimmed)}
+          className="flex items-center gap-2 px-4 py-1.5 text-xs font-semibold rounded-lg bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/50 hover:bg-brand-cyan/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {mutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />}
+          Himoyani saqlash
+        </button>
+      </div>
+      {errorMessage && <p className="text-xs text-red-400">{errorMessage}</p>}
+    </div>
+  );
+}
+
+interface PortfolioProjectCardProps {
+  project: PortfolioProject;
+  isOwner: boolean;
+  onSaved: () => void;
+}
+
+function PortfolioProjectCard({ project, isOwner, onSaved }: PortfolioProjectCardProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const hasDefense = Boolean(project.defense && project.defense.trim().length > 0);
+  const showEditor = isOwner && (!hasDefense || isEditing);
+
+  return (
+    <div className="glass-panel p-5 border border-brand-border">
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <h4 className="font-bold text-white">{project.title}</h4>
+        {project.rubricTotal !== null ? (
+          <span className="shrink-0 text-xs font-mono px-2 py-0.5 rounded bg-brand-green/20 text-brand-green">
+            {project.rubricTotal}/{project.rubricMax} ball
+          </span>
+        ) : (
+          <span className="shrink-0 text-xs px-2 py-0.5 rounded bg-white/10 text-gray-400">Baholanmagan</span>
+        )}
+      </div>
+
+      <div className="flex gap-2 flex-wrap mb-3">
+        {project.githubUrl && (
+          <a
+            href={project.githubUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[10px] bg-white/10 px-2 py-0.5 rounded hover:bg-white/20 transition-colors flex items-center gap-1"
+          >
+            <Github size={10} /> GitHub
+          </a>
+        )}
+        {project.demoUrl && (
+          <a
+            href={project.demoUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[10px] bg-white/10 px-2 py-0.5 rounded hover:bg-white/20 transition-colors flex items-center gap-1"
+          >
+            <Globe size={10} /> Demo
+          </a>
+        )}
+        {!project.githubUrl && !project.demoUrl && (
+          <span className="text-[10px] text-gray-500">Havola qo'shilmagan</span>
+        )}
+      </div>
+
+      {project.rubricScores.length > 0 && (
+        <div className="space-y-1 mb-3">
+          {project.rubricScores.map((score) => (
+            <div key={score.label} className="flex items-center justify-between text-xs">
+              <span className="text-gray-400">{score.label}</span>
+              <span className="font-mono text-gray-300">{score.points}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {hasDefense && (
+        <div className="bg-black/20 border border-brand-border rounded-lg p-3">
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <span className="text-[10px] uppercase tracking-widest text-gray-500">Loyiha himoyasi</span>
+            {isOwner && !isEditing && (
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="text-[10px] text-brand-cyan hover:underline"
+              >
+                Tahrirlash
+              </button>
+            )}
+          </div>
+          <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{project.defense}</p>
+        </div>
+      )}
+
+      {!hasDefense && !isOwner && (
+        <p className="text-xs text-gray-500 italic">Muallif hali loyiha himoyasini yozmagan.</p>
+      )}
+
+      {showEditor && (
+        <DefenseEditor
+          submissionId={project.submissionId}
+          initialValue={project.defense ?? ''}
+          onSaved={() => {
+            setIsEditing(false);
+            onSaved();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+interface PortfolioSectionProps {
+  viewerId: string;
+  ownerId: string;
+}
+
+function PortfolioSection({ viewerId, ownerId }: PortfolioSectionProps) {
+  const queryClient = useQueryClient();
+  const isOwner = viewerId === ownerId;
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['portfolio', ownerId],
+    queryFn: () => api.get<PortfolioResponse>(`/portfolio/${ownerId}`),
+    retry: false,
+  });
+
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ['portfolio', ownerId] });
+  };
+
+  if (isLoading) {
+    return <p className="text-sm text-gray-500">Portfolio yuklanmoqda...</p>;
+  }
+
+  // A closed profile answers 404 on purpose (it must not confirm the id exists),
+  // so this is a normal state, not an error screen.
+  if (error instanceof ApiError && error.status === 404) {
+    return (
+      <div className="glass-panel p-6 border border-brand-border flex items-start gap-3">
+        <EyeOff size={18} className="text-gray-500 shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-semibold text-white mb-1">Bu profil yopiq</p>
+          <p className="text-xs text-gray-400 leading-relaxed">
+            Egasi portfolioni yashirgan. Sozlamalardan profilni ochiq qilsangiz, ishlaringiz hammaga ko'rinadi.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <p className="text-sm text-red-400">
+        Portfolioni yuklab bo'lmadi. Sahifani yangilab, qaytadan urinib ko'ring.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="space-y-3">
+        <h3 className="font-bold text-lg flex items-center gap-2">
+          <CheckCircle2 className="text-brand-green" /> Yechilgan masalalar
+          <span className="text-sm font-mono text-gray-500">({data.solvedCount})</span>
+        </h3>
+        {data.solved.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            Hali bironta masala yechilmagan. Amaliyot bo'limidan birinchi masalani yeching!
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {data.solved.map((problem) => (
+              <SolvedProblemRow key={problem.problemId} problem={problem} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="font-bold text-lg flex items-center gap-2">
+          <Briefcase className="text-brand-purple" /> Loyihalar portfoliosi
+          <span className="text-sm font-mono text-gray-500">({data.projects.length})</span>
+        </h3>
+        {data.projects.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            Hali topshirilgan loyiha yo'q. Kursdagi loyiha darsini yakunlang — portfolio shu yerda yig'iladi.
+          </p>
+        ) : (
+          <div className="grid sm:grid-cols-2 gap-4">
+            {data.projects.map((project) => (
+              <PortfolioProjectCard
+                key={project.submissionId}
+                project={project}
+                isOwner={isOwner}
+                onSaved={invalidate}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface ProfileProps {
   user: User;
   onRoleToggle?: () => void;
@@ -246,7 +579,7 @@ interface ModuleProgressEntry {
   unlocked: boolean;
 }
 
-const TABS = ["Umumiy ko'rinish", 'Loyihalar', "Ko'nikmalar", 'Faollik'] as const;
+const TABS = ["Umumiy ko'rinish", 'Portfolio', 'Loyihalar', "Ko'nikmalar", 'Faollik'] as const;
 type ProfileTab = (typeof TABS)[number];
 
 export function Profile({ user, onRoleToggle }: ProfileProps) {
@@ -402,6 +735,8 @@ export function Profile({ user, onRoleToggle }: ProfileProps) {
           </div>
         </div>
       )}
+
+      {activeTab === 'Portfolio' && <PortfolioSection viewerId={user.id} ownerId={user.id} />}
 
       {activeTab === 'Loyihalar' && (
         <div className="space-y-6">

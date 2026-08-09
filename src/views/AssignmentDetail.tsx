@@ -13,6 +13,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { formatRelativeTime } from '../lib/utils';
+import { trackLabel } from '../lib/tracks';
 
 interface AssignmentDetailData {
   id: string;
@@ -21,6 +22,7 @@ interface AssignmentDetailData {
   track: string;
   dueDate: string;
   xpReward: number;
+  moduleKey: string | null;
   submission: {
     id: string;
     githubUrl: string | null;
@@ -38,15 +40,6 @@ interface AssignmentDetailProps {
   onTriggerSuccess: () => void;
 }
 
-const TRACK_LABEL: Record<string, string> = {
-  frontend: 'Frontend',
-  robotics: 'Robototexnika',
-  office: 'Ofis',
-};
-
-function trackLabel(track: string): string {
-  return TRACK_LABEL[track] ?? track;
-}
 
 export function AssignmentDetail({ assignmentId, onBack, onTriggerSuccess }: AssignmentDetailProps) {
   const [repoUrl, setRepoUrl] = useState('');
@@ -132,13 +125,13 @@ export function AssignmentDetail({ assignmentId, onBack, onTriggerSuccess }: Ass
                   <p className="text-brand-purple font-bold text-sm uppercase">{trackLabel(assignment.track)} yo'nalishi</p>
                 </div>
                 <div className="px-3 py-1 bg-brand-orange/20 border border-brand-orange/50 text-brand-orange text-[10px] font-black rounded-full whitespace-nowrap">
-                  {formatRelativeTime(assignment.dueDate)}
+                  {assignment.moduleKey ? "O'z tezligingizda" : formatRelativeTime(assignment.dueDate)}
                 </div>
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-sm font-bold text-white uppercase tracking-widest">Maqsad</h3>
-                <p className="text-gray-400 text-sm leading-relaxed">{assignment.description}</p>
+                <h3 className="text-sm font-bold text-white uppercase tracking-widest">Maqsad va topshiriq</h3>
+                <p className="text-gray-400 text-sm leading-relaxed whitespace-pre-line">{assignment.description}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

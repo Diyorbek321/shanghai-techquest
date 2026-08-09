@@ -8,6 +8,8 @@ import { setAuthCookie, clearAuthCookie } from '../auth/cookies';
 import { serializeUser } from '../serializers/user';
 import { requireAuth } from '../middleware/auth';
 import { authRateLimiter } from '../middleware/rateLimit';
+import { TRACK_VALUES } from '../serializers/track';
+import { avatarUrlForEmail } from '../avatar';
 
 export const authRouter = Router();
 
@@ -15,7 +17,7 @@ const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   name: z.string().min(1).max(100),
-  track: z.enum(['frontend', 'robotics', 'office']).optional(),
+  track: z.enum(TRACK_VALUES).optional(),
 });
 
 const loginSchema = z.object({
@@ -44,7 +46,7 @@ authRouter.post('/register', authRateLimiter, async (req, res) => {
       role: Role.STUDENT,
       track: track ? (track.toUpperCase() as Track) : null,
       title: 'New Recruit',
-      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(email)}`,
+      avatarUrl: avatarUrlForEmail(email),
     },
   });
 

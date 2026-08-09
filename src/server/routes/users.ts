@@ -6,7 +6,8 @@ import { prisma } from '../db';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { serializeUser } from '../serializers/user';
 import { checkAchievements } from '../achievements/check';
-import { toClientTrack, toPrismaTrack } from '../serializers/track';
+import { TRACK_VALUES, toClientTrack, toPrismaTrack } from '../serializers/track';
+import { avatarUrlForEmail } from '../avatar';
 
 export const usersRouter = Router();
 
@@ -42,7 +43,7 @@ const createUserSchema = z.object({
   password: z.string().min(8),
   name: z.string().min(1).max(100),
   role: z.enum(['student', 'teacher', 'admin']),
-  track: z.enum(['frontend', 'robotics', 'office']).optional(),
+  track: z.enum(TRACK_VALUES).optional(),
 });
 
 usersRouter.post('/', requireRole(Role.ADMIN), async (req, res) => {
@@ -66,7 +67,7 @@ usersRouter.post('/', requireRole(Role.ADMIN), async (req, res) => {
       role: role.toUpperCase() as Role,
       track: track ? toPrismaTrack(track) : null,
       title: role === 'student' ? 'New Recruit' : undefined,
-      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(email)}`,
+      avatarUrl: avatarUrlForEmail(email),
     },
   });
   res.status(201).json(serializeUser(user));
@@ -153,7 +154,7 @@ usersRouter.post('/me/spend', async (req, res) => {
 const updateUserSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   role: z.enum(['student', 'teacher', 'admin']).optional(),
-  track: z.enum(['frontend', 'robotics', 'office']).nullable().optional(),
+  track: z.enum(TRACK_VALUES).nullable().optional(),
 });
 
 usersRouter.patch('/:id', requireRole(Role.ADMIN), async (req, res) => {

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { BrainCircuit, CheckCircle2, XCircle, ChevronRight, ChevronLeft, Play, Check, Loader2, Search } from 'lucide-react';
+import { BrainCircuit, CheckCircle2, XCircle, ChevronRight, ChevronLeft, Play, Check, Loader2, Search, EyeOff, AlertTriangle } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD' | 'EXPERT' | 'MASTER';
 type Language = 'javascript' | 'python' | 'cpp';
@@ -27,13 +27,67 @@ interface ProblemListResponse {
 
 interface ProblemDetail extends ProblemListItem {
   description: string;
-  starterCode: Record<Language, string>;
+  starterCode: Record<Language, string | null>;
+  /** Languages this problem ships starter code for; lesson practice is Python-only. */
+  languages: Language[];
+}
+
+const LANGUAGE_LABEL: Record<Language, string> = {
+  javascript: 'JavaScript',
+  python: 'Python 3',
+  cpp: 'C++',
+};
+
+/** One test case verdict. Hidden cases deliberately omit expected/actual. */
+interface SubmitTestResult {
+  label: string;
+  hidden: boolean;
+  passed: boolean;
+  expected?: string;
+  actual?: string;
+  stderr?: string;
 }
 
 interface SubmitResult {
   passed: boolean;
-  feedback: string;
+  testsPassed: number;
+  testsTotal: number;
   pointsAwarded: number;
+  feedback: string;
+  results: SubmitTestResult[];
+}
+
+/** Message shown in the results panel when the submission itself failed. */
+interface SubmitFailure {
+  title: string;
+  detail: string;
+  /** Sandbox outage is not the student's fault — render it as a warning, not a rejection. */
+  sandboxDown: boolean;
+}
+
+const SANDBOX_DOWN_FAILURE: SubmitFailure = {
+  title: 'Kod ishga tushirish xizmati vaqtincha ishlamayapti',
+  detail:
+    "Sinov muhiti (sandbox) hozir javob bermayapti. Kodingiz saqlanib qoldi — bir necha daqiqadan so'ng qayta yuboring yoki o'qituvchiga xabar bering.",
+  sandboxDown: true,
+};
+
+function toSubmitFailure(error: unknown): SubmitFailure {
+  if (error instanceof ApiError && error.status === 503) {
+    return SANDBOX_DOWN_FAILURE;
+  }
+  return {
+    title: 'Yuborishda xatolik yuz berdi',
+    detail: error instanceof Error ? error.message : "Noma'lum xatolik. Iltimos, qaytadan urinib ko'ring.",
+    sandboxDown: false,
+  };
+}
+
+interface RunResult {
+  stdout: string;
+  stderr: string;
+  compileOutput: string | null;
+  timedOut: boolean;
 }
 
 const DIFFICULTY_LABEL: Record<Difficulty, string> = {
@@ -63,12 +117,64 @@ const DIFFICULTY_TABS: { label: string; value: Difficulty | 'ALL' }[] = [
 
 const PAGE_SIZE = 25;
 
+/** Monospace block that scrolls on its own instead of stretching the panel. */
+function OutputBlock({ label, value, tone }: { label: string; value: string; tone: 'expected' | 'actual' | 'error' }) {
+  const toneClass =
+    tone === 'expected' ? 'text-brand-green' : tone === 'actual' ? 'text-red-400' : 'text-yellow-300';
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">{label}</p>
+      <pre
+        className={`bg-black/60 border border-white/10 rounded px-2 py-1.5 text-xs whitespace-pre-wrap break-words overflow-x-auto max-h-32 ${toneClass}`}
+      >
+        {value === '' ? '(bo‘sh)' : value}
+      </pre>
+    </div>
+  );
+}
+
+function TestResultRow({ test }: { test: SubmitTestResult }) {
+  const showDetails = !test.passed && !test.hidden;
+  return (
+    <li className="rounded-md border border-white/10 bg-black/30 px-3 py-2 min-w-0">
+      <div className="flex items-center gap-2 text-xs">
+        {test.passed ? (
+          <CheckCircle2 size={14} className="text-brand-green shrink-0" />
+        ) : (
+          <XCircle size={14} className="text-red-500 shrink-0" />
+        )}
+        <span className={`truncate ${test.passed ? 'text-gray-300' : 'text-red-300 font-bold'}`}>
+          {test.hidden && !test.passed ? 'Yashirin test — yiqildi' : test.label}
+        </span>
+        {test.hidden && (
+          <span className="ml-auto flex items-center gap-1 text-[10px] uppercase tracking-wider text-gray-500 shrink-0">
+            <EyeOff size={11} /> Yashirin
+          </span>
+        )}
+      </div>
+
+      {showDetails && (
+        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+          <OutputBlock label="Kutilgan natija" value={test.expected ?? ''} tone="expected" />
+          <OutputBlock label="Sizning natijangiz" value={test.actual ?? ''} tone="actual" />
+          {test.stderr && (
+            <div className="md:col-span-2">
+              <OutputBlock label="Xatolik oqimi" value={test.stderr} tone="error" />
+            </div>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
 export function Problems() {
   const [activeProblemId, setActiveProblemId] = useState<string | null>(null);
   const [language, setLanguage] = useState<Language>('javascript');
   const [code, setCode] = useState('');
-  const [output, setOutput] = useState('');
+  const [runResult, setRunResult] = useState<RunResult | null>(null);
   const [result, setResult] = useState<SubmitResult | null>(null);
+  const [submitFailure, setSubmitFailure] = useState<SubmitFailure | null>(null);
   const [difficultyFilter, setDifficultyFilter] = useState<Difficulty | 'ALL'>('ALL');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -96,47 +202,76 @@ export function Problems() {
     enabled: !!activeProblemId,
   });
 
+  const runCode = useMutation({
+    mutationFn: () => api.post<RunResult>('/problems/run', { code, language }),
+    onSuccess: (data) => {
+      setRunResult(data);
+      setResult(null);
+      setSubmitFailure(null);
+    },
+    onError: (error: unknown) => {
+      const message =
+        error instanceof ApiError && error.status === 503
+          ? SANDBOX_DOWN_FAILURE.detail
+          : error instanceof Error
+            ? error.message
+            : 'Kodni ishga tushirishda xatolik yuz berdi.';
+      setRunResult({ stdout: '', stderr: message, compileOutput: null, timedOut: false });
+      setResult(null);
+      setSubmitFailure(null);
+    },
+  });
+
   const submit = useMutation({
     mutationFn: () =>
       api.post<SubmitResult>(`/problems/${activeProblemId}/submit`, { code, language }),
     onSuccess: (data) => {
       setResult(data);
-      setOutput('');
+      setRunResult(null);
+      setSubmitFailure(null);
       queryClient.invalidateQueries({ queryKey: ['problems'] });
     },
     onError: (error: unknown) => {
-      const message = error instanceof Error ? error.message : 'Yuborishda xatolik yuz berdi.';
-      alert(message);
+      setSubmitFailure(toSubmitFailure(error));
+      setResult(null);
+      setRunResult(null);
     },
   });
 
   const handleSelectProblem = (prob: ProblemListItem) => {
     setActiveProblemId(prob.id);
-    setOutput('');
+    setRunResult(null);
     setResult(null);
+    setSubmitFailure(null);
   };
 
   React.useEffect(() => {
-    if (activeProblem) {
-      setCode(activeProblem.starterCode[language]);
-    }
+    if (!activeProblem) return;
+    // Fall back to the problem's first available language when the currently
+    // selected one has no starter code (e.g. Python-only lesson practice).
+    const next = activeProblem.starterCode[language] !== null ? language : activeProblem.languages[0] ?? language;
+    setLanguage(next);
+    setCode(activeProblem.starterCode[next] ?? '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProblem]);
 
   const handleLanguageChange = (lang: Language) => {
     setLanguage(lang);
     if (activeProblem) {
-      setCode(activeProblem.starterCode[lang]);
+      setCode(activeProblem.starterCode[lang] ?? '');
     }
   };
 
   const handleRun = () => {
+    if (runCode.isPending) return;
     setResult(null);
-    setOutput("Kod muharrirda tayyor. Baholash uchun 'Yuborish' tugmasini bosing.");
+    setSubmitFailure(null);
+    runCode.mutate();
   };
 
   const handleSubmit = () => {
     if (!activeProblemId || submit.isPending) return;
+    setSubmitFailure(null);
     submit.mutate();
   };
 
@@ -292,18 +427,27 @@ export function Problems() {
             onChange={(e) => handleLanguageChange(e.target.value as Language)}
             className="bg-black/50 border border-white/10 text-white text-sm rounded-md px-3 py-1.5 focus:outline-none focus:border-brand-cyan/50"
           >
-            <option value="javascript">JavaScript</option>
-            <option value="python">Python 3</option>
-            <option value="cpp">C++</option>
+            {activeProblem.languages.map((lang) => (
+              <option key={lang} value={lang}>{LANGUAGE_LABEL[lang]}</option>
+            ))}
           </select>
 
           <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: runCode.isPending ? 1 : 1.05 }}
+            whileTap={{ scale: runCode.isPending ? 1 : 0.95 }}
             onClick={handleRun}
-            className="flex items-center gap-2 px-4 py-1.5 text-sm font-bold text-white bg-brand-purple/20 border border-brand-purple/50 rounded-md hover:bg-brand-purple/30 transition-all"
+            disabled={runCode.isPending}
+            className="flex items-center gap-2 px-4 py-1.5 text-sm font-bold text-white bg-brand-purple/20 border border-brand-purple/50 rounded-md hover:bg-brand-purple/30 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <Play size={16} /> Ishga tushirish
+            {runCode.isPending ? (
+              <>
+                <Loader2 size={16} className="animate-spin" /> Ishga tushirilmoqda...
+              </>
+            ) : (
+              <>
+                <Play size={16} /> Ishga tushirish
+              </>
+            )}
           </motion.button>
           <motion.button
             whileHover={{ scale: submit.isPending ? 1 : 1.05 }}
@@ -314,7 +458,7 @@ export function Problems() {
           >
             {submit.isPending ? (
               <>
-                <Loader2 size={16} className="animate-spin" /> AI tekshirilmoqda...
+                <Loader2 size={16} className="animate-spin" /> Testlar bajarilmoqda...
               </>
             ) : (
               <>
@@ -379,28 +523,92 @@ export function Problems() {
           </div>
 
           {/* Terminal / Output */}
-          <div className="h-48 bg-[#0a0a0a] flex flex-col border-t border-black">
+          <div className="h-64 bg-[#0a0a0a] flex flex-col border-t border-black">
             <div className="bg-[#1e1e1e] px-4 py-2 text-xs font-bold text-gray-400 flex items-center justify-between border-b border-black">
               <span>Sinov Natijalari</span>
+              {result && (
+                <span className={`font-mono ${result.passed ? 'text-brand-green' : 'text-red-400'}`}>
+                  {result.testsPassed}/{result.testsTotal} test o'tdi
+                </span>
+              )}
             </div>
-            <div className="p-4 font-mono text-sm overflow-y-auto flex-1">
+            <div className="p-4 font-mono text-sm overflow-y-auto overflow-x-hidden flex-1">
               {submit.isPending ? (
                 <div className="flex items-center gap-2 text-brand-cyan">
-                  <Loader2 size={16} className="animate-spin" /> AI kodingizni tekshirmoqda, iltimos kuting...
+                  <Loader2 size={16} className="animate-spin" /> Kodingiz testlarda tekshirilmoqda, iltimos kuting...
+                </div>
+              ) : submitFailure ? (
+                <div
+                  className={`flex items-start gap-2 rounded-md border px-3 py-2 ${
+                    submitFailure.sandboxDown
+                      ? 'border-yellow-500/40 bg-yellow-500/10 text-yellow-300'
+                      : 'border-red-500/40 bg-red-500/10 text-red-300'
+                  }`}
+                >
+                  <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="font-bold">{submitFailure.title}</p>
+                    <p className="text-xs text-gray-300 mt-1 whitespace-pre-wrap break-words">{submitFailure.detail}</p>
+                  </div>
                 </div>
               ) : result ? (
-                <div className="space-y-3">
-                  <div className={`flex items-center gap-2 font-bold ${result.passed ? 'text-brand-green' : 'text-red-500'}`}>
+                <div className="space-y-3 min-w-0">
+                  <div className={`flex flex-wrap items-center gap-2 font-bold ${result.passed ? 'text-brand-green' : 'text-red-500'}`}>
                     {result.passed ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
-                    {result.passed ? "Qabul qilindi! ✅" : "Qabul qilinmadi ❌"}
-                    {result.passed && (
+                    {result.passed ? 'Qabul qilindi!' : 'Qabul qilinmadi'}
+                    <span className="text-gray-400 font-normal">
+                      {result.testsPassed}/{result.testsTotal} test o'tdi
+                    </span>
+                    {result.passed && result.pointsAwarded > 0 && (
                       <span className="text-brand-purple">+{result.pointsAwarded} XP</span>
                     )}
                   </div>
-                  <pre className="text-gray-300 whitespace-pre-wrap">{result.feedback}</pre>
+
+                  {result.results.length > 0 ? (
+                    <ul className="space-y-1.5">
+                      {result.results.map((test, i) => (
+                        <TestResultRow key={`${test.label}-${i}`} test={test} />
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-gray-600 italic text-xs">Bu masala uchun testlar topilmadi.</p>
+                  )}
+
+                  {result.feedback && (
+                    <div className="border-t border-white/10 pt-2">
+                      <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Qo'shimcha izoh</p>
+                      <pre className="text-gray-400 text-xs whitespace-pre-wrap break-words">{result.feedback}</pre>
+                    </div>
+                  )}
                 </div>
-              ) : output ? (
-                <pre className="text-gray-300 whitespace-pre-wrap">{output}</pre>
+              ) : runCode.isPending ? (
+                <div className="flex items-center gap-2 text-brand-cyan">
+                  <Loader2 size={16} className="animate-spin" /> Kod ishga tushirilmoqda...
+                </div>
+              ) : runResult ? (
+                <div className="space-y-2">
+                  {runResult.compileOutput && (
+                    <div>
+                      <p className="text-yellow-500 font-bold mb-1">Kompilyatsiya:</p>
+                      <pre className="text-yellow-200 whitespace-pre-wrap">{runResult.compileOutput}</pre>
+                    </div>
+                  )}
+                  {runResult.stdout && (
+                    <pre className="text-gray-300 whitespace-pre-wrap">{runResult.stdout}</pre>
+                  )}
+                  {runResult.stderr && (
+                    <div>
+                      <p className="text-red-500 font-bold mb-1">Xatolik:</p>
+                      <pre className="text-red-400 whitespace-pre-wrap">{runResult.stderr}</pre>
+                    </div>
+                  )}
+                  {runResult.timedOut && (
+                    <p className="text-red-500 font-bold">Vaqt tugadi: kod juda uzoq ishladi va to'xtatildi.</p>
+                  )}
+                  {!runResult.compileOutput && !runResult.stdout && !runResult.stderr && !runResult.timedOut && (
+                    <div className="text-gray-600 italic">Dastur natija chiqarmadi (stdout bo'sh).</div>
+                  )}
+                </div>
               ) : (
                 <div className="text-gray-600 italic">Natijalarni ko'rish uchun kodingizni ishga tushiring...</div>
               )}
