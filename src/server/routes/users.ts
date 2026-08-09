@@ -10,6 +10,7 @@ import { TRACK_VALUES, toClientTrack, toPrismaTrack } from '../serializers/track
 import { avatarUrlForEmail } from '../avatar';
 import { teacherManagesStudent } from '../utils/teacherScope';
 import { generatePassword } from '../users/credentials';
+import { notify } from '../notifications/notify';
 
 export const usersRouter = Router();
 
@@ -182,6 +183,50 @@ usersRouter.delete('/:id', requireRole(Role.ADMIN), async (req, res) => {
   }
   await prisma.user.delete({ where: { id: req.params.id } });
   res.status(204).send();
+});
+
+const teacherRewardSchema = z.object({
+  // Capped so a single click cannot dwarf a term's worth of earned XP and make
+  // the leaderboard meaningless.
+  xp: z.number().int().min(0).max(500).default(0),
+  coins: z.number().int().min(0).max(500).default(0),
+  message: z.string().min(1).max(300),
+});
+
+/**
+ * Teacher recognition: XP/coins plus a note that lands in the student's
+ * notifications. At this age a named word from the teacher moves behaviour more
+ * than any amount of automated points, so the message is required and the
+ * points are optional.
+ */
+usersRouter.post('/:id/reward', requireRole(Role.TEACHER, Role.ADMIN), async (req, res) => {
+  const parsed = teacherRewardSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Noto'g'ri ma'lumot kiritildi." });
+  }
+  const { xp, coins, message } = parsed.data;
+  if (xp === 0 && coins === 0) {
+    return res.status(400).json({ error: 'Kamida XP yoki tanga bering.' });
+  }
+  if (!(await teacherManagesStudent(req.user!, req.params.id))) {
+    return res.status(403).json({ error: "Bu o'quvchini mukofotlash huquqingiz yo'q." });
+  }
+
+  const student = await prisma.user.update({
+    where: { id: req.params.id },
+    data: { xp: { increment: xp }, coins: { increment: coins } },
+  });
+
+  const parts = [xp > 0 ? `+${xp} XP` : null, coins > 0 ? `+${coins} tanga` : null].filter(Boolean);
+  await notify(prisma, {
+    userId: student.id,
+    type: 'SUCCESS',
+    title: `${req.user!.name} sizni mukofotladi (${parts.join(', ')})`,
+    body: message,
+  });
+
+  await checkAchievements(student.id);
+  res.json(serializeUser(student));
 });
 
 /**

@@ -38,13 +38,17 @@ interface Battle {
   opponent: BattlePlayer | null;
 }
 
-type Scope = 'track' | 'global';
+type Scope = 'class' | 'track' | 'global';
 
-// Backend (/leaderboard) only distinguishes two real scopes: the caller's own
-// track and the global pool — there is no weekly/monthly time window, so the
-// tabs must map 1:1 to those two distinct behaviors instead of implying a
+// Backend (/leaderboard) distinguishes three real scopes: the caller's own
+// class, their track, and the global pool — there is no weekly/monthly time
+// window, so the tabs map 1:1 to those behaviors instead of implying a
 // time-period split that doesn't exist server-side.
+//
+// Class comes first and is the default: a top-50 global board is unreachable
+// for most students, while their own room is the ranking they actually feel.
 const SCOPE_TABS: { label: string; scope: Scope }[] = [
+  { label: 'Sinfim', scope: 'class' },
   { label: 'Trekim', scope: 'track' },
   { label: 'Barcha davr', scope: 'global' },
 ];

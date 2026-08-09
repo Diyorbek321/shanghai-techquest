@@ -14,6 +14,7 @@ export function serializeUser(user: PrismaUser) {
     xp: user.xp,
     nextLevelXp,
     streak: user.streak,
+    streakFreezes: user.streakFreezes,
     coins: user.coins,
     role: user.role.toLowerCase() as 'student' | 'teacher' | 'admin',
     track: toClientTrack(user.track),

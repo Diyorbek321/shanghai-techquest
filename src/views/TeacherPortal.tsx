@@ -13,9 +13,10 @@ import {
   Star,
   CalendarCheck,
   BookText,
-  KeyRound
+  KeyRound,
+  Award
 } from 'lucide-react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { formatRelativeTime, formatDate } from '../lib/utils';
 import { Track } from '../types';
@@ -326,6 +327,8 @@ function StudentDetailModal({ student, onClose }: { student: StudentRow | null; 
               ))}
             </div>
 
+            <RewardBox studentId={student.id} />
+
             <div className="space-y-2 pt-4 border-t border-white/10">
               <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
                 <Mail size={12} /> Xabar yuborish
@@ -350,6 +353,66 @@ function StudentDetailModal({ student, onClose }: { student: StudentRow | null; 
         </div>
       )}
     </AnimatePresence>
+  );
+}
+
+/** Preset awards, so recognising a student is one click rather than a form. */
+const REWARD_PRESETS = [
+  { label: 'Faol qatnashdi', xp: 50, coins: 25 },
+  { label: 'Uy vazifasi a\'lo', xp: 100, coins: 50 },
+  { label: 'Sinf yulduzi', xp: 200, coins: 100 },
+];
+
+function RewardBox({ studentId }: { studentId: string }) {
+  const [message, setMessage] = useState('');
+  const [preset, setPreset] = useState(REWARD_PRESETS[0]);
+  const queryClient = useQueryClient();
+
+  const reward = useMutation({
+    mutationFn: () => api.post(`/users/${studentId}/reward`, { xp: preset.xp, coins: preset.coins, message: message.trim() || preset.label }),
+    onSuccess: () => {
+      setMessage('');
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+    },
+  });
+
+  return (
+    <div className="space-y-2 pt-4 border-t border-white/10">
+      <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+        <Award size={12} /> Mukofotlash
+      </h3>
+      <div className="flex flex-wrap gap-2">
+        {REWARD_PRESETS.map((p) => (
+          <button
+            key={p.label}
+            type="button"
+            onClick={() => setPreset(p)}
+            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
+              preset.label === p.label
+                ? 'bg-brand-orange text-black'
+                : 'bg-white/5 text-gray-400 hover:text-white'
+            }`}
+          >
+            {p.label} · +{p.xp} XP
+          </button>
+        ))}
+      </div>
+      <input
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        placeholder={`Maqtov matni (bo'sh qolsa: "${preset.label}")`}
+        className="w-full bg-black/30 border border-brand-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"
+      />
+      <button
+        onClick={() => reward.mutate()}
+        disabled={reward.isPending}
+        className="flex items-center gap-2 bg-brand-orange/20 hover:bg-brand-orange/30 text-brand-orange border border-brand-orange/50 font-medium px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50"
+      >
+        <Award size={14} /> {reward.isPending ? 'Yuborilmoqda...' : `+${preset.xp} XP, +${preset.coins} tanga berish`}
+      </button>
+      {reward.isSuccess && <p className="text-xs text-brand-green">Mukofot yuborildi.</p>}
+      {reward.isError && <p className="text-xs text-brand-red">{(reward.error as Error).message}</p>}
+    </div>
   );
 }
 

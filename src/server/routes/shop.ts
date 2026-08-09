@@ -4,6 +4,7 @@ import { prisma } from '../db';
 import { requireAuth } from '../middleware/auth';
 import { serializeUser } from '../serializers/user';
 import { checkAchievements } from '../achievements/check';
+import { MAX_STREAK_FREEZES, isConsumable } from '../shop/consumables';
 
 export const shopRouter = Router();
 
@@ -38,6 +39,30 @@ shopRouter.post('/purchase', async (req, res) => {
   const item = await prisma.item.findUnique({ where: { id: parsed.data.itemId } });
   if (!item) {
     return res.status(404).json({ error: 'Mahsulot topilmadi.' });
+  }
+
+  // Consumables are stock, not possessions: they add to a counter and can be
+  // rebought, so the owned-once rule below must not apply to them.
+  if (isConsumable(item.key)) {
+    if (req.user!.streakFreezes >= MAX_STREAK_FREEZES) {
+      return res.status(409).json({ error: `Ko'pi bilan ${MAX_STREAK_FREEZES} ta muzlatish saqlay olasiz.` });
+    }
+    try {
+      const user = await prisma.$transaction(async (tx) => {
+        const { count } = await tx.user.updateMany({
+          where: { id: req.user!.id, coins: { gte: item.price } },
+          data: { coins: { decrement: item.price }, streakFreezes: { increment: 1 } },
+        });
+        if (count === 0) throw new InsufficientCoinsError();
+        return tx.user.findUniqueOrThrow({ where: { id: req.user!.id } });
+      });
+      return res.status(201).json({ inventory: null, user: serializeUser(user) });
+    } catch (err) {
+      if (err instanceof InsufficientCoinsError) {
+        return res.status(409).json({ error: 'Tangalar yetarli emas.' });
+      }
+      throw err;
+    }
   }
 
   const alreadyOwned = await prisma.userInventory.findUnique({

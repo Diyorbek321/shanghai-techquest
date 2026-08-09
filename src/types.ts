@@ -14,6 +14,8 @@ export interface User {
   xp: number;
   nextLevelXp: number;
   streak: number;
+  /// Unused streak freezes; one is spent automatically to cover a missed day.
+  streakFreezes: number;
   coins: number;
   avatarGear?: string[];
   role: UserRole;

@@ -111,3 +111,77 @@ describe('POST /api/daily-exercise/complete', () => {
     expect(res.body.streak).toBe(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Streak freeze
+//
+// A missed day normally resets the streak to 1. A freeze bought from the shop
+// absorbs one such gap. These run on their own student so the shared OFFICE
+// fixture above keeps its own streak state.
+// ---------------------------------------------------------------------------
+
+describe('streak freeze', () => {
+  let freezerId: string;
+  let freezerCookie: string;
+
+  beforeEach(async () => {
+    const passwordHash = await bcrypt.hash('password123', 10);
+    const student = await prisma.user.create({
+      data: {
+        email: uniqueEmail('daily-freeze'),
+        passwordHash,
+        name: 'Freeze Student',
+        role: Role.STUDENT,
+        track: Track.OFFICE,
+      },
+    });
+    freezerId = student.id;
+    userIds.push(student.id);
+    freezerCookie = cookieFor(student.id, student.role, student.track);
+  });
+
+  it('spends a freeze to carry the streak across a missed day', async () => {
+    // Streak of 5 with nothing logged yesterday: the gap is real.
+    await prisma.user.update({ where: { id: freezerId }, data: { streak: 5, streakFreezes: 1 } });
+
+    const res = await request(app).post('/api/daily-exercise/complete').set('Cookie', freezerCookie).send({});
+    expect(res.status).toBe(200);
+    expect(res.body.usedFreeze).toBe(true);
+    expect(res.body.streak).toBe(6);
+    expect(res.body.streakFreezes).toBe(0);
+  });
+
+  it('resets the streak when there is no freeze left', async () => {
+    await prisma.user.update({ where: { id: freezerId }, data: { streak: 5, streakFreezes: 0 } });
+
+    const res = await request(app).post('/api/daily-exercise/complete').set('Cookie', freezerCookie).send({});
+    expect(res.status).toBe(200);
+    expect(res.body.usedFreeze).toBe(false);
+    expect(res.body.streak).toBe(1);
+  });
+
+  it('does not burn a freeze for a student with no streak to save', async () => {
+    // First ever exercise: there is no gap, so the freeze must survive.
+    await prisma.user.update({ where: { id: freezerId }, data: { streak: 0, streakFreezes: 2 } });
+
+    const res = await request(app).post('/api/daily-exercise/complete').set('Cookie', freezerCookie).send({});
+    expect(res.status).toBe(200);
+    expect(res.body.usedFreeze).toBe(false);
+    expect(res.body.streak).toBe(1);
+    expect(res.body.streakFreezes).toBe(2);
+  });
+
+  it('does not spend a freeze when yesterday was actually completed', async () => {
+    await prisma.user.update({ where: { id: freezerId }, data: { streak: 3, streakFreezes: 1 } });
+    const exercise = await prisma.dailyExercise.findFirstOrThrow({ where: { track: Track.OFFICE } });
+    await prisma.dailyExerciseLog.create({
+      data: { userId: freezerId, date: offsetKey(-1), exerciseId: exercise.id, completed: true, completedAt: new Date() },
+    });
+
+    const res = await request(app).post('/api/daily-exercise/complete').set('Cookie', freezerCookie).send({});
+    expect(res.status).toBe(200);
+    expect(res.body.usedFreeze).toBe(false);
+    expect(res.body.streak).toBe(4);
+    expect(res.body.streakFreezes).toBe(1);
+  });
+});

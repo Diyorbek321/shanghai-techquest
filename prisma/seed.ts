@@ -698,6 +698,11 @@ async function main() {
   // Shop item catalog
   await prisma.item.createMany({
     data: [
+      // The only consumable in the shop: bought repeatedly and spent, so it is
+      // held as a counter on the user rather than an inventory row. Priced to be
+      // a couple of days' earnings — cheap enough to matter, dear enough that
+      // missing days still costs something. See server/shop/consumables.ts.
+      { key: 'streak-freeze', name: 'Ketma-ketlik Muzlatgichi', type: 'BOOST', price: 150, rarity: 'COMMON' },
       { key: 'neon-visor-frame', name: 'Neon Vizor', type: 'FRAME', price: 500, rarity: 'RARE' },
       { key: 'cyber-shield-frame', name: 'Kibernetik Qalqon', type: 'FRAME', price: 1200, rarity: 'EPIC' },
       { key: 'holographic-crown-frame', name: 'Golografik Toj Ramkasi', type: 'FRAME', price: 1000, rarity: 'EPIC' },
@@ -881,6 +886,34 @@ async function main() {
     ],
     skipDuplicates: true,
   });
+
+  // Backend drills come from the lessons themselves: every deck already ends
+  // with a MAKE-OSON task, which is exactly a short daily exercise. Deriving
+  // them keeps one source of truth instead of a second hand-written list that
+  // would drift from the slides. Upserted (not createMany) so an edited lesson
+  // updates its drill.
+  //
+  // Without these the BACKEND pool was empty and every backend student saw
+  // "no exercise today" forever — the streak mechanic hangs off this endpoint,
+  // so the whole daily loop was dead on the biggest course.
+  for (const lesson of backendLessons) {
+    const prompt = lesson.makeEasy.trim();
+    if (!prompt) continue;
+    const data = {
+      track: Track.BACKEND,
+      moduleKey: lesson.key,
+      prompt,
+      // Deliberately short: this is the "keep the habit alive" task, not homework.
+      estMinutes: 10,
+      xpReward: 30,
+      lessonOrder: lesson.order,
+    };
+    await prisma.dailyExercise.upsert({
+      where: { key: `daily-${lesson.key}` },
+      update: data,
+      create: { key: `daily-${lesson.key}`, ...data },
+    });
+  }
 
   const cyberSentinels = await prisma.team.findUniqueOrThrow({ where: { tag: 'CYBS' } });
 
