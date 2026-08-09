@@ -25,6 +25,7 @@ import { dailyExerciseRouter } from './dailyExercise';
 import { lessonsRouter } from './lessons';
 import { quizRouter } from './quiz';
 import { portfolioRouter } from './portfolio';
+import { classGoalsRouter } from './classGoals';
 import { uploadsRouter } from './uploads';
 
 export const apiRouter = Router();
@@ -54,5 +55,6 @@ apiRouter.use('/daily-exercise', dailyExerciseRouter);
 apiRouter.use('/lessons', lessonsRouter);
 apiRouter.use('/quiz', quizRouter);
 apiRouter.use('/portfolio', portfolioRouter);
+apiRouter.use('/class-goals', classGoalsRouter);
 apiRouter.use('/uploads', uploadsRouter);
 apiRouter.use(reviewCodeRouter);

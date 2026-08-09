@@ -7,6 +7,7 @@ import { TaskSequencer } from '../components/TaskSequencer';
 import { api } from '../lib/api';
 import { formatRelativeTime } from '../lib/utils';
 import { trackLabel } from '../lib/tracks';
+import { ClassGoalWidget } from '../components/ClassGoalWidget';
 
 interface DashboardProps {
   user: User;
@@ -133,6 +134,9 @@ export function Dashboard({ user, onNavigate, onTriggerSuccess }: DashboardProps
         
         {/* LEFT COLUMN - 60% (7/12) */}
         <div className="lg:col-span-7 space-y-6">
+
+          {/* Shared cohort target — renders nothing when the class has none. */}
+          <ClassGoalWidget />
           
           {/* Continue Learning */}
           <section className="glass-panel p-5 relative overflow-hidden group">

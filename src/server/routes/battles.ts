@@ -105,10 +105,34 @@ battlesRouter.post('/', async (req, res) => {
     }
     opponentId = parsed.data.opponentId;
   } else if (!parsed.data.isAI) {
-    const candidates = await prisma.user.findMany({
-      where: { role: Role.STUDENT, id: { not: req.user!.id } },
+    // Matchmaking used to draw from every student on the platform, so a
+    // first-month backend student could be paired against someone on the office
+    // track over a problem neither has covered — a guaranteed bad match. Prefer
+    // classmates, then anyone on the same track, and only then fall back to the
+    // whole pool so a lone student can still find a game.
+    const classmates = await prisma.user.findMany({
+      where: {
+        role: Role.STUDENT,
+        id: { not: req.user!.id },
+        enrollments: { some: { class: { enrollments: { some: { userId: req.user!.id } } } } },
+      },
       select: { id: true },
     });
+
+    const sameTrack = classmates.length
+      ? classmates
+      : await prisma.user.findMany({
+          where: { role: Role.STUDENT, id: { not: req.user!.id }, track: req.user!.track },
+          select: { id: true },
+        });
+
+    const candidates = sameTrack.length
+      ? sameTrack
+      : await prisma.user.findMany({
+          where: { role: Role.STUDENT, id: { not: req.user!.id } },
+          select: { id: true },
+        });
+
     if (candidates.length === 0) {
       return res.status(409).json({ error: 'Hozircha boshqa raqib topilmadi. AI bilan janjal qiling.' });
     }

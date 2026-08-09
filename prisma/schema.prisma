@@ -119,6 +119,15 @@ enum BattleStatus {
   JUDGED
 }
 
+/// What a ClassGoal counts. Every option must be countable inside a date
+/// window: QuizAttempt is deliberately absent because it is upserted in place,
+/// so its timestamp is the last answer rather than one event per attempt.
+enum ClassGoalMetric {
+  PROBLEMS_SOLVED
+  DAILY_EXERCISES
+  HOMEWORK_DONE
+}
+
 enum ChatRole {
   USER
   ASSISTANT
@@ -212,6 +221,7 @@ model ClassGroup {
   events      CalendarEvent[]
   attendances Attendance[]
   homework    Homework[]
+  goals       ClassGoal[]
 
   @@index([teacherId])
 }
@@ -401,6 +411,32 @@ model Homework {
   @@index([userId])
   @@index([classId])
   @@index([batchId])
+}
+
+/// A collective target for a whole cohort — "this week the class solves 100
+/// problems". Individual leaderboards only ever motivate the top of the class;
+/// a shared bar pulls the students who are behind, because the group needs
+/// their contribution too.
+///
+/// Progress is not stored: it is counted from the underlying events inside the
+/// window (see server/classGoals/progress.ts), so it can never drift out of
+/// sync with reality. Only the payout is recorded, via `achievedAt`.
+model ClassGoal {
+  id         String          @id @default(cuid())
+  classId    String
+  class      ClassGroup      @relation(fields: [classId], references: [id], onDelete: Cascade)
+  title      String
+  metric     ClassGoalMetric
+  target     Int
+  startsAt   DateTime
+  endsAt     DateTime
+  /// XP paid to every enrolled student, once, when the target is first reached.
+  xpReward   Int             @default(0)
+  /// Set when the reward has been paid, so it is never paid twice.
+  achievedAt DateTime?
+  createdAt  DateTime        @default(now())
+
+  @@index([classId])
 }
 
 model Attendance {

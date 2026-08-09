@@ -14,7 +14,8 @@ import {
   CalendarCheck,
   BookText,
   KeyRound,
-  Award
+  Award,
+  Target
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
@@ -22,6 +23,7 @@ import { formatRelativeTime, formatDate } from '../lib/utils';
 import { Track } from '../types';
 import { StudentAccountsPanel } from '../components/teacher/StudentAccountsPanel';
 import { HomeworkPanel } from '../components/teacher/HomeworkPanel';
+import { ClassGoalsPanel } from '../components/teacher/ClassGoalsPanel';
 
 interface ClassGroup {
   id: string;
@@ -40,7 +42,7 @@ interface StudentRow {
   lastSubmittedAt: string | null;
 }
 
-type TeacherTab = 'overview' | 'students' | 'accounts' | 'homework';
+type TeacherTab = 'overview' | 'students' | 'accounts' | 'homework' | 'goals';
 
 export function TeacherPortal() {
   const [activeTab, setActiveTab] = useState<TeacherTab>('overview');
@@ -102,6 +104,7 @@ export function TeacherPortal() {
           { id: 'students', label: 'O\'quvchilar', icon: Users },
           { id: 'accounts', label: 'Login/parol', icon: KeyRound },
           { id: 'homework', label: 'Uy vazifasi', icon: BookText },
+          { id: 'goals', label: 'Sinf maqsadi', icon: Target },
         ].map(tab => (
           <button
             key={tab.id}
@@ -219,6 +222,8 @@ export function TeacherPortal() {
       )}
 
       {activeTab === 'accounts' && <StudentAccountsPanel classId={selectedClassId} />}
+
+      {activeTab === 'goals' && <ClassGoalsPanel classId={selectedClassId} />}
 
       {activeTab === 'homework' && (
         <HomeworkPanel
