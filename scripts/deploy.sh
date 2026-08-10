@@ -85,6 +85,26 @@ docker compose build app
 step "5/8  Ishga tushirish (migratsiyalar konteyner CMD'sida qo'llanadi)"
 docker compose up -d app
 
+# `up -d app` starts app and its dependencies only, so the one-shot that
+# installs Piston's language runtimes never runs — which leaves a Piston that
+# accepts connections but answers every execution with "runtime is unknown".
+# The symptom is not an outage: the site is up and only the Run/Submit button
+# is dead, so it goes unnoticed until a student reports it. Piston's install
+# endpoint is idempotent, so re-running this on every deploy is a fast no-op.
+docker compose up piston-init
+
+# Installing a runtime and being able to RUN one are different things, and the
+# difference is invisible from the outside: /api/v2/runtimes answering 200 does
+# not mean python executes. So the check is an actual execution.
+echo "kod ishga tushiruvchi tekshirilmoqda..."
+PISTON_OUT=$(curl -sf -X POST -H 'Content-Type: application/json' \
+  -d '{"language":"python","version":"3.10.0","files":[{"content":"print(2+2)"}]}' \
+  http://127.0.0.1:2000/api/v2/execute | grep -o '"stdout":"[^"]*"' || true)
+case "$PISTON_OUT" in
+  *4*) echo "  python ishlayapti" ;;
+  *)   echo "  OGOHLANTIRISH: python bajarilmadi ($PISTON_OUT). Masalalardagi 'Ishga tushirish' tugmasi ishlamaydi." ;;
+esac
+
 step "6/8  Sog'liqni kutish"
 for i in $(seq 1 60); do
   if curl -sf -o /dev/null http://127.0.0.1:3000/; then
