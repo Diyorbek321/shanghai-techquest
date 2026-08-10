@@ -2072,4 +2072,222 @@ for i in range(m):
     else:
         print(f"Topildi: {topildi[0]['nom']}")`,
   },
+  // --- Darslar 58-61: shablon dvigateli, formalar, DRF serializerlari ---
+  {
+    key: 'backend-dars-58-medium',
+    solutionPy: `import json
+context = json.loads(input())
+n = int(input())
+shablon = [input() for i in range(n)]
+def toliq(qator, qoshimcha):
+    natija = qator
+    for kalit in qoshimcha:
+        natija = natija.replace("{{ " + kalit + " }}", str(qoshimcha[kalit]))
+    for kalit in context:
+        natija = natija.replace("{{ " + kalit + " }}", str(context[kalit]))
+    while "{{" in natija and "}}" in natija:
+        boshi = natija.index("{{")
+        oxiri = natija.index("}}", boshi) + 2
+        natija = natija[:boshi] + natija[oxiri:]
+    return natija
+chiqish = []
+i = 0
+while i < len(shablon):
+    qator = shablon[i].strip()
+    if qator.startswith("{% for ") and qator.endswith(" %}"):
+        bolaklar = qator[7:-3].split(" in ")
+        royxat = context.get(bolaklar[1], [])
+        tana = []
+        i += 1
+        while not shablon[i].strip().startswith("{% endfor %}"):
+            tana.append(shablon[i])
+            i += 1
+        for element in royxat:
+            for t in tana:
+                chiqish.append(toliq(t, {bolaklar[0]: element}))
+    else:
+        chiqish.append(toliq(shablon[i], {}))
+    i += 1
+for qator in chiqish:
+    print(qator)`,
+  },
+  {
+    key: 'backend-dars-58-hard',
+    solutionPy: `b = int(input())
+asos = [input() for i in range(b)]
+c = int(input())
+bola = [input() for i in range(c)]
+bloklar = {}
+i = 0
+while i < len(bola):
+    qator = bola[i].strip()
+    if qator.startswith("{% block ") and qator.endswith(" %}"):
+        nom = qator[9:-3].strip()
+        tana = []
+        i += 1
+        while not bola[i].strip().startswith("{% endblock %}"):
+            tana.append(bola[i])
+            i += 1
+        bloklar[nom] = tana
+    i += 1
+chiqish = []
+i = 0
+while i < len(asos):
+    qator = asos[i].strip()
+    if qator.startswith("{% block ") and qator.endswith(" %}"):
+        nom = qator[9:-3].strip()
+        asl = []
+        i += 1
+        while not asos[i].strip().startswith("{% endblock %}"):
+            asl.append(asos[i])
+            i += 1
+        chiqish.extend(bloklar.get(nom, asl))
+    else:
+        chiqish.append(asos[i])
+    i += 1
+for qator in chiqish:
+    print(qator)`,
+  },
+  {
+    key: 'backend-dars-59-easy',
+    solutionPy: `import json
+majburiy = json.loads(input())
+malumot = json.loads(input())
+xatolar = []
+for maydon in majburiy:
+    qiymat = malumot.get(maydon, "")
+    if str(qiymat).strip() == "":
+        xatolar.append(maydon)
+if xatolar:
+    print("is_valid: False")
+    for maydon in xatolar:
+        print(f"{maydon}: Bu maydon majburiy.")
+else:
+    print("is_valid: True")`,
+  },
+  {
+    key: 'backend-dars-59-medium',
+    solutionPy: `import json
+n = int(input())
+maydonlar = [input().split(" ") for i in range(n)]
+malumot = json.loads(input())
+xatolar = []
+for bolaklar in maydonlar:
+    nom = bolaklar[0]
+    tur = bolaklar[1]
+    parametrlar = bolaklar[2:]
+    eng_katta = None
+    eng_kichik = None
+    for p in parametrlar:
+        if p.startswith("max="):
+            eng_katta = int(p[4:])
+        if p.startswith("min="):
+            eng_kichik = int(p[4:])
+    qiymat = malumot.get(nom, "")
+    if str(qiymat).strip() == "":
+        if "optional" not in parametrlar:
+            xatolar.append((nom, "Bu maydon majburiy."))
+        continue
+    if tur == "int":
+        try:
+            son = int(str(qiymat))
+        except ValueError:
+            xatolar.append((nom, "Butun son kiriting."))
+            continue
+        if (eng_kichik is not None and son < eng_kichik) or (eng_katta is not None and son > eng_katta):
+            xatolar.append((nom, f"Qiymat {eng_kichik} va {eng_katta} orasida bo'lishi kerak."))
+    elif tur == "email":
+        if "@" not in str(qiymat):
+            xatolar.append((nom, "To'g'ri email kiriting."))
+    elif eng_katta is not None and len(str(qiymat)) > eng_katta:
+        xatolar.append((nom, f"Bu maydon {eng_katta} belgidan oshmasligi kerak."))
+print("is_valid: True" if not xatolar else "is_valid: False")
+for nom, xabar in xatolar:
+    print(f"{nom}: {xabar}")`,
+  },
+  {
+    key: 'backend-dars-59-hard',
+    solutionPy: `import json
+malumot = json.loads(input())
+xatolar = []
+tozalangan = {}
+for maydon in ["parol", "parol2", "yosh"]:
+    qiymat = malumot.get(maydon, "")
+    if str(qiymat).strip() == "":
+        xatolar.append((maydon, "Bu maydon majburiy."))
+    else:
+        tozalangan[maydon] = qiymat
+if "parol" in tozalangan and len(str(tozalangan["parol"])) < 8:
+    xatolar.append(("parol", "Parol kamida 8 ta belgidan iborat bo'lsin."))
+    del tozalangan["parol"]
+if "yosh" in tozalangan:
+    try:
+        yosh = int(str(tozalangan["yosh"]))
+        if yosh < 18:
+            xatolar.append(("yosh", "18 yoshdan kichiklar ro'yxatdan o'ta olmaydi."))
+            del tozalangan["yosh"]
+    except ValueError:
+        xatolar.append(("yosh", "Butun son kiriting."))
+        del tozalangan["yosh"]
+if "parol" in tozalangan and "parol2" in tozalangan and tozalangan["parol"] != tozalangan["parol2"]:
+    xatolar.append(("__all__", "Parollar mos kelmadi."))
+print("is_valid: True" if not xatolar else "is_valid: False")
+for nom, xabar in xatolar:
+    print(f"{nom}: {xabar}")`,
+  },
+  {
+    key: 'backend-dars-61-easy',
+    solutionPy: `import json
+obyekt = json.loads(input())
+maydonlar = input().split()
+natija = {}
+for maydon in maydonlar:
+    natija[maydon] = obyekt[maydon]
+print(json.dumps(natija, ensure_ascii=False))`,
+  },
+  {
+    key: 'backend-dars-61-medium',
+    solutionPy: `import json
+n = int(input())
+obyektlar = [json.loads(input()) for i in range(n)]
+maydonlar = input().split()
+natija = []
+for obyekt in obyektlar:
+    qator = {}
+    for maydon in maydonlar:
+        if maydon == "nom_uzunligi":
+            qator[maydon] = len(obyekt["nom"])
+        else:
+            qator[maydon] = obyekt[maydon]
+    natija.append(qator)
+print(json.dumps(natija, ensure_ascii=False))`,
+  },
+  {
+    key: 'backend-dars-61-hard',
+    solutionPy: `import json
+n = int(input())
+maydonlar = [input().split(" ") for i in range(n)]
+malumot = json.loads(input())
+xatolar = {}
+tozalangan = {}
+for nom, tur, holat in maydonlar:
+    qiymat = malumot.get(nom, "")
+    if str(qiymat).strip() == "":
+        if holat == "required":
+            xatolar[nom] = ["Bu maydon majburiy."]
+        continue
+    if tur == "int":
+        try:
+            tozalangan[nom] = int(str(qiymat))
+        except ValueError:
+            xatolar[nom] = ["Butun son kiriting."]
+    else:
+        tozalangan[nom] = qiymat
+if xatolar:
+    print("is_valid: False")
+    print(json.dumps(xatolar, ensure_ascii=False))
+else:
+    print("is_valid: True")
+    print(json.dumps(tozalangan, ensure_ascii=False))`,
+  },
 ];
