@@ -1945,4 +1945,131 @@ for i in range(m):
     else:
         print(natija)`,
   },
+  // --- Darslar 54-56: query parametrlari, migratsiya SQL, ORM ---
+  {
+    key: 'backend-dars-54-easy',
+    solutionPy: `query = input()
+parametrlar = {}
+for bolak in query.split("&"):
+    if "=" not in bolak:
+        continue
+    kalit, qiymat = bolak.split("=", 1)
+    parametrlar[kalit] = qiymat
+n = int(input())
+for i in range(n):
+    kalit, zaxira = input().split("|")
+    qiymat = parametrlar.get(kalit, zaxira)
+    if qiymat == "":
+        qiymat = zaxira
+    print(qiymat)`,
+  },
+  {
+    key: 'backend-dars-55-easy',
+    solutionPy: `TURLAR = {"CharField": "varchar(200)", "TextField": "text", "IntegerField": "integer", "BooleanField": "bool", "DateField": "date"}
+jadval = input()
+n = int(input())
+qatorlar = ["    id integer PRIMARY KEY AUTOINCREMENT"]
+for i in range(n):
+    nom, tur = input().split(" ")
+    qatorlar.append(f"    {nom} {TURLAR[tur]} NOT NULL")
+print(f"CREATE TABLE {jadval} (")
+print(",\\n".join(qatorlar))
+print(");")`,
+  },
+  {
+    key: 'backend-dars-55-medium',
+    solutionPy: `TURLAR = {"CharField": "varchar(200)", "TextField": "text", "IntegerField": "integer", "BooleanField": "bool", "DateField": "date"}
+jadval = input()
+n = int(input())
+qatorlar = ["    id integer PRIMARY KEY AUTOINCREMENT"]
+for i in range(n):
+    bolaklar = input().split(" ")
+    nom = bolaklar[0]
+    tur = bolaklar[1]
+    cheklov = "NULL" if "null=True" in bolaklar[2:] else "NOT NULL"
+    qatorlar.append(f"    {nom} {TURLAR[tur]} {cheklov}")
+print(f"CREATE TABLE {jadval} (")
+print(",\\n".join(qatorlar))
+print(");")`,
+  },
+  {
+    key: 'backend-dars-55-hard',
+    solutionPy: `TURLAR = {"CharField": "varchar(200)", "TextField": "text", "IntegerField": "integer", "BooleanField": "bool", "DateField": "date"}
+jadval = input()
+n = int(input())
+qatorlar = ["    id integer PRIMARY KEY AUTOINCREMENT"]
+indekslar = []
+for i in range(n):
+    bolaklar = input().split(" ")
+    nom = bolaklar[0]
+    tur = bolaklar[1]
+    if tur == "ForeignKey":
+        maqsad = bolaklar[2]
+        cheklov = "NULL" if "null=True" in bolaklar[3:] else "NOT NULL"
+        qatorlar.append(f'    {nom}_id integer {cheklov} REFERENCES "{maqsad}" ("id")')
+        indekslar.append(f"CREATE INDEX {jadval}_{nom}_id ON {jadval} ({nom}_id);")
+    else:
+        cheklov = "NULL" if "null=True" in bolaklar[2:] else "NOT NULL"
+        qatorlar.append(f"    {nom} {TURLAR[tur]} {cheklov}")
+print(f"CREATE TABLE {jadval} (")
+print(",\\n".join(qatorlar))
+print(");")
+for indeks in indekslar:
+    print(indeks)`,
+  },
+  {
+    key: 'backend-dars-56-easy',
+    solutionPy: `import json
+n = int(input())
+yozuvlar = [json.loads(input()) for i in range(n)]
+qidiruv = input()
+topildi = [y for y in yozuvlar if y["nom"] == qidiruv]
+if not topildi:
+    print("QuerySet bo'sh")
+for y in topildi:
+    print(f"{y['id']} {y['nom']} {y['narx']}")`,
+  },
+  {
+    key: 'backend-dars-56-medium',
+    solutionPy: `import json
+n = int(input())
+yozuvlar = [json.loads(input()) for i in range(n)]
+amal, ifoda = input().split(" ", 1)
+maydon_qism, qiymat = ifoda.split("=", 1)
+if "__" in maydon_qism:
+    maydon, lookup = maydon_qism.split("__", 1)
+else:
+    maydon = maydon_qism
+    lookup = "exact"
+def mos(yozuv):
+    hozirgi = yozuv[maydon]
+    if lookup == "icontains":
+        return qiymat.lower() in str(hozirgi).lower()
+    if lookup == "gt":
+        return int(hozirgi) > int(qiymat)
+    if lookup == "lt":
+        return int(hozirgi) < int(qiymat)
+    return str(hozirgi) == qiymat
+natija = [y for y in yozuvlar if mos(y) == (amal == "filter")]
+if not natija:
+    print("QuerySet bo'sh")
+for y in natija:
+    print(y["nom"])`,
+  },
+  {
+    key: 'backend-dars-56-hard',
+    solutionPy: `import json
+n = int(input())
+yozuvlar = [json.loads(input()) for i in range(n)]
+m = int(input())
+for i in range(m):
+    maydon, qiymat = input().split("=", 1)
+    topildi = [y for y in yozuvlar if str(y[maydon]) == qiymat]
+    if len(topildi) == 0:
+        print("DoesNotExist")
+    elif len(topildi) > 1:
+        print("MultipleObjectsReturned")
+    else:
+        print(f"Topildi: {topildi[0]['nom']}")`,
+  },
 ];
