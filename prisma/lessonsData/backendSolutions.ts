@@ -1748,4 +1748,201 @@ print(f"Domen: {domen}")
 print(f"Port: {port}")
 print(f"Manzil: {manzil}")`,
   },
+  // --- Darslar 50-53: HTTP, REST, Django marshrutlash ---
+  {
+    key: 'backend-dars-50-easy',
+    solutionPy: `n = int(input())
+xatolar = 0
+for i in range(n):
+    kod = int(input())
+    if 100 <= kod < 200:
+        nom = "Axborot"
+    elif 200 <= kod < 300:
+        nom = "Muvaffaqiyat"
+    elif 300 <= kod < 400:
+        nom = "Yo'naltirish"
+    elif 400 <= kod < 500:
+        nom = "Client xatosi"
+    elif 500 <= kod < 600:
+        nom = "Server xatosi"
+    else:
+        nom = "Noma'lum"
+    if 400 <= kod < 600:
+        xatolar += 1
+    print(f"{kod} - {nom}")
+print(f"Xatolar: {xatolar}")`,
+  },
+  {
+    key: 'backend-dars-50-medium',
+    solutionPy: `AMALLAR = {"GET": "O'qish", "POST": "Yaratish", "PUT": "To'liq yangilash", "PATCH": "Qisman yangilash", "DELETE": "O'chirish"}
+metod, yol, versiya = input().split(" ")
+if "?" in yol:
+    resurs, query = yol.split("?", 1)
+else:
+    resurs = yol
+    query = "yo'q"
+amal = AMALLAR.get(metod, "Qo'llab-quvvatlanmaydi")
+print(f"Metod: {metod}")
+print(f"Resurs: {resurs}")
+print(f"Query: {query}")
+print(f"Amal: {amal}")`,
+  },
+  {
+    key: 'backend-dars-50-hard',
+    solutionPy: `import sys
+qatorlar = sys.stdin.read().split("\\n")
+metod, yol, versiya = qatorlar[0].split(" ")
+headerlar = {}
+i = 1
+while i < len(qatorlar) and qatorlar[i] != "":
+    nom, qiymat = qatorlar[i].split(":", 1)
+    headerlar[nom.lower()] = qiymat.strip()
+    i += 1
+tana = "\\n".join(qatorlar[i + 1:]).strip()
+if metod not in ["GET", "POST", "PUT", "PATCH", "DELETE"]:
+    javob = "405 Method Not Allowed"
+elif metod in ["POST", "PUT", "PATCH"] and tana == "":
+    javob = "400 Bad Request"
+elif metod == "POST":
+    javob = "201 Created"
+else:
+    javob = "200 OK"
+host = headerlar.get("host", "yo'q")
+print(f"Metod: {metod}")
+print(f"Yo'l: {yol}")
+print(f"Header soni: {len(headerlar)}")
+print(f"Host: {host}")
+print(f"Javob: {javob}")`,
+  },
+  {
+    key: 'backend-dars-51-easy',
+    solutionPy: `import json
+javob = json.loads(input())
+print(f"Jami: {javob['count']}")
+if not javob["results"]:
+    print("Ro'yxat bo'sh")
+for element in javob["results"]:
+    print(f"#{element['id']} {element['ism']}")`,
+  },
+  {
+    key: 'backend-dars-51-medium',
+    solutionPy: `METODLAR = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+FELLAR = ["get", "list", "create", "delete", "update", "add", "remove", "edit", "new", "fetch"]
+n = int(input())
+for i in range(n):
+    metod, yol = input().split(" ", 1)
+    if metod not in METODLAR:
+        sabab = "noma'lum metod"
+    elif not yol.startswith("/api/"):
+        sabab = "/api/ bilan boshlanmagan"
+    else:
+        sabab = None
+        for bolak in yol.split("/"):
+            if bolak.lower() in FELLAR:
+                sabab = "URL'da fe'l bor"
+                break
+    if sabab is None:
+        print(f"{metod} {yol} - TO'G'RI")
+    else:
+        print(f"{metod} {yol} - XATO: {sabab}")`,
+  },
+  {
+    key: 'backend-dars-51-hard',
+    solutionPy: `import json
+malumot = json.loads(input())
+talabalar = malumot["talabalar"]
+guruhlar = {}
+for talaba in talabalar:
+    guruhlar.setdefault(talaba["guruh"], []).append(talaba["ball"])
+for guruh in sorted(guruhlar):
+    ballar = guruhlar[guruh]
+    ortacha = sum(ballar) / len(ballar)
+    print(f"{guruh}: {len(ballar)} ta, o'rtacha {ortacha:.1f}")
+eng = sorted(talabalar, key=lambda t: (-t["ball"], t["ism"]))[0]
+print(f"Eng yuqori: {eng['ism']} ({eng['ball']})")`,
+  },
+  {
+    key: 'backend-dars-53-easy',
+    solutionPy: `n = int(input())
+naqshlar = []
+for i in range(n):
+    naqsh, view = input().split(" ")
+    naqshlar.append((naqsh, view))
+m = int(input())
+for i in range(m):
+    url = input()
+    topildi = "404"
+    for naqsh, view in naqshlar:
+        if naqsh == url:
+            topildi = view
+            break
+    print(topildi)`,
+  },
+  {
+    key: 'backend-dars-53-medium',
+    solutionPy: `def bolaklar(yol):
+    return [b for b in yol.split("/") if b != ""]
+n = int(input())
+naqshlar = []
+for i in range(n):
+    naqsh, view = input().split(" ")
+    naqshlar.append((bolaklar(naqsh), view))
+m = int(input())
+for i in range(m):
+    url_bolaklar = bolaklar(input())
+    natija = "404"
+    for naqsh, view in naqshlar:
+        if len(naqsh) != len(url_bolaklar):
+            continue
+        args = []
+        mos = True
+        for shablon, qiymat in zip(naqsh, url_bolaklar):
+            if shablon.startswith("<") and shablon.endswith(">"):
+                tur, nom = shablon[1:-1].split(":")
+                if tur == "int" and not qiymat.isdigit():
+                    mos = False
+                    break
+                args.append(f"{nom}={qiymat}")
+            elif shablon != qiymat:
+                mos = False
+                break
+        if mos:
+            natija = view + ("(" + ", ".join(args) + ")" if args else "")
+            break
+    print(natija)`,
+  },
+  {
+    key: 'backend-dars-53-hard',
+    solutionPy: `def konvertorlar(naqsh):
+    return [b for b in naqsh.split("/") if b.startswith("<") and b.endswith(">")]
+n = int(input())
+naqshlar = {}
+for i in range(n):
+    naqsh, nom = input().split(" ")
+    naqshlar[nom] = naqsh
+m = int(input())
+for i in range(m):
+    sorov = input().split(" ")
+    nom = sorov[0]
+    args = sorov[1:]
+    if nom not in naqshlar:
+        print("XATO: nom topilmadi")
+        continue
+    naqsh = naqshlar[nom]
+    joylar = konvertorlar(naqsh)
+    if len(joylar) != len(args):
+        print("XATO: argument soni mos emas")
+        continue
+    natija = naqsh
+    xato = False
+    for joy, qiymat in zip(joylar, args):
+        if joy.startswith("<int:") and not qiymat.isdigit():
+            xato = True
+            break
+        natija = natija.replace(joy, qiymat, 1)
+    if xato:
+        print("XATO: int emas")
+    else:
+        print(natija)`,
+  },
 ];
