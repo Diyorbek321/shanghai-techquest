@@ -362,4 +362,424 @@ if not topildi:
     else:
         print(f"{a} / {b} = {a / b}")`,
   },
+  // --- Darslar 13-16: lug'atlar, to'plamlar, funksiyalar ---
+  {
+    key: 'backend-dars-13-easy',
+    solutionPy: `kitob = {"Ali": "901234567", "Malika": "935556677", "Bexruz": "977778899"}
+ism = input()
+print(f"{ism} -> {kitob[ism]}")`,
+  },
+  {
+    key: 'backend-dars-13-medium',
+    solutionPy: `kitob = {"Ali": "901234567", "Malika": "935556677", "Bexruz": "977778899"}
+ism = input()
+raqam = input()
+kitob[ism] = raqam
+print(f"Saqlandi: {ism} - {raqam}")
+print(f"Jami: {len(kitob)}")`,
+  },
+  {
+    key: 'backend-dars-13-hard',
+    solutionPy: `n = int(input())
+kitob = {}
+for i in range(n):
+    qator = input().split()
+    kitob[qator[0]] = qator[1]
+qidiruv = input()
+if qidiruv in kitob:
+    print(f"{qidiruv}: {kitob[qidiruv]}")
+else:
+    print("Topilmadi")`,
+  },
+  {
+    key: 'backend-dars-14-easy',
+    solutionPy: `n = int(input())
+narxlar = {}
+for i in range(n):
+    nom, narx = input().split()
+    narxlar[nom] = int(narx)
+for nom in narxlar:
+    print(f"{nom}: {narxlar[nom]}")
+print(f"Mahsulotlar: {len(narxlar)}")`,
+  },
+  {
+    key: 'backend-dars-14-medium',
+    solutionPy: `n = int(input())
+savat = {}
+for i in range(n):
+    nom, narx = input().split()
+    savat[nom] = savat.get(nom, 0) + int(narx)
+jami = 0
+for nom in savat:
+    print(f"{nom}: {savat[nom]}")
+    jami += savat[nom]
+print(f"Jami: {jami}")`,
+  },
+  {
+    key: 'backend-dars-14-hard',
+    solutionPy: `n = int(input())
+ballar = {}
+for i in range(n):
+    ism, ball = input().split()
+    ballar[ism] = int(ball)
+eng_yuqori = None
+eng_past = None
+for ism in ballar:
+    if eng_yuqori is None or ballar[ism] > ballar[eng_yuqori]:
+        eng_yuqori = ism
+    if eng_past is None or ballar[ism] < ballar[eng_past]:
+        eng_past = ism
+print(f"Eng yuqori: {eng_yuqori} ({ballar[eng_yuqori]})")
+print(f"Eng past: {eng_past} ({ballar[eng_past]})")`,
+  },
+  {
+    key: 'backend-dars-15-easy',
+    solutionPy: `sonlar = [int(x) for x in input().split()]
+noyob = sorted(set(sonlar))
+print(f"Noyob: {len(noyob)}")
+print(" ".join(str(son) for son in noyob))`,
+  },
+  {
+    key: 'backend-dars-15-medium',
+    solutionPy: `birinchi = set(input().split())
+ikkinchi = set(input().split())
+umumiy = sorted(birinchi & ikkinchi)
+if umumiy:
+    print(" ".join(umumiy))
+else:
+    print("Umumiy element yo'q")`,
+  },
+  {
+    key: 'backend-dars-15-hard',
+    solutionPy: `matn = input().lower()
+harflar = set()
+for harf in matn:
+    if harf != " ":
+        harflar.add(harf)
+tartibli = sorted(harflar)
+print(f"Noyob harflar: {len(tartibli)}")
+print(" ".join(tartibli))`,
+  },
+  {
+    key: 'backend-dars-16-easy',
+    solutionPy: `def kvadrat(n):
+    print(f"Kvadrat: {n * n}")
+def kub(n):
+    print(f"Kub: {n * n * n}")
+def yarim(n):
+    print(f"Yarim: {n / 2}")
+son = int(input())
+kvadrat(son)
+kub(son)
+yarim(son)`,
+  },
+  {
+    key: 'backend-dars-16-medium',
+    solutionPy: `def salomlash(ism):
+    print(f"Salom, {ism}! Bugungi darsga xush kelibsiz.")
+ismlar = []
+for i in range(3):
+    ismlar.append(input())
+for ism in ismlar:
+    salomlash(ism)`,
+  },
+  {
+    key: 'backend-dars-16-hard',
+    solutionPy: `def tortburchak(eni, boyi):
+    print(f"Yuza: {eni * boyi}")
+    print(f"Perimetr: {2 * (eni + boyi)}")
+for i in range(2):
+    eni, boyi = input().split()
+    tortburchak(int(eni), int(boyi))`,
+  },
+  // --- Darslar 17-20: return, *args/**kwargs, math/random, datetime ---
+  {
+    key: 'backend-dars-17-easy',
+    solutionPy: `def yigindi(a, b):
+    return a + b
+birinchi = int(input())
+ikkinchi = int(input())
+natija = yigindi(birinchi, ikkinchi)
+print(f"Yig'indi: {natija}")`,
+  },
+  {
+    key: 'backend-dars-17-medium',
+    solutionPy: `def doira_yuzasi(radius=1):
+    return 3.14159 * radius * radius
+r = int(input())
+print(f"Standart: {doira_yuzasi():.2f}")
+print(f"Radius {r}: {doira_yuzasi(r):.2f}")`,
+  },
+  {
+    key: 'backend-dars-17-hard',
+    solutionPy: `def statistika(sonlar):
+    kichik = min(sonlar)
+    katta = max(sonlar)
+    ortacha = sum(sonlar) / len(sonlar)
+    return kichik, katta, ortacha
+sonlar = [int(x) for x in input().split()]
+kichik, katta, ortacha = statistika(sonlar)
+print(f"Min: {kichik}")
+print(f"Max: {katta}")
+print(f"O'rtacha: {ortacha:.2f}")`,
+  },
+  {
+    key: 'backend-dars-18-easy',
+    solutionPy: `def yigindi(*sonlar):
+    jami = 0
+    for son in sonlar:
+        jami += son
+    return jami
+n = int(input())
+umumiy = 0
+for i in range(n):
+    guruh = [int(x) for x in input().split()]
+    natija = yigindi(*guruh)
+    print(natija)
+    umumiy += natija
+print(f"Jami: {umumiy}")`,
+  },
+  {
+    key: 'backend-dars-18-medium',
+    solutionPy: `def profil(**malumot):
+    print("--- Profil ---")
+    for kalit, qiymat in malumot.items():
+        print(f"{kalit}: {qiymat}")
+n = int(input())
+for i in range(n):
+    juftliklar = {}
+    for bolak in input().split():
+        kalit, qiymat = bolak.split("=")
+        juftliklar[kalit] = qiymat
+    profil(**juftliklar)`,
+  },
+  {
+    key: 'backend-dars-18-hard',
+    solutionPy: `sozlar = input().split()
+osish = sorted(sozlar, key=lambda s: len(s))
+kamayish = sorted(sozlar, key=lambda s: len(s), reverse=True)
+print(" ".join(osish))
+print(" ".join(kamayish))`,
+  },
+  {
+    key: 'backend-dars-19-easy',
+    solutionPy: `import math
+n = int(input())
+ildiz = math.sqrt(n)
+print(f"Ildiz: {ildiz:.2f}")
+print(f"Yuqoriga: {math.ceil(ildiz)}")
+print(f"Pastga: {math.floor(ildiz)}")`,
+  },
+  {
+    key: 'backend-dars-19-medium',
+    solutionPy: `import math
+r = int(input())
+k = int(input())
+print(f"Uzunlik: {2 * math.pi * r:.2f}")
+print(f"Faktorial: {math.factorial(k)}")`,
+  },
+  {
+    key: 'backend-dars-19-hard',
+    solutionPy: `import random
+import math
+urug = int(input())
+n = int(input())
+random.seed(urug)
+sonlar = []
+for i in range(n):
+    sonlar.append(random.randint(1, 100))
+print(" ".join(str(son) for son in sonlar))
+print(" ".join(f"{math.sqrt(son):.2f}" for son in sonlar))`,
+  },
+  {
+    key: 'backend-dars-20-easy',
+    solutionPy: `from datetime import datetime
+matn = input()
+sana = datetime.strptime(matn, "%Y-%m-%d")
+print(sana.strftime("%d.%m.%Y"))`,
+  },
+  {
+    key: 'backend-dars-20-medium',
+    solutionPy: `from datetime import datetime
+tugilgan = datetime.strptime(input(), "%Y-%m-%d")
+bugun = datetime.strptime(input(), "%Y-%m-%d")
+kunlar = (bugun - tugilgan).days
+yosh = bugun.year - tugilgan.year
+if (bugun.month, bugun.day) < (tugilgan.month, tugilgan.day):
+    yosh -= 1
+print(f"Kunlar: {kunlar}")
+print(f"To'liq yosh: {yosh}")`,
+  },
+  {
+    key: 'backend-dars-20-hard',
+    solutionPy: `from datetime import datetime, timedelta
+kunlar_nomi = ["Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba", "Yakshanba"]
+sana = datetime.strptime(input(), "%Y-%m-%d")
+n = int(input())
+natija = sana + timedelta(days=n)
+print(f"Sana: {natija.strftime('%d.%m.%Y')}")
+print(f"Hafta kuni: {kunlar_nomi[natija.weekday()]}")`,
+  },
+  // --- Darslar 21-24: pip, fayllar, JSON/CSV, try/except ---
+  {
+    key: 'backend-dars-21-easy',
+    solutionPy: `n = int(input())
+for i in range(n):
+    qator = input()
+    nom, versiya = qator.split("==")
+    print(f"{nom} — {versiya}")`,
+  },
+  {
+    key: 'backend-dars-21-medium',
+    solutionPy: `paketlar = set()
+n = int(input())
+for i in range(n):
+    paketlar.add(input().split("==")[0])
+m = int(input())
+for i in range(m):
+    paketlar.add(input().split("==")[0])
+for nom in sorted(paketlar):
+    print(nom)
+print(f"Jami: {len(paketlar)}")`,
+  },
+  {
+    key: 'backend-dars-21-hard',
+    solutionPy: `n = int(input())
+for i in range(n):
+    birinchi, ikkinchi = input().split()
+    a = [int(x) for x in birinchi.split(".")]
+    b = [int(x) for x in ikkinchi.split(".")]
+    if a > b:
+        print(birinchi)
+    elif b > a:
+        print(ikkinchi)
+    else:
+        print("teng")`,
+  },
+  {
+    key: 'backend-dars-22-easy',
+    solutionPy: `matn = input()
+with open("matn.txt", "w", encoding="utf-8") as f:
+    f.write(matn)
+with open("matn.txt", "r", encoding="utf-8") as f:
+    oqilgan = f.read()
+print("Faylga yozildi")
+print(oqilgan)`,
+  },
+  {
+    key: 'backend-dars-22-medium',
+    solutionPy: `n = int(input())
+for i in range(n):
+    yozuv = input()
+    with open("kundalik.txt", "a", encoding="utf-8") as f:
+        f.write(yozuv + "\\n")
+with open("kundalik.txt", "r", encoding="utf-8") as f:
+    satrlar = f.read().splitlines()
+for raqam, satr in enumerate(satrlar, start=1):
+    print(f"{raqam}. {satr}")
+print(f"Yozuvlar soni: {len(satrlar)}")`,
+  },
+  {
+    key: 'backend-dars-22-hard',
+    solutionPy: `n = int(input())
+with open("matnlar.txt", "w", encoding="utf-8") as f:
+    for i in range(n):
+        f.write(input() + "\\n")
+with open("matnlar.txt", "r", encoding="utf-8") as f:
+    satrlar = f.read().splitlines()
+eng_uzun = satrlar[0]
+for satr in satrlar:
+    if len(satr) > len(eng_uzun):
+        eng_uzun = satr
+print(f"Eng uzun satr: {eng_uzun}")
+print(f"Uzunligi: {len(eng_uzun)}")`,
+  },
+  {
+    key: 'backend-dars-23-easy',
+    solutionPy: `import json
+ism = input()
+yosh = int(input())
+talaba = {"ism": ism, "yosh": yosh}
+with open("talaba.json", "w", encoding="utf-8") as f:
+    json.dump(talaba, f, ensure_ascii=False)
+with open("talaba.json", "r", encoding="utf-8") as f:
+    oqilgan = json.load(f)
+print(f"Ism: {oqilgan['ism']}")
+print(f"Yosh: {oqilgan['yosh']}")
+print(f"Kalitlar soni: {len(oqilgan)}")`,
+  },
+  {
+    key: 'backend-dars-23-medium',
+    solutionPy: `import json
+n = int(input())
+talabalar = []
+for i in range(n):
+    ism, ball = input().split()
+    talabalar.append({"ism": ism, "ball": int(ball)})
+with open("talabalar.json", "w", encoding="utf-8") as f:
+    json.dump(talabalar, f, ensure_ascii=False)
+with open("talabalar.json", "r", encoding="utf-8") as f:
+    oqilgan = json.load(f)
+jami = 0
+for talaba in oqilgan:
+    print(f"{talaba['ism']}: {talaba['ball']}")
+    jami += talaba["ball"]
+ortacha = jami / len(oqilgan)
+print(f"O'rtacha: {round(ortacha, 1)}")`,
+  },
+  {
+    key: 'backend-dars-23-hard',
+    solutionPy: `import csv
+n = int(input())
+qatorlar = []
+for i in range(n):
+    ism, shahar, yosh = input().split(",")
+    qatorlar.append({"ism": ism, "shahar": shahar, "yosh": yosh})
+with open("odamlar.csv", "w", encoding="utf-8", newline="") as f:
+    yozuvchi = csv.DictWriter(f, fieldnames=["ism", "shahar", "yosh"])
+    yozuvchi.writeheader()
+    yozuvchi.writerows(qatorlar)
+kattalar = 0
+with open("odamlar.csv", "r", encoding="utf-8", newline="") as f:
+    for qator in csv.DictReader(f):
+        if int(qator["yosh"]) >= 18:
+            print(f"{qator['ism']} ({qator['shahar']})")
+            kattalar += 1
+print(f"Kattalar: {kattalar}")`,
+  },
+  {
+    key: 'backend-dars-24-easy',
+    solutionPy: `qator = input()
+try:
+    son = int(qator)
+    print(f"Natija: {son * 2}")
+except ValueError:
+    print("Xato: butun son kiriting")`,
+  },
+  {
+    key: 'backend-dars-24-medium',
+    solutionPy: `with open("mavjud.txt", "w", encoding="utf-8") as f:
+    f.write("Salom")
+nom = input()
+try:
+    with open(nom, "r", encoding="utf-8") as f:
+        print(f"Mazmun: {f.read()}")
+except FileNotFoundError:
+    print("Xato: fayl topilmadi")
+print("Dastur tugadi")`,
+  },
+  {
+    key: 'backend-dars-24-hard',
+    solutionPy: `n = int(input())
+for i in range(n):
+    a, b = input().split()
+    try:
+        natija = int(a) / int(b)
+        print(f"{natija:.2f}")
+    except ZeroDivisionError:
+        print("Xato: nolga bo'lib bo'lmaydi")
+    except ValueError:
+        print("Xato: son emas")
+print(f"Tekshirilgan amallar: {n}")`,
+  },
 ];
