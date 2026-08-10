@@ -12,6 +12,7 @@ import { Leaderboard } from './views/Leaderboard';
 import { Classes } from './views/Classes';
 import { Assignments } from './views/Assignments';
 import { Achievements } from './views/Achievements';
+import { Certificates } from './views/Certificates';
 import { Profile } from './views/Profile';
 import { Shop } from './views/Shop';
 import { Arena } from './views/Arena';
@@ -114,6 +115,8 @@ export default function App({ user }: { user: User }) {
         return <MissionLog />;
       case 'achievements':
         return <Achievements />;
+      case 'certificates':
+        return <Certificates />;
       case 'profile':
         return <Profile user={mockUser} />;
       case 'settings':

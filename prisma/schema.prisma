@@ -199,6 +199,7 @@ model User {
   receivedMessages     DirectMessage[]   @relation("DMRecipient")
   dailyExerciseLogs    DailyExerciseLog[]
   quizAttempts         QuizAttempt[]
+  certificates         Certificate[]
 
   @@index([teamId])
 }
@@ -343,6 +344,31 @@ model QuizAttempt {
 
   @@unique([userId, questionId])
   @@index([userId, dueAt])
+}
+
+/// An issued certificate. Rows are immutable once written: a certificate that
+/// can change after the fact is not evidence of anything.
+model Certificate {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track  Track
+  /// 'month' for one block of the curriculum, 'course' for the whole track.
+  kind   String
+  /// Null for a course certificate; the Lesson.month it covers otherwise.
+  month  Int?
+  title  String
+  /// Printed on the certificate so a third party can ask the school to confirm it.
+  serial String @unique
+  /// Snapshot at issue time — the curriculum can grow later, and a certificate
+  /// must keep meaning what it meant on the day it was earned.
+  lessonsCompleted Int
+  lessonsTotal     Int
+  issuedAt         DateTime @default(now())
+
+  /// One certificate per scope; re-claiming is a no-op rather than a duplicate.
+  @@unique([userId, track, kind, month])
+  @@index([userId])
 }
 
 /// Grading criteria for a project lesson (Lesson.kind === 'project').
