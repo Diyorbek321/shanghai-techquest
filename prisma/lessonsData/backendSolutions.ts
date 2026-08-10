@@ -782,4 +782,415 @@ for i in range(n):
         print("Xato: son emas")
 print(f"Tekshirilgan amallar: {n}")`,
   },
+  // --- Darslar 25-30: OOP — classlar, meros, property, magic metodlar ---
+  {
+    key: 'backend-dars-25-easy',
+    solutionPy: `class Talaba:
+    def __init__(self, ism, yosh):
+        self.ism = ism
+        self.yosh = yosh
+for i in range(2):
+    ism, yosh = input().split()
+    talaba = Talaba(ism, int(yosh))
+    print(f"{talaba.ism}, {talaba.yosh} yosh")`,
+  },
+  {
+    key: 'backend-dars-25-medium',
+    solutionPy: `class Kitob:
+    def __init__(self, nom, muallif, yil):
+        self.nom = nom
+        self.muallif = muallif
+        self.yil = yil
+nom = input()
+muallif = input()
+yil = int(input())
+joriy = int(input())
+kitob = Kitob(nom, muallif, yil)
+print(f"{kitob.nom} — {kitob.muallif} ({kitob.yil})")
+print(f"Yoshi: {joriy - kitob.yil} yil")`,
+  },
+  {
+    key: 'backend-dars-25-hard',
+    solutionPy: `class Talaba:
+    def __init__(self, ism, yosh):
+        self.ism = ism
+        self.yosh = yosh
+n = int(input())
+talabalar = []
+for i in range(n):
+    ism, yosh = input().split()
+    talabalar.append(Talaba(ism, int(yosh)))
+for tartib, talaba in enumerate(talabalar, start=1):
+    print(f"{tartib}. {talaba.ism} ({talaba.yosh})")
+print(f"Jami: {n}")
+yigindi = 0
+for talaba in talabalar:
+    yigindi += talaba.yosh
+print(f"O'rtacha yosh: {round(yigindi / n, 1)}")`,
+  },
+  {
+    key: 'backend-dars-26-easy',
+    solutionPy: `class Sanoqchi:
+    def __init__(self):
+        self.qiymat = 0
+    def oshir(self):
+        self.qiymat += 1
+    def kamaytir(self):
+        self.qiymat -= 1
+    def korsat(self):
+        print(f"Hisob: {self.qiymat}")
+n = int(input())
+sanoqchi = Sanoqchi()
+for i in range(n):
+    buyruq = input()
+    if buyruq == "oshir":
+        sanoqchi.oshir()
+    elif buyruq == "kamaytir":
+        sanoqchi.kamaytir()
+    else:
+        sanoqchi.korsat()
+print(f"Yakuniy: {sanoqchi.qiymat}")`,
+  },
+  {
+    key: 'backend-dars-26-medium',
+    solutionPy: `class Mashina:
+    def __init__(self):
+        self.tezlik = 0
+        self.yoqilgan = False
+    def yoq(self):
+        if self.yoqilgan:
+            print("Mashina allaqachon yoqilgan")
+        else:
+            self.yoqilgan = True
+            print("Mashina yoqildi")
+    def tezlash(self, n):
+        if not self.yoqilgan:
+            print("Avval mashinani yoqing")
+        else:
+            self.tezlik += n
+            print(f"Tezlik: {self.tezlik} km/h")
+    def toxta(self):
+        self.tezlik = 0
+        self.yoqilgan = False
+        print("Mashina to'xtadi")
+n = int(input())
+mashina = Mashina()
+for i in range(n):
+    buyruq = input().split()
+    if buyruq[0] == "yoq":
+        mashina.yoq()
+    elif buyruq[0] == "tezlash":
+        mashina.tezlash(int(buyruq[1]))
+    else:
+        mashina.toxta()
+print(f"Yakuniy tezlik: {mashina.tezlik}")`,
+  },
+  {
+    key: 'backend-dars-26-hard',
+    solutionPy: `class Hisob:
+    def __init__(self, balans):
+        self.balans = balans
+    def qoshish(self, summa):
+        if summa <= 0:
+            print("Xato: summa musbat bo'lishi kerak")
+        else:
+            self.balans += summa
+            print(f"Qo'shildi: {summa}. Balans: {self.balans}")
+    def yechish(self, summa):
+        if summa <= 0:
+            print("Xato: summa musbat bo'lishi kerak")
+        elif summa > self.balans:
+            print(f"Mablag' yetarli emas. Balans: {self.balans}")
+        else:
+            self.balans -= summa
+            print(f"Yechildi: {summa}. Balans: {self.balans}")
+hisob = Hisob(int(input()))
+n = int(input())
+for i in range(n):
+    amal, summa = input().split()
+    if amal == "qoshish":
+        hisob.qoshish(int(summa))
+    else:
+        hisob.yechish(int(summa))
+print(f"Yakuniy balans: {hisob.balans}")`,
+  },
+  {
+    key: 'backend-dars-27-easy',
+    solutionPy: `class Telefon:
+    def __init__(self, marka, zaryad):
+        self.marka = marka
+        self.zaryad = zaryad
+    def qongiroq(self):
+        if self.zaryad >= 5:
+            self.zaryad -= 5
+            print(f"{self.marka} jiringlamoqda")
+        else:
+            print(f"{self.marka} zaryadi yetarli emas")
+marka = input()
+zaryad = int(input())
+n = int(input())
+telefon = Telefon(marka, zaryad)
+for i in range(n):
+    telefon.qongiroq()
+print(f"Zaryad: {telefon.zaryad}%")`,
+  },
+  {
+    key: 'backend-dars-27-medium',
+    solutionPy: `class Hayvon:
+    def __init__(self, nom, tur, yosh):
+        self.nom = nom
+        self.tur = tur
+        self.yosh = yosh
+    def __str__(self):
+        return f"{self.nom} — {self.tur}, {self.yosh} yoshda"
+n = int(input())
+hayvonlar = []
+for i in range(n):
+    nom, tur, yosh = input().split()
+    hayvonlar.append(Hayvon(nom, tur, int(yosh)))
+for hayvon in hayvonlar:
+    print(hayvon)
+print(f"Jami: {n} ta hayvon")`,
+  },
+  {
+    key: 'backend-dars-27-hard',
+    solutionPy: `class Mahsulot:
+    def __init__(self, nom, narx, miqdor):
+        self.nom = nom
+        self.narx = narx
+        self.miqdor = miqdor
+    def jami(self):
+        return self.narx * self.miqdor
+n = int(input())
+mahsulotlar = []
+for i in range(n):
+    nom, narx, miqdor = input().split()
+    mahsulotlar.append(Mahsulot(nom, int(narx), int(miqdor)))
+tanlangan = 0
+for mahsulot in mahsulotlar:
+    if mahsulot.jami() >= 100000:
+        print(f"{mahsulot.nom}: {mahsulot.jami()} so'm")
+        tanlangan += 1
+print(f"Tanlangan: {tanlangan} ta")`,
+  },
+  {
+    key: 'backend-dars-28-easy',
+    solutionPy: `class Odam:
+    def __init__(self, ism, yosh):
+        self.ism = ism
+        self.yosh = yosh
+    def tanishtir(self):
+        print(f"Men {self.ism}, {self.yosh} yoshdaman.")
+class Talaba(Odam):
+    def __init__(self, ism, yosh, guruh):
+        super().__init__(ism, yosh)
+        self.guruh = guruh
+    def tanishtir(self):
+        super().tanishtir()
+        print(f"Guruhim: {self.guruh}.")
+odam = Odam(input(), int(input()))
+talaba = Talaba(input(), int(input()), input())
+odam.tanishtir()
+talaba.tanishtir()`,
+  },
+  {
+    key: 'backend-dars-28-medium',
+    solutionPy: `class Hayvon:
+    def __init__(self, nom):
+        self.nom = nom
+    def ovoz(self):
+        return "Noaniq ovoz"
+class Mushuk(Hayvon):
+    def ovoz(self):
+        return "Miyov"
+class Sher(Mushuk):
+    def ovoz(self):
+        return "Rrrr"
+n = int(input())
+for i in range(n):
+    tur, nom = input().split()
+    if tur == "sher":
+        hayvon = Sher(nom)
+    elif tur == "mushuk":
+        hayvon = Mushuk(nom)
+    else:
+        hayvon = Hayvon(nom)
+    print(f"{hayvon.nom}: {hayvon.ovoz()}")`,
+  },
+  {
+    key: 'backend-dars-28-hard',
+    solutionPy: `import math
+class Shakl:
+    def yuza(self):
+        return 0
+class Kvadrat(Shakl):
+    def __init__(self, tomon):
+        self.tomon = tomon
+    def yuza(self):
+        return self.tomon * self.tomon
+class Doira(Shakl):
+    def __init__(self, radius):
+        self.radius = radius
+    def yuza(self):
+        return math.pi * self.radius ** 2
+n = int(input())
+umumiy = 0
+for i in range(n):
+    tur, olcham = input().split()
+    if tur == "kvadrat":
+        shakl = Kvadrat(int(olcham))
+        print(f"Kvadrat: {shakl.yuza():.2f}")
+    else:
+        shakl = Doira(int(olcham))
+        print(f"Doira: {shakl.yuza():.2f}")
+    umumiy += shakl.yuza()
+print(f"Umumiy yuza: {umumiy:.2f}")`,
+  },
+  {
+    key: 'backend-dars-29-easy',
+    solutionPy: `class Hisob:
+    def __init__(self, balans):
+        self._balans = balans
+    def kirim(self, summa):
+        self._balans += summa
+        print(f"Kirim: {summa}. Balans: {self._balans}")
+    def chiqim(self, summa):
+        if summa > self._balans:
+            print("Mablag' yetarli emas")
+        else:
+            self._balans -= summa
+            print(f"Chiqim: {summa}. Balans: {self._balans}")
+hisob = Hisob(int(input()))
+while True:
+    qator = input()
+    if qator == "yakun":
+        break
+    amal, summa = qator.split()
+    if amal == "kirim":
+        hisob.kirim(int(summa))
+    else:
+        hisob.chiqim(int(summa))
+print(f"Yakuniy balans: {hisob._balans}")`,
+  },
+  {
+    key: 'backend-dars-29-medium',
+    solutionPy: `class Harorat:
+    def __init__(self):
+        self._qiymat = 0
+    @property
+    def qiymat(self):
+        return self._qiymat
+    @qiymat.setter
+    def qiymat(self, yangi):
+        if yangi < -273:
+            raise ValueError("-273 dan past bo'lishi mumkin emas")
+        self._qiymat = yangi
+n = int(input())
+harorat = Harorat()
+for i in range(n):
+    yangi = int(input())
+    try:
+        harorat.qiymat = yangi
+        print(f"Harorat: {harorat.qiymat}")
+    except ValueError as xato:
+        print(f"Xato: {xato}")
+print(f"Oxirgi harorat: {harorat.qiymat}")`,
+  },
+  {
+    key: 'backend-dars-29-hard',
+    solutionPy: `class Talaba:
+    def __init__(self, ism, familiya):
+        self.ism = ism
+        self.familiya = familiya
+    @property
+    def toliq_ism(self):
+        return f"{self.ism} {self.familiya}"
+n = int(input())
+talabalar = []
+for i in range(n):
+    ism, familiya = input().split()
+    talabalar.append(Talaba(ism, familiya))
+for tartib, talaba in enumerate(talabalar, start=1):
+    print(f"{tartib}. {talaba.toliq_ism}")
+if talabalar:
+    try:
+        talabalar[-1].toliq_ism = "Yangi Ism"
+    except AttributeError:
+        print("Xato: to'liq ismni o'zgartirib bo'lmaydi")`,
+  },
+  {
+    key: 'backend-dars-30-easy',
+    solutionPy: `class Nuqta:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+    def __str__(self):
+        return f"({self.x}, {self.y})"
+    def __repr__(self):
+        return f"Nuqta(x={self.x}, y={self.y})"
+n = int(input())
+nuqtalar = []
+for i in range(n):
+    x, y = input().split()
+    nuqtalar.append(Nuqta(int(x), int(y)))
+for nuqta in nuqtalar:
+    print(nuqta)
+print(nuqtalar)`,
+  },
+  {
+    key: 'backend-dars-30-medium',
+    solutionPy: `class Hayvon:
+    def __init__(self, nom):
+        self.nom = nom
+    def ovoz(self):
+        return "..."
+class Mushuk(Hayvon):
+    def ovoz(self):
+        return "Miyov"
+class It(Hayvon):
+    def ovoz(self):
+        return "Vov"
+n = int(input())
+mushuklar = 0
+itlar = 0
+for i in range(n):
+    tur, nom = input().split()
+    if tur == "mushuk":
+        hayvon = Mushuk(nom)
+        mushuklar += 1
+    elif tur == "it":
+        hayvon = It(nom)
+        itlar += 1
+    else:
+        hayvon = Hayvon(nom)
+    print(f"{hayvon.nom} deydi: {hayvon.ovoz()}")
+print(f"Mushuklar: {mushuklar}, itlar: {itlar}")`,
+  },
+  {
+    key: 'backend-dars-30-hard',
+    solutionPy: `class Savat:
+    def __init__(self):
+        self.mahsulotlar = []
+    def qoshish(self, nom):
+        self.mahsulotlar.append(nom)
+    def __str__(self):
+        if not self.mahsulotlar:
+            return "bo'sh"
+        return ", ".join(self.mahsulotlar)
+    def __len__(self):
+        return len(self.mahsulotlar)
+    def __contains__(self, nom):
+        return nom in self.mahsulotlar
+n = int(input())
+savat = Savat()
+for i in range(n):
+    savat.qoshish(input())
+qidiruv = input()
+print(f"Savat: {savat}")
+print(f"Elementlar soni: {len(savat)}")
+if qidiruv in savat:
+    print(f"{qidiruv} bor")
+else:
+    print(f"{qidiruv} yo'q")`,
+  },
 ];
