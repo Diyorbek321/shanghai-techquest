@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Github, Linkedin, Globe, Calendar, Award, Zap, Shield, Star, Medal, Lock, Activity as ActivityIcon, Briefcase, CheckCircle2, FileText, Loader2, EyeOff } from 'lucide-react';
 import { User } from '../types';
 import { api, ApiError } from '../lib/api';
+import { ParentReportCard } from '../components/ParentReportCard';
 import { formatDate, formatRelativeTime } from '../lib/utils';
 import { trackLabel } from '../lib/tracks';
 
@@ -608,6 +609,10 @@ export function Profile({ user, onRoleToggle }: ProfileProps) {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-10">
+      {/* Weekly summary a student can show at home. Students only: staff have no
+          coursework of their own, so the report would be empty by construction. */}
+      {user.role === 'student' && <ParentReportCard userId={user.id} />}
+
       {/* Header Profile Card */}
       <div className="glass-panel overflow-hidden border-0 relative shadow-2xl">
         <div className="h-48 bg-gradient-to-r from-[#0A0E27] via-brand-purple/40 to-brand-cyan/20 relative">
