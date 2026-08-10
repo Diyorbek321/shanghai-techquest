@@ -34,7 +34,7 @@ START="${START:-}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 step() { printf '\n=== %s\n' "$1"; }
 
-step "1/7  Tekshiruv"
+step "1/8  Tekshiruv"
 command -v docker >/dev/null || { echo "XATO: docker topilmadi."; exit 1; }
 docker compose version >/dev/null 2>&1 || { echo "XATO: 'docker compose' plagini yo'q."; exit 1; }
 [ -d "$APP_DIR" ] || { echo "XATO: $APP_DIR topilmadi."; exit 1; }
@@ -43,7 +43,7 @@ cd "$APP_DIR"
 [ -f .env ] || { echo "XATO: $APP_DIR/.env yo'q — DATABASE_URL va JWT_SECRET shundan olinadi."; exit 1; }
 echo "papka: $APP_DIR | shoxobcha: $BRANCH"
 
-step "2/7  Zaxira"
+step "2/8  Zaxira"
 mkdir -p "$BACKUP_DIR"
 DB_BACKUP="$BACKUP_DIR/techquest-db-$STAMP.sql.gz"
 docker compose exec -T postgres pg_dump -U techquest techquest | gzip > "$DB_BACKUP"
@@ -57,7 +57,7 @@ FILES_BACKUP="$BACKUP_DIR/techquest-files-$STAMP.tar.gz"
 tar --exclude=node_modules --exclude=.git --exclude=dist -czf "$FILES_BACKUP" -C "$APP_DIR" .
 echo "fayl:  $FILES_BACKUP ($(du -h "$FILES_BACKUP" | cut -f1))"
 
-step "3/7  Kodni yangilash"
+step "3/8  Kodni yangilash"
 if [ ! -d .git ]; then
   echo "git repozitoriysi emas — checkout'ga aylantirilmoqda"
   git init -q
@@ -79,13 +79,13 @@ git diff --stat "origin/$BRANCH" -- . | tail -5 || true
 git reset -q --hard "origin/$BRANCH"
 git log -1 --format='hozirgi commit: %h %ad %s' --date=short
 
-step "4/7  Image qurish"
+step "4/8  Image qurish"
 docker compose build app
 
-step "5/7  Ishga tushirish (migratsiyalar konteyner CMD'sida qo'llanadi)"
+step "5/8  Ishga tushirish (migratsiyalar konteyner CMD'sida qo'llanadi)"
 docker compose up -d app
 
-step "6/7  Sog'liqni kutish"
+step "6/8  Sog'liqni kutish"
 for i in $(seq 1 60); do
   if curl -sf -o /dev/null http://127.0.0.1:3000/; then
     echo "javob berdi ($i s)"
@@ -99,13 +99,25 @@ for i in $(seq 1 60); do
   sleep 1
 done
 
-step "7/7  Python Backend kursi"
+step "7/8  Python Backend kursi"
 if [ -n "$SKIP_SEED" ]; then
   echo "SKIP_SEED o'rnatilgan — o'tkazib yuborildi."
 else
   SEED_ARGS=(--apply --teacher "$TEACHER_EMAIL" --days "$LESSON_DAYS")
   [ -n "$START" ] && SEED_ARGS+=(--start "$START")
   docker compose exec -T app npx tsx scripts/seedBackendCourse.ts "${SEED_ARGS[@]}"
+fi
+
+step "8/8  Parsons mashqlari (qatorlarni tartiblash)"
+if [ -n "$SKIP_SEED" ]; then
+  echo "SKIP_SEED o'rnatilgan — o'tkazib yuborildi."
+else
+  # Runs INSIDE the app container so PISTON_URL resolves to the compose network.
+  # Every reference solution is executed against its problem's own test cases;
+  # a failure exits non-zero and is surfaced rather than swallowed, because a
+  # Parsons exercise built from wrong code teaches the wrong structure.
+  docker compose exec -T app npx tsx scripts/addParsonsSolutions.ts --apply \
+    || echo "OGOHLANTIRISH: ba'zi yechimlar tekshiruvdan o'tmadi — yuqoridagi ro'yxatga qarang."
 fi
 
 step "Yakuniy holat"

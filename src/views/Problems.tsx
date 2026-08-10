@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { BrainCircuit, CheckCircle2, XCircle, ChevronRight, ChevronLeft, Play, Check, Loader2, Search, EyeOff, AlertTriangle } from 'lucide-react';
+import { BrainCircuit, CheckCircle2, XCircle, ChevronRight, ChevronLeft, Play, Check, Loader2, Search, EyeOff, AlertTriangle, ListOrdered } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../lib/api';
+import { ParsonsPuzzle } from '../components/ParsonsPuzzle';
 
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD' | 'EXPERT' | 'MASTER';
 type Language = 'javascript' | 'python' | 'cpp';
@@ -27,6 +28,7 @@ interface ProblemListResponse {
 
 interface ProblemDetail extends ProblemListItem {
   description: string;
+  hasParsons: boolean;
   starterCode: Record<Language, string | null>;
   /** Languages this problem ships starter code for; lesson practice is Python-only. */
   languages: Language[];
@@ -170,6 +172,7 @@ function TestResultRow({ test }: { test: SubmitTestResult }) {
 
 export function Problems() {
   const [activeProblemId, setActiveProblemId] = useState<string | null>(null);
+  const [showParsons, setShowParsons] = useState(false);
   const [language, setLanguage] = useState<Language>('javascript');
   const [code, setCode] = useState('');
   const [runResult, setRunResult] = useState<RunResult | null>(null);
@@ -252,6 +255,9 @@ export function Problems() {
     const next = activeProblem.starterCode[language] !== null ? language : activeProblem.languages[0] ?? language;
     setLanguage(next);
     setCode(activeProblem.starterCode[next] ?? '');
+    // Collapse the scaffolding when a different problem opens, so the student
+    // meets each new problem with the editor rather than with the answer cards.
+    setShowParsons(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProblem]);
 
@@ -495,6 +501,31 @@ export function Problems() {
               return <p key={i} className="mb-2">{line}</p>;
             })}
           </div>
+
+          {/* Scaffolding for the student who is about to give up. Offered, never
+              forced: a Parsons exercise reaches the same learning gain in less
+              time, but only writing the code practises writing the code. */}
+          {activeProblem.hasParsons && (
+            <div className="mt-6 pt-6 border-t border-brand-border">
+              {showParsons ? (
+                <ParsonsPuzzle problemId={activeProblem.id} />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowParsons(true)}
+                  className="w-full text-left p-4 rounded-lg border border-brand-purple/30 bg-brand-purple/5 hover:bg-brand-purple/10 transition-colors"
+                >
+                  <span className="flex items-center gap-2 font-semibold text-brand-purple text-sm">
+                    <ListOrdered size={16} /> Qiynalyapsizmi?
+                  </span>
+                  <span className="block text-xs text-gray-400 mt-1">
+                    Tayyor qatorlarni to'g'ri tartibga joylash mashqini oching — kod yozmasdan
+                    dasturning tuzilishini o'rganasiz.
+                  </span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right Panel: Editor & Output */}

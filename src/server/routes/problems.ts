@@ -9,6 +9,8 @@ import { notify } from '../notifications/notify';
 import { competenceContext, competenceMessage } from '../notifications/competence';
 import { executeCode, PistonUnavailableError } from '../code/piston';
 import { judgeSubmission, parseTestCases, type JudgeResult, type TestCaseResult } from '../code/judge';
+import { buildBoard, gradeOrder, seedFrom } from '../parsons/blocks';
+import { parsonsPoints } from '../parsons/award';
 
 export const problemsRouter = Router();
 
@@ -94,6 +96,9 @@ problemsRouter.get('/:id', async (req, res) => {
       .filter(([, starter]) => starter !== null)
       .map(([language]) => language),
     solved: !!latestSubmission,
+    // Whether a line-ordering variant exists. A boolean, never the solution
+    // itself — the ordered source must not leave the server.
+    hasParsons: problem.solutionPy !== null,
   });
 });
 
@@ -285,5 +290,125 @@ problemsRouter.post('/:id/submit', async (req, res) => {
     pointsAwarded,
     feedback,
     results,
+  });
+});
+
+const parsonsSubmitSchema = z.object({
+  /** Block ids, in the order the student arranged them. */
+  order: z.array(z.string().min(1)).min(1).max(200),
+});
+
+/**
+ * The shuffled board.
+ *
+ * The seed is fixed per (problem, student), so refreshing the page does not
+ * reshuffle a half-finished attempt — and two students never get boards that
+ * can be copied from each other by position.
+ */
+problemsRouter.get('/:id/parsons', async (req, res) => {
+  const problem = await prisma.problem.findUnique({ where: { id: req.params.id } });
+  if (!problem) {
+    return res.status(404).json({ error: 'Masala topilmadi.' });
+  }
+  if (!problem.solutionPy) {
+    return res.status(404).json({ error: "Bu masala uchun qatorlarni tartiblash mashqi tayyorlanmagan." });
+  }
+
+  const solved = await prisma.problemSubmission.findFirst({
+    where: { problemId: problem.id, userId: req.user!.id, passed: true },
+    select: { id: true },
+  });
+
+  const board = buildBoard(problem.solutionPy, seedFrom(`${problem.id}:${req.user!.id}`));
+  res.json({
+    problemId: problem.id,
+    title: problem.title,
+    description: problem.description,
+    // Only ever the shuffled cards. The ordered solution stays on the server.
+    blocks: board,
+    points: parsonsPoints(problem.points),
+    alreadySolved: Boolean(solved),
+  });
+});
+
+problemsRouter.post('/:id/parsons', async (req, res) => {
+  const parsed = parsonsSubmitSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Noto'g'ri ma'lumot kiritildi." });
+  }
+  const problem = await prisma.problem.findUnique({ where: { id: req.params.id } });
+  if (!problem) {
+    return res.status(404).json({ error: 'Masala topilmadi.' });
+  }
+  if (!problem.solutionPy) {
+    return res.status(404).json({ error: "Bu masala uchun qatorlarni tartiblash mashqi tayyorlanmagan." });
+  }
+
+  // The board is rebuilt from the same seed rather than trusted from the
+  // client, so a submission can only ever be made of the cards this student was
+  // actually dealt.
+  const board = buildBoard(problem.solutionPy, seedFrom(`${problem.id}:${req.user!.id}`));
+  const textById = new Map(board.map((block) => [block.id, block.text]));
+  const unknown = parsed.data.order.find((id) => !textById.has(id));
+  if (unknown) {
+    return res.status(400).json({ error: 'Yuborilgan qatorlar bu mashqqa tegishli emas.' });
+  }
+
+  const submittedText = parsed.data.order.map((id) => textById.get(id)!);
+  const grade = gradeOrder(problem.solutionPy, submittedText);
+
+  // Ordering given lines is scaffolding, so it pays less than writing the code —
+  // and never twice, nor on top of a problem the student already solved outright.
+  const alreadySolved = await prisma.problemSubmission.findFirst({
+    where: { problemId: problem.id, userId: req.user!.id, passed: true },
+    select: { id: true },
+  });
+  const pointsAwarded = grade.correct && !alreadySolved ? parsonsPoints(problem.points) : 0;
+
+  const feedback = grade.correct
+    ? "Tartib to'g'ri — dastur to'liq ishlaydi."
+    : `${grade.linesCorrect}/${grade.linesTotal} qator o'z o'rnida. Noto'g'ri joydagi qatorlar belgilandi.`;
+
+  await prisma.$transaction([
+    prisma.problemSubmission.create({
+      data: {
+        problemId: problem.id,
+        userId: req.user!.id,
+        code: submittedText.join('\n'),
+        // Marks the row as a line-ordering attempt rather than written code, so
+        // the two modes stay distinguishable in a student's history.
+        language: 'parsons',
+        passed: grade.correct,
+        feedback,
+        pointsAwarded,
+        testsPassed: grade.linesCorrect,
+        testsTotal: grade.linesTotal,
+      },
+    }),
+    ...(pointsAwarded > 0
+      ? [prisma.user.update({ where: { id: req.user!.id }, data: { xp: { increment: pointsAwarded } } })]
+      : []),
+  ]);
+
+  if (pointsAwarded > 0) {
+    const context = await competenceContext(prisma, req.user!.id, problem.tags);
+    await notify(prisma, {
+      userId: req.user!.id,
+      type: 'SUCCESS',
+      title: 'Qatorlar tartibi to\'g\'ri',
+      body: competenceMessage(problem.title, pointsAwarded, context),
+    });
+  }
+
+  await checkAchievements(req.user!.id);
+
+  res.status(201).json({
+    correct: grade.correct,
+    linesCorrect: grade.linesCorrect,
+    linesTotal: grade.linesTotal,
+    // Positions only — never the expected text, which would hand over the answer.
+    wrongPositions: grade.wrongPositions,
+    pointsAwarded,
+    feedback,
   });
 });

@@ -604,6 +604,13 @@ model Problem {
   starterCodeJs  String?
   starterCodePy  String?
   starterCodeCpp String?
+  /// Reference solution, used ONLY to build the Parsons (line-ordering) variant.
+  /// Null means this problem has no Parsons mode. Never sent to a student: the
+  /// API ships shuffled lines, never the ordered source. A value here is only
+  /// written by scripts/addParsonsSolutions.ts, which refuses to store a
+  /// solution that does not pass the problem's own test cases — a Parsons
+  /// exercise built from wrong code would drill the wrong structure.
+  solutionPy     String?
   /// Set for bonus practice attached to a taught lesson; null for the general pool.
   lessonId       String?
   lesson         Lesson?    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
