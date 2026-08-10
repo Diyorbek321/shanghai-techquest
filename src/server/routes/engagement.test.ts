@@ -132,9 +132,13 @@ describe('POST /api/users/:id/reward', () => {
 });
 
 describe('GET /api/leaderboard?scope=class', () => {
+  // The board now returns the caller's league rather than a flat top-50, so the
+  // payload is { league, progress, players } instead of a bare array.
+  const idsOf = (body: { players: { id: string }[] }) => body.players.map((p) => p.id);
+
   it('shows classmates and hides students from other classes', async () => {
     const res = await request(app).get('/api/leaderboard?scope=class').set('Cookie', learnerCookie).expect(200);
-    const ids = res.body.map((p: { id: string }) => p.id);
+    const ids = idsOf(res.body);
 
     expect(ids).toContain(learnerId);
     expect(ids).toContain(classmateId);
@@ -143,17 +147,38 @@ describe('GET /api/leaderboard?scope=class', () => {
 
   it('marks the requesting student', async () => {
     const res = await request(app).get('/api/leaderboard?scope=class').set('Cookie', learnerCookie).expect(200);
-    expect(res.body.find((p: { id: string }) => p.id === learnerId)?.isUser).toBe(true);
+    expect(res.body.players.find((p: { id: string }) => p.id === learnerId)?.isUser).toBe(true);
   });
 
   it('still supports the existing track scope', async () => {
     const res = await request(app).get('/api/leaderboard?scope=track').set('Cookie', learnerCookie).expect(200);
-    expect(res.body.map((p: { id: string }) => p.id)).toContain(outsiderId);
+    expect(idsOf(res.body)).toContain(outsiderId);
   });
 
   it('falls back to track for an unknown scope', async () => {
     const res = await request(app).get('/api/leaderboard?scope=nonsense').set('Cookie', learnerCookie).expect(200);
-    expect(res.body.map((p: { id: string }) => p.id)).toContain(outsiderId);
+    expect(idsOf(res.body)).toContain(outsiderId);
+  });
+
+  it('ranks within the league, so no student sees a cohort-wide position', async () => {
+    const res = await request(app).get('/api/leaderboard?scope=track').set('Cookie', learnerCookie).expect(200);
+
+    expect(res.body.league.name).toBeTruthy();
+    expect(res.body.players.length).toBeLessThanOrEqual(25);
+    expect(res.body.players.map((p: { rank: number }) => p.rank)).toEqual(
+      res.body.players.map((_: unknown, i: number) => i + 1)
+    );
+  });
+
+  it('reports personal weekly progress alongside the ranking', async () => {
+    const res = await request(app).get('/api/leaderboard?scope=track').set('Cookie', learnerCookie).expect(200);
+
+    expect(res.body.progress).toMatchObject({
+      thisWeek: expect.any(Number),
+      lastWeek: expect.any(Number),
+      delta: expect.any(Number),
+    });
+    expect(res.body.progress.delta).toBe(res.body.progress.thisWeek - res.body.progress.lastWeek);
   });
 });
 

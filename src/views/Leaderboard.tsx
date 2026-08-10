@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, Swords } from 'lucide-react';
+import { Trophy, Swords, TrendingUp } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { User, ViewType } from '../types';
 import { VersusTransition } from '../components/VersusTransition';
@@ -23,6 +23,26 @@ interface LeaderboardPlayer {
   track: string | null;
   eloRating: number;
   isUser: boolean;
+}
+
+interface League {
+  name: string;
+  index: number;
+  total: number;
+  size: number;
+}
+
+interface WeeklyProgress {
+  thisWeek: number;
+  lastWeek: number;
+  delta: number;
+}
+
+/** GET /leaderboard returns the caller's league only — never the whole cohort. */
+interface LeaderboardResponse {
+  league: League;
+  progress: WeeklyProgress;
+  players: LeaderboardPlayer[];
 }
 
 interface BattlePlayer {
@@ -60,10 +80,14 @@ export function Leaderboard({ user, onNavigate, onSelectBattle }: LeaderboardPro
 
   const scope = SCOPE_TABS[activeTabIndex].scope;
 
-  const { data: players = [], isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['leaderboard', scope],
-    queryFn: () => api.get<LeaderboardPlayer[]>(`/leaderboard?scope=${scope}`),
+    queryFn: () => api.get<LeaderboardResponse>(`/leaderboard?scope=${scope}`),
   });
+
+  const players = data?.players ?? [];
+  const league = data?.league;
+  const progress = data?.progress;
 
   const createBattle = useMutation({
     mutationFn: () => api.post<Battle>('/battles', { isAI: false }),
@@ -119,7 +143,11 @@ export function Leaderboard({ user, onNavigate, onSelectBattle }: LeaderboardPro
             </span>
             <span className="text-xs font-mono text-brand-green uppercase tracking-widest animate-pulse">Jonli</span>
           </h1>
-          <p className="text-gray-400">Tengdoshlaringiz bilan bellashing va reytingda yuqoriga ko'tariling.</p>
+          <p className="text-gray-400">
+            {league
+              ? `${league.name} ligasi — sizga eng yaqin ${league.size} ta o'quvchi.`
+              : 'Tengdoshlaringiz bilan bellashing.'}
+          </p>
         </div>
 
         <div className="flex bg-black/40 p-1 rounded-lg border border-brand-border">
@@ -179,6 +207,34 @@ export function Leaderboard({ user, onNavigate, onSelectBattle }: LeaderboardPro
             ))}
           </div>
 
+          {/* Personal progress — the one number nobody else can take from you. */}
+          {progress && (
+            <div className="glass-panel p-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <TrendingUp
+                  size={20}
+                  className={progress.delta >= 0 ? 'text-brand-green' : 'text-gray-500'}
+                />
+                <div>
+                  <h4 className="font-semibold text-white text-sm">Shaxsiy o'sishingiz</h4>
+                  <p className="text-xs text-gray-400">
+                    {progress.thisWeek === 0 && progress.lastWeek === 0
+                      ? "Bu hafta birinchi masalangizni yeching — o'sish shu yerda ko'rinadi."
+                      : progress.delta > 0
+                        ? `Bu hafta ${progress.thisWeek} ta masala — o'tgan haftadan ${progress.delta} ta ko'p.`
+                        : progress.delta === 0
+                          ? `Bu hafta ham ${progress.thisWeek} ta masala — sur'atni ushlab turibsiz.`
+                          : `Bu hafta ${progress.thisWeek} ta masala, o'tgan hafta ${progress.lastWeek} ta edi.`}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="font-mono text-2xl font-bold text-brand-green">{progress.thisWeek}</div>
+                <div className="text-[10px] uppercase tracking-widest text-gray-500">shu hafta</div>
+              </div>
+            </div>
+          )}
+
           {/* User Highlight */}
           {userRow && (
             <div className="bg-brand-cyan/10 border border-brand-cyan/30 rounded-xl p-4 flex items-center justify-between neon-glow-cyan">
@@ -187,11 +243,13 @@ export function Leaderboard({ user, onNavigate, onSelectBattle }: LeaderboardPro
                   #{userRow.rank}
                 </div>
                 <div>
-                  <h4 className="font-semibold text-white">Sizning o'rningiz</h4>
+                  <h4 className="font-semibold text-white">
+                    {league ? `${league.name} ligasidagi o'rningiz` : "Sizning o'rningiz"}
+                  </h4>
                   <p className="text-xs text-brand-cyan">
                     {xpToNextRank !== null && xpToNextRank > 0
                       ? `Oldingi o'ringa yetish uchun bor-yo'g'i ${xpToNextRank} XP qoldi!`
-                      : "Siz reytingning eng tepasidasiz!"}
+                      : "Siz ligangizning eng tepasidasiz!"}
                   </p>
                 </div>
               </div>
