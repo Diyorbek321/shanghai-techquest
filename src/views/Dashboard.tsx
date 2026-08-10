@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Clock, PlayCircle, Star, Target, Zap, ChevronRight, Activity, ArrowUpRight, Code, CheckSquare, Trophy, Gift, LayoutList } from 'lucide-react';
+import { Clock, PlayCircle, Star, Target, Zap, ChevronRight, Activity, ArrowUpRight, Code, CheckSquare, Trophy, Gift, LayoutList, RefreshCw } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { User } from '../types';
 import { TaskSequencer } from '../components/TaskSequencer';
@@ -72,6 +72,12 @@ export function Dashboard({ user, onNavigate, onTriggerSuccess }: DashboardProps
     queryKey: ['quests'],
     queryFn: () => api.get<Quest[]>('/quests'),
   });
+
+  const { data: due } = useQuery({
+    queryKey: ['quiz', 'due', 'count'],
+    queryFn: () => api.get<{ count: number }>('/quiz/due/count'),
+  });
+  const dueCount = due?.count ?? 0;
 
   const { data: notifications = [] } = useQuery({
     queryKey: ['notifications'],
@@ -190,6 +196,34 @@ export function Dashboard({ user, onNavigate, onTriggerSuccess }: DashboardProps
               </div>
             </div>
           </section>
+
+          {/* Spaced repetition. The scheduler and the interleaving already ran
+              server-side (src/server/quiz/schedule.ts); what was missing was
+              telling the student anything was waiting — a review queue nobody
+              is shown is a review queue nobody works. */}
+          {dueCount > 0 && (
+            <section className="glass-panel p-5 relative overflow-hidden border-brand-purple/30">
+              <div className="absolute left-0 top-0 bottom-0 w-1 bg-brand-purple"></div>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <RefreshCw className="text-brand-purple shrink-0" size={18} />
+                  <div>
+                    <h2 className="font-semibold text-lg text-brand-purple">Takrorlash vaqti keldi</h2>
+                    <p className="text-sm text-gray-400">
+                      {dueCount} ta savol takrorlashga tayyor. Ular keyingi dars testiga
+                      avtomatik qo'shiladi — eslab qolish shundan mustahkamlanadi.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => onNavigate('backend_course')}
+                  className="shrink-0 px-4 py-2 bg-brand-purple text-white font-bold rounded hover:bg-brand-purple/90 transition-colors text-sm"
+                >
+                  Darsga o'tish
+                </button>
+              </div>
+            </section>
+          )}
 
           {/* Daily Coding Katas */}
           <section className="glass-panel p-5 relative overflow-hidden group border-brand-orange/30">
