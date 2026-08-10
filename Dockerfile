@@ -37,6 +37,15 @@ COPY --from=build /app/prisma ./prisma
 # Lesson slide decks are served by GET /api/lessons/:key/slides.
 COPY --from=build /app/lesson-assets ./lesson-assets
 
+# Maintenance scripts (scripts/seedBackendCourse.ts, scripts/dedupeClasses.ts)
+# run inside this container against the live database — `docker compose exec app
+# npx tsx scripts/...`. They import from src/ and prisma/, and tsx is already
+# present because the runtime copies node_modules wholesale from the build stage
+# (devDependencies included). Together this is ~1.5 MB of source text.
+COPY --from=build /app/scripts ./scripts
+COPY --from=build /app/src ./src
+COPY --from=build /app/tsconfig.json ./tsconfig.json
+
 # server.ts hardcodes PORT = 3000 and binds to 0.0.0.0.
 EXPOSE 3000
 
