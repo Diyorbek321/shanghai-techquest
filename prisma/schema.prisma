@@ -403,6 +403,11 @@ model Submission {
   /// teacher never has to guess which name is the "real" author.
   partnerId    String?
   partner      User?    @relation("SubmissionPartner", fields: [partnerId], references: [id], onDelete: SetNull)
+  /// Student chose to show this work to their classmates. Opt-in and revocable:
+  /// these are minors, so nothing they make is published by default.
+  showcased    Boolean  @default(false)
+  /// One line from the author about what they built.
+  showcaseNote String   @default("")
 
   @@unique([assignmentId, userId])
   @@index([userId])

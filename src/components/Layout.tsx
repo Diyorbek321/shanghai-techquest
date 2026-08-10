@@ -30,7 +30,8 @@ import {
   LogOut,
   UserCog,
   Award,
-  Lock
+  Lock,
+  LayoutGrid
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { ViewType, User, Track } from '../types';
@@ -80,6 +81,7 @@ export function Layout({ children, currentView, onNavigate, user }: LayoutProps)
     { id: 'leaderboard', label: 'Reyting', icon: <Trophy size={20} /> },
     { id: 'teams', label: 'Jamoalar', icon: <Users size={20} />, customColor: 'text-brand-orange' },
     { id: 'achievements', label: 'Yutuqlar', icon: <Medal size={20} /> },
+    { id: 'gallery', label: "Ko'rgazma", icon: <LayoutGrid size={20} />, customColor: 'text-brand-cyan' },
     { id: 'certificates', label: 'Sertifikatlar', icon: <Award size={20} />, customColor: 'text-[#FFD700]' },
     { id: 'shop', label: "Do'kon", icon: <Store size={20} />, customColor: 'text-[#FFD700]' },
     { id: 'profile', label: 'Profil', icon: <UserIcon size={20} /> },
