@@ -1193,4 +1193,347 @@ if qidiruv in savat:
 else:
     print(f"{qidiruv} yo'q")`,
   },
+  // --- Darslar 31-33: comprehension, generatorlar, dekoratorlar ---
+  {
+    key: 'backend-dars-31-easy',
+    solutionPy: `n = int(input())
+royxat = [son for son in range(1, n + 1) if son % 2 == 0]
+print(royxat)
+print(f"Yig'indi: {sum(royxat)}")`,
+  },
+  {
+    key: 'backend-dars-31-medium',
+    solutionPy: `sozlar = input().split()
+lugat = {soz: len(soz) for soz in sozlar}
+print(lugat)
+eng_uzun = sozlar[0]
+for soz in sozlar:
+    if len(soz) > len(eng_uzun):
+        eng_uzun = soz
+print(f"Eng uzun: {eng_uzun}")`,
+  },
+  {
+    key: 'backend-dars-31-hard',
+    solutionPy: `n = int(input())
+qatorlar = [input().split() for i in range(n)]
+kvadratlar = [int(x) ** 2 for qator in qatorlar for x in qator if int(x) % 3 == 0]
+print(kvadratlar)
+print(f"Soni: {len(kvadratlar)}")
+print(f"Yig'indi: {sum(kvadratlar)}")`,
+  },
+  {
+    key: 'backend-dars-32-easy',
+    solutionPy: `def sonlar(n):
+    for son in range(1, n + 1):
+        yield son
+n = int(input())
+print(*sonlar(n))
+print(f"Yig'indi: {sum(sonlar(n))}")`,
+  },
+  {
+    key: 'backend-dars-32-medium',
+    solutionPy: `def fib(k):
+    a = 1
+    b = 1
+    for i in range(k):
+        yield a
+        a, b = b, a + b
+k = int(input())
+hadlar = list(fib(k))
+print(*hadlar)
+if hadlar:
+    print(f"Oxirgi had: {hadlar[-1]}")
+else:
+    print("Oxirgi had: yo'q")`,
+  },
+  {
+    key: 'backend-dars-32-hard',
+    solutionPy: `def qidir(satrlar, soz):
+    for tartib, satr in enumerate(satrlar, start=1):
+        if soz in satr:
+            yield tartib, satr
+soz = input()
+satrlar = []
+while True:
+    qator = input()
+    if qator == "TUGADI":
+        break
+    satrlar.append(qator)
+topildi = 0
+for tartib, satr in qidir(satrlar, soz):
+    print(f"{tartib}: {satr}")
+    topildi += 1
+print(f"Topildi: {topildi} ta")`,
+  },
+  {
+    key: 'backend-dars-33-easy',
+    solutionPy: `def log(func):
+    def wrapper(*args):
+        print(f"Chaqirildi: {func.__name__}")
+        natija = func(*args)
+        print(f"Natija: {natija}")
+        return natija
+    return wrapper
+@log
+def qoshish(a, b):
+    return a + b
+@log
+def kopaytir(a, b):
+    return a * b
+a, b = input().split()
+qoshish(int(a), int(b))
+kopaytir(int(a), int(b))`,
+  },
+  {
+    key: 'backend-dars-33-medium',
+    solutionPy: `import functools
+def bezak(func):
+    @functools.wraps(func)
+    def wrapper(*args):
+        return f"*** {func(*args)} ***"
+    return wrapper
+@bezak
+def salom(ism):
+    return f"Salom, {ism}!"
+n = int(input())
+for i in range(n):
+    print(salom(input()))
+print(f"Funksiya nomi: {salom.__name__}")`,
+  },
+  {
+    key: 'backend-dars-33-hard',
+    solutionPy: `def sanagich(func):
+    def wrapper(*args):
+        wrapper.hisob += 1
+        return func(*args)
+    wrapper.hisob = 0
+    return wrapper
+@sanagich
+def salom(ism):
+    return f"Salom, {ism}!"
+@sanagich
+def xayr(ism):
+    return f"Xayr, {ism}!"
+while True:
+    qator = input()
+    if qator == "yakun":
+        break
+    amal, ism = qator.split()
+    if amal == "salom":
+        print(salom(ism))
+    else:
+        print(xayr(ism))
+print(f"salom: {salom.hisob} marta")
+print(f"xayr: {xayr.hisob} marta")`,
+  },
+  // --- Darslar 34-35: requirements tahlili, PEP 8 ---
+  {
+    key: 'backend-dars-34-easy',
+    solutionPy: `n = int(input())
+paketlar = {}
+for i in range(n):
+    qator = input().strip()
+    if qator == "" or qator.startswith("#"):
+        continue
+    nom, versiya = qator.split("==")
+    paketlar[nom.strip().lower()] = versiya.strip()
+for nom in sorted(paketlar):
+    print(f"{nom}=={paketlar[nom]}")
+print(f"Jami: {len(paketlar)}")`,
+  },
+  {
+    key: 'backend-dars-34-medium',
+    solutionPy: `n = int(input())
+talab = []
+for i in range(n):
+    nom, versiya = input().split("==")
+    talab.append((nom, versiya))
+m = int(input())
+ornatilgan = {}
+for i in range(m):
+    nom, versiya = input().split("==")
+    ornatilgan[nom] = versiya
+muammolar = 0
+for nom, kerak in talab:
+    if nom not in ornatilgan:
+        print(f"{nom}: yo'q")
+        muammolar += 1
+    elif ornatilgan[nom] != kerak:
+        print(f"{nom}: boshqa versiya (kerak {kerak}, o'rnatilgan {ornatilgan[nom]})")
+        muammolar += 1
+    else:
+        print(f"{nom}: OK")
+print(f"Muammolar: {muammolar}")`,
+  },
+  {
+    key: 'backend-dars-34-hard',
+    solutionPy: `def versiya_royxati(matn):
+    return [int(x) for x in matn.split(".")]
+def solishtir(a, b):
+    uzunlik = max(len(a), len(b))
+    a = a + [0] * (uzunlik - len(a))
+    b = b + [0] * (uzunlik - len(b))
+    return (a > b) - (a < b)
+n = int(input())
+talab = []
+for i in range(n):
+    nom, kerak = input().split(">=")
+    talab.append((nom, kerak))
+m = int(input())
+ornatilgan = {}
+for i in range(m):
+    nom, versiya = input().split("==")
+    ornatilgan[nom] = versiya
+yangilash = 0
+for nom, kerak in talab:
+    if nom not in ornatilgan:
+        print(f"{nom}: o'rnatilmagan")
+        yangilash += 1
+    elif solishtir(versiya_royxati(ornatilgan[nom]), versiya_royxati(kerak)) >= 0:
+        print(f"{nom}: yaroqli ({ornatilgan[nom]})")
+    else:
+        print(f"{nom}: eski ({ornatilgan[nom]} < {kerak})")
+        yangilash += 1
+print(f"Yangilash kerak: {yangilash}")`,
+  },
+  {
+    key: 'backend-dars-35-easy',
+    solutionPy: `n = int(input())
+for i in range(n):
+    nom = input()
+    natija = ""
+    for tartib, belgi in enumerate(nom):
+        if belgi.isupper() and tartib != 0:
+            natija += "_"
+        natija += belgi
+    print(natija.lower())`,
+  },
+  // --- Darslar 35-36: flake8, type hints, kutubxona tizimi ---
+  {
+    key: 'backend-dars-35-medium',
+    solutionPy: `n = int(input())
+xatolar = 0
+for tartib in range(1, n + 1):
+    qator = input()
+    if len(qator) > 79:
+        print(f"qator {tartib}: 79 belgidan uzun")
+        xatolar += 1
+    if "\\t" in qator:
+        print(f"qator {tartib}: tab ishlatilgan")
+        xatolar += 1
+    if qator.endswith(" ") or qator.endswith("\\t"):
+        print(f"qator {tartib}: oxirida bo'sh joy")
+        xatolar += 1
+print(f"Xatolar: {xatolar}")`,
+  },
+  {
+    key: 'backend-dars-35-hard',
+    solutionPy: `n = int(input())
+toliq_soni = 0
+for i in range(n):
+    qator = input().strip()
+    nom = qator[4:qator.index("(")]
+    ichi = qator[qator.index("(") + 1:qator.rindex(")")]
+    yetishmaydi = []
+    if ichi.strip() != "":
+        for param in ichi.split(","):
+            if ":" not in param:
+                yetishmaydi.append(param.strip())
+    if "->" not in qator:
+        yetishmaydi.append("qaytish")
+    if yetishmaydi:
+        print(f"{nom}: yetishmaydi -> " + ", ".join(yetishmaydi))
+    else:
+        print(f"{nom}: to'liq")
+        toliq_soni += 1
+print(f"To'liq: {toliq_soni} / {n}")`,
+  },
+  {
+    key: 'backend-dars-36-easy',
+    solutionPy: `class Kitob:
+    def __init__(self, nom, muallif, yil):
+        self.nom = nom
+        self.muallif = muallif
+        self.yil = yil
+    def info(self):
+        return f"«{self.nom}» — {self.muallif} ({self.yil})"
+n = int(input())
+kitoblar = []
+for i in range(n):
+    nom, muallif, yil = input().split("|")
+    kitoblar.append(Kitob(nom, muallif, int(yil)))
+for kitob in kitoblar:
+    print(kitob.info())
+print(f"Jami kitoblar: {n}")`,
+  },
+  {
+    key: 'backend-dars-36-medium',
+    solutionPy: `class Kitob:
+    def __init__(self, nom, muallif, yil):
+        self.nom = nom
+        self.muallif = muallif
+        self.yil = yil
+        self.band = False
+n = int(input())
+kitoblar = []
+for i in range(n):
+    nom, muallif, yil = input().split("|")
+    kitoblar.append(Kitob(nom, muallif, int(yil)))
+m = int(input())
+for i in range(m):
+    buyruq, argument = input().split(" ", 1)
+    if buyruq == "QIDIR":
+        topilgan = [k for k in kitoblar if argument.lower() in k.nom.lower()]
+        if topilgan:
+            for kitob in topilgan:
+                print(f"Topildi: {kitob.nom}")
+        else:
+            print(f"Topilmadi: {argument}")
+    else:
+        kitob = None
+        for k in kitoblar:
+            if k.nom == argument:
+                kitob = k
+                break
+        if kitob is None:
+            print(f"Kitob yo'q: {argument}")
+        elif buyruq == "BAND":
+            if kitob.band:
+                print(f"Allaqachon band: {argument}")
+            else:
+                kitob.band = True
+                print(f"Band qilindi: {argument}")
+        else:
+            if not kitob.band:
+                print(f"Band emas: {argument}")
+            else:
+                kitob.band = False
+                print(f"Qaytarildi: {argument}")
+bosh = 0
+for kitob in kitoblar:
+    if not kitob.band:
+        bosh += 1
+print(f"Bo'sh kitoblar: {bosh}")`,
+  },
+  {
+    key: 'backend-dars-36-hard',
+    solutionPy: `n = int(input())
+mualliflar = {}
+onyilliklar = {}
+band = 0
+for i in range(n):
+    nom, muallif, yil, holat = input().split("|")
+    mualliflar[muallif] = mualliflar.get(muallif, 0) + 1
+    onyillik = int(yil) // 10 * 10
+    onyilliklar[onyillik] = onyilliklar.get(onyillik, 0) + 1
+    if holat == "band":
+        band += 1
+print("Mualliflar:")
+for muallif, soni in sorted(mualliflar.items(), key=lambda juft: (-juft[1], juft[0])):
+    print(f"{muallif} — {soni} ta")
+print("O'n yilliklar:")
+for onyillik in sorted(onyilliklar):
+    print(f"{onyillik}-yillar — {onyilliklar[onyillik]} ta")
+print(f"Band: {band} / {n}")`,
+  },
 ];
