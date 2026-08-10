@@ -2290,4 +2290,144 @@ else:
     print("is_valid: True")
     print(json.dumps(tozalangan, ensure_ascii=False))`,
   },
+  // --- Darslar 62-64: API endpointlari, ViewSet, serializer validatsiyasi ---
+  {
+    key: 'backend-dars-62-hard',
+    solutionPy: `n = int(input())
+kitoblar = {}
+keyingi_id = 1
+for i in range(n):
+    bolaklar = input().split(" ", 2)
+    metod = bolaklar[0]
+    yol = bolaklar[1]
+    if yol == "/api/kitoblar/":
+        if metod == "GET":
+            print(f"200 {len(kitoblar)}")
+        elif metod == "POST":
+            nom = ""
+            if len(bolaklar) > 2 and bolaklar[2].startswith("nom="):
+                nom = bolaklar[2][4:].strip()
+            if nom == "":
+                print("400 nom majburiy")
+            else:
+                kitoblar[keyingi_id] = nom
+                keyingi_id += 1
+                print(f"201 {nom}")
+        else:
+            print("405 Method Not Allowed")
+    elif yol.startswith("/api/kitoblar/") and yol.endswith("/") and yol[14:-1].isdigit():
+        kitob_id = int(yol[14:-1])
+        if metod == "GET":
+            print(f"200 {kitoblar[kitob_id]}" if kitob_id in kitoblar else "404 Not Found")
+        elif metod == "DELETE":
+            if kitob_id in kitoblar:
+                del kitoblar[kitob_id]
+                print("204")
+            else:
+                print("404 Not Found")
+        else:
+            print("405 Method Not Allowed")
+    else:
+        print("404 Not Found")`,
+  },
+  {
+    key: 'backend-dars-63-easy',
+    solutionPy: `n = int(input())
+for i in range(n):
+    prefiks, basename = input().split(" ")
+    print(f"/api/{prefiks}/ {basename}-list")
+    print(f"/api/{prefiks}/<pk>/ {basename}-detail")`,
+  },
+  {
+    key: 'backend-dars-63-medium',
+    solutionPy: `ROYXAT = {"GET": "list", "POST": "create"}
+DETAL = {"GET": "retrieve", "PUT": "update", "PATCH": "partial_update", "DELETE": "destroy"}
+n = int(input())
+for i in range(n):
+    metod, yol = input().split(" ")
+    if yol == "/api/kitoblar/":
+        print(ROYXAT.get(metod, "405"))
+    elif yol.startswith("/api/kitoblar/") and yol.endswith("/") and yol[14:-1].isdigit():
+        print(DETAL.get(metod, "405"))
+    else:
+        print("404")`,
+  },
+  {
+    key: 'backend-dars-63-hard',
+    solutionPy: `n = int(input())
+detalli = []
+royxatli = []
+for i in range(n):
+    url_path, detail = input().split(" ")
+    if detail == "true":
+        detalli.append(url_path)
+    else:
+        royxatli.append(url_path)
+print("/api/kitoblar/ kitob-list")
+print("/api/kitoblar/<pk>/ kitob-detail")
+for url_path in sorted(detalli):
+    print(f"/api/kitoblar/<pk>/{url_path}/ kitob-{url_path}")
+for url_path in sorted(royxatli):
+    print(f"/api/kitoblar/{url_path}/ kitob-{url_path}")`,
+  },
+  {
+    key: 'backend-dars-64-easy',
+    solutionPy: `n = int(input())
+for i in range(n):
+    nom, narx = input().split(";")
+    nom = nom.strip()
+    narx = narx.strip()
+    if nom == "":
+        print("400 nom")
+    elif not narx.isdigit():
+        print("400 narx")
+    else:
+        print(f"201 {nom} {int(narx)}")`,
+  },
+  {
+    key: 'backend-dars-64-medium',
+    solutionPy: `n = int(input())
+kitoblar = {}
+keyingi_id = 1
+for i in range(n):
+    qator = input()
+    if qator == "LIST":
+        if not kitoblar:
+            print("200 bo'sh")
+        else:
+            print("200 " + ",".join(f"{k}:{kitoblar[k]}" for k in sorted(kitoblar)))
+    elif qator.startswith("CREATE "):
+        kitoblar[keyingi_id] = qator[7:]
+        print(f"201 {keyingi_id}")
+        keyingi_id += 1
+    else:
+        kitob_id = int(qator[9:])
+        print(f"200 {kitoblar[kitob_id]}" if kitob_id in kitoblar else "404")`,
+  },
+  {
+    key: 'backend-dars-64-hard',
+    solutionPy: `n = int(input())
+for i in range(n):
+    nom, narx, yil = input().split("|")
+    nom = nom.strip()
+    xatolar = []
+    if nom == "":
+        xatolar.append("nom: bo'sh bo'lmasin")
+    elif len(nom) > 50:
+        xatolar.append("nom: 50 belgidan oshmasin")
+    if not narx.strip().isdigit():
+        xatolar.append("narx: butun son bo'lsin")
+    elif int(narx) <= 0:
+        xatolar.append("narx: musbat bo'lsin")
+    if not yil.strip().isdigit():
+        xatolar.append("yil: butun son bo'lsin")
+    elif not 1900 <= int(yil) <= 2026:
+        xatolar.append("yil: 1900-2026 oralig'ida bo'lsin")
+    if xatolar:
+        print("400")
+        for xato in xatolar:
+            print(xato)
+    else:
+        print(f"201 {nom}")`,
+  },
 ];
