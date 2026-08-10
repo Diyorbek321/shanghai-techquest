@@ -61,9 +61,18 @@ step "3/7  Kodni yangilash"
 if [ ! -d .git ]; then
   echo "git repozitoriysi emas — checkout'ga aylantirilmoqda"
   git init -q
+fi
+# The deployment directory is not owned by root, and git refuses to operate on a
+# repository owned by another user unless it is listed as safe. Registered before
+# any other git command, because even `git remote add` trips the check. The guard
+# keeps repeated deploys from appending the same entry to ~/.gitconfig forever.
+git config --global --get-all safe.directory 2>/dev/null | grep -qxF "$APP_DIR" \
+  || git config --global --add safe.directory "$APP_DIR"
+if git remote get-url origin >/dev/null 2>&1; then
+  git remote set-url origin "$REPO"
+else
   git remote add origin "$REPO"
 fi
-git remote set-url origin "$REPO"
 git fetch -q origin "$BRANCH"
 echo "o'zgaradigan fayllar:"
 git diff --stat "origin/$BRANCH" -- . | tail -5 || true
