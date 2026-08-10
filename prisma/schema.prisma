@@ -200,6 +200,7 @@ model User {
   dailyExerciseLogs    DailyExerciseLog[]
   quizAttempts         QuizAttempt[]
   certificates         Certificate[]
+  pairedSubmissions    Submission[]      @relation("SubmissionPartner")
 
   @@index([teamId])
 }
@@ -397,6 +398,11 @@ model Submission {
   rubricScores Json     @default("[]")
   /// Student's short written defense of their own project.
   defense      String   @default("")
+  /// The classmate this work was written with. Recorded on BOTH students' rows,
+  /// so either one's own page tells the truth about who they worked with and a
+  /// teacher never has to guess which name is the "real" author.
+  partnerId    String?
+  partner      User?    @relation("SubmissionPartner", fields: [partnerId], references: [id], onDelete: SetNull)
 
   @@unique([assignmentId, userId])
   @@index([userId])

@@ -5,7 +5,7 @@ import { prisma } from '../db';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { resolveTrackFilter } from '../utils/trackScope';
 import { TRACK_VALUES, toClientTrack, toPrismaTrack } from '../serializers/track';
-import { notifyMany } from '../notifications/notify';
+import { notify, notifyMany } from '../notifications/notify';
 import { checkAchievements } from '../achievements/check';
 
 export const assignmentsRouter = Router();
@@ -120,6 +120,8 @@ const submitSchema = z
     fileUrl: z.string().refine((v) => v.startsWith('/api/uploads/'), { message: 'Fayl manzili yaroqsiz.' }).optional(),
     fileName: z.string().min(1).max(255).optional(),
     content: z.string().max(2000).optional(),
+    /// Classmate this was written with, for pair programming.
+    partnerId: z.string().min(1).optional(),
   })
   .refine((data) => Boolean(data.githubUrl || data.fileUrl), {
     message: "GitHub havolasi yoki fayl biriktirilishi shart.",
@@ -135,6 +137,44 @@ assignmentsRouter.post('/:id/submissions', requireRole(Role.STUDENT), async (req
   if (!assignment) {
     return res.status(404).json({ error: 'Vazifa topilmadi.' });
   }
+  // Pair programming: the partner must be a real classmate on this assignment,
+  // and their own work must not be silently overwritten by someone naming them.
+  const partnerId = parsed.data.partnerId ?? null;
+  if (partnerId) {
+    if (partnerId === req.user!.id) {
+      return res.status(400).json({ error: "O'zingizni sherik sifatida tanlay olmaysiz." });
+    }
+    const partner = await prisma.user.findUnique({
+      where: { id: partnerId },
+      select: { id: true, role: true },
+    });
+    if (!partner || partner.role !== Role.STUDENT) {
+      return res.status(400).json({ error: "Sherik topilmadi." });
+    }
+    if (assignment.classId) {
+      const enrolled = await prisma.enrollment.findUnique({
+        where: { userId_classId: { userId: partnerId, classId: assignment.classId } },
+      });
+      if (!enrolled) {
+        return res.status(400).json({ error: "Sherik bu sinfda o'qimaydi." });
+      }
+    }
+    // Naming a partner writes to THEIR row too. If they already handed in work
+    // of their own with someone else (or alone), that work would be destroyed —
+    // so this is refused rather than resolved by guessing whose is the real one.
+    const partnerExisting = await prisma.submission.findUnique({
+      where: { assignmentId_userId: { assignmentId: assignment.id, userId: partnerId } },
+      select: { status: true, partnerId: true },
+    });
+    const partnerAlreadyHandedIn =
+      partnerExisting && partnerExisting.status !== 'PENDING' && partnerExisting.partnerId !== req.user!.id;
+    if (partnerAlreadyHandedIn) {
+      return res.status(409).json({
+        error: "Bu o'quvchi bu vazifani allaqachon mustaqil topshirgan — uni sherik sifatida qo'sha olmaysiz.",
+      });
+    }
+  }
+
   const submission = await prisma.submission.upsert({
     where: { assignmentId_userId: { assignmentId: assignment.id, userId: req.user!.id } },
     update: {
@@ -143,12 +183,14 @@ assignmentsRouter.post('/:id/submissions', requireRole(Role.STUDENT), async (req
       fileUrl: parsed.data.fileUrl ?? null,
       fileName: parsed.data.fileName ?? null,
       content: parsed.data.content ?? null,
+      partnerId,
       status: 'SUBMITTED',
       submittedAt: new Date(),
     },
     create: {
       assignmentId: assignment.id,
       userId: req.user!.id,
+      partnerId,
       githubUrl: parsed.data.githubUrl,
       demoUrl: parsed.data.demoUrl,
       fileUrl: parsed.data.fileUrl,
@@ -158,6 +200,33 @@ assignmentsRouter.post('/:id/submissions', requireRole(Role.STUDENT), async (req
       submittedAt: new Date(),
     },
   });
+
+  // The mirror row. Pair work counts for both students — everything downstream
+  // (lesson completion, certificates, the teacher's list) reads Submission, so
+  // a partner without their own row would show up as not having handed in.
+  if (partnerId) {
+    const shared = {
+      githubUrl: parsed.data.githubUrl ?? null,
+      demoUrl: parsed.data.demoUrl ?? null,
+      fileUrl: parsed.data.fileUrl ?? null,
+      fileName: parsed.data.fileName ?? null,
+      content: parsed.data.content ?? null,
+      partnerId: req.user!.id,
+      status: 'SUBMITTED' as const,
+      submittedAt: new Date(),
+    };
+    await prisma.submission.upsert({
+      where: { assignmentId_userId: { assignmentId: assignment.id, userId: partnerId } },
+      update: shared,
+      create: { assignmentId: assignment.id, userId: partnerId, ...shared },
+    });
+    await notify(prisma, {
+      userId: partnerId,
+      type: 'INFO',
+      title: 'Juftlikdagi ish topshirildi',
+      body: `"${assignment.title}" vazifasi siz bilan birga bajarilgan deb belgilandi.`,
+    });
+  }
 
   if (assignment.moduleKey) {
     const existingProgress = await prisma.moduleProgress.findUnique({
