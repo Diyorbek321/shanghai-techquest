@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildBoard, gradeOrder, seedFrom, toLines } from './blocks';
+import { buildBoard, gradeOrder, isParsonsSuitable, MAX_PARSONS_LINES, seedFrom, toLines } from './blocks';
 
 const SOLUTION = [
   'n = int(input())',
@@ -95,3 +95,35 @@ describe('gradeOrder', () => {
     expect(gradeOrder(SOLUTION, flat).correct).toBe(false);
   });
 });
+
+describe('isParsonsSuitable', () => {
+  const lines = (n: number) => Array.from({ length: n }, (_, i) => `print(${i})`).join('\n');
+
+  it('offers a solution of a workable size', () => {
+    expect(isParsonsSuitable(lines(2))).toBe(true);
+    expect(isParsonsSuitable(lines(12))).toBe(true);
+    expect(isParsonsSuitable(lines(MAX_PARSONS_LINES))).toBe(true);
+  });
+
+  // Past the ceiling the puzzle costs more than writing the program, and the
+  // student it exists for is the first to drown in it.
+  it('withholds a solution too long to shuffle usefully', () => {
+    expect(isParsonsSuitable(lines(MAX_PARSONS_LINES + 1))).toBe(false);
+    expect(isParsonsSuitable(lines(46))).toBe(false);
+  });
+
+  it('withholds anything that cannot be shuffled at all', () => {
+    expect(isParsonsSuitable(lines(1))).toBe(false);
+    expect(isParsonsSuitable('')).toBe(false);
+    expect(isParsonsSuitable(null)).toBe(false);
+    expect(isParsonsSuitable(undefined)).toBe(false);
+  });
+
+  // Blank lines are dropped before shuffling, so they must not count toward
+  // the ceiling — otherwise spacing alone could withhold a short solution.
+  it('counts only the lines that become cards', () => {
+    const padded = lines(MAX_PARSONS_LINES).split('\n').join('\n\n');
+    expect(isParsonsSuitable(padded)).toBe(true);
+  });
+});
+

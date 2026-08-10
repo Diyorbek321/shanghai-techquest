@@ -6,7 +6,7 @@ import { createApp } from '../index';
 import { prisma } from '../db';
 import { signToken } from '../auth/jwt';
 import { AUTH_COOKIE_NAME } from '../auth/cookies';
-import { toLines } from '../parsons/blocks';
+import { MAX_PARSONS_LINES, toLines } from '../parsons/blocks';
 import { parsonsPoints } from '../parsons/award';
 
 const app = createApp();
@@ -20,6 +20,7 @@ let studentCookie: string;
 let otherCookie: string;
 let problemId: string;
 let plainProblemId: string;
+let longProblemId: string;
 
 beforeAll(async () => {
   const passwordHash = await bcrypt.hash('password123', 10);
@@ -49,17 +50,23 @@ beforeAll(async () => {
     testCases: [],
   };
 
-  const [withSolution, without] = await Promise.all([
+  // Verified content, but too many lines to shuffle usefully — stored, not offered.
+  const LONG_SOLUTION = Array.from({ length: MAX_PARSONS_LINES + 5 }, (_, i) => `print(${i})`).join('\n');
+
+  const [withSolution, without, tooLong] = await Promise.all([
     prisma.problem.create({ data: { ...base, key: unique('parsons-with'), solutionPy: SOLUTION } }),
     prisma.problem.create({ data: { ...base, key: unique('parsons-without') } }),
+    prisma.problem.create({ data: { ...base, key: unique('parsons-long'), solutionPy: LONG_SOLUTION } }),
   ]);
   problemId = withSolution.id;
   plainProblemId = without.id;
+  longProblemId = tooLong.id;
 });
 
 afterAll(async () => {
-  await prisma.problemSubmission.deleteMany({ where: { problemId: { in: [problemId, plainProblemId] } } });
-  await prisma.problem.deleteMany({ where: { id: { in: [problemId, plainProblemId] } } });
+  const ids = [problemId, plainProblemId, longProblemId];
+  await prisma.problemSubmission.deleteMany({ where: { problemId: { in: ids } } });
+  await prisma.problem.deleteMany({ where: { id: { in: ids } } });
   await prisma.user.deleteMany({ where: { id: studentId } });
 });
 
@@ -96,6 +103,35 @@ describe('GET /api/problems/:id/parsons', () => {
     expect(mine.body.blocks.map((b: { id: string }) => b.id)).not.toEqual(
       theirs.body.blocks.map((b: { id: string }) => b.id)
     );
+  });
+
+  // The three endpoints must agree. A problem listed as having the exercise but
+  // 404ing when opened is worse than one that never advertised it.
+  it('withholds a solution that is too long, consistently across endpoints', async () => {
+    const detail = await request(app)
+      .get(`/api/problems/${longProblemId}`)
+      .set('Cookie', studentCookie)
+      .expect(200);
+    expect(detail.body.hasParsons).toBe(false);
+
+    await request(app)
+      .get(`/api/problems/${longProblemId}/parsons`)
+      .set('Cookie', studentCookie)
+      .expect(404);
+
+    await request(app)
+      .post(`/api/problems/${longProblemId}/parsons`)
+      .set('Cookie', studentCookie)
+      .send({ order: ['anything'] })
+      .expect(404);
+  });
+
+  it('advertises the exercise on a problem that has a workable solution', async () => {
+    const detail = await request(app)
+      .get(`/api/problems/${problemId}`)
+      .set('Cookie', studentCookie)
+      .expect(200);
+    expect(detail.body.hasParsons).toBe(true);
   });
 
   it('404s for a problem with no Parsons variant', async () => {

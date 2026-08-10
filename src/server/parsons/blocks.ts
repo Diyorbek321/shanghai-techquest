@@ -46,6 +46,41 @@ export function toLines(solution: string): string[] {
     .filter((line) => line.trim() !== '');
 }
 
+/**
+ * Longest solution still worth shuffling.
+ *
+ * A Parsons problem exists to REMOVE cognitive load. Past a certain size it
+ * adds load instead: forty-six shuffled cards is a harder task than writing the
+ * program, and the student it was built for — the one about to give up — is the
+ * first to drown in it. Studied Parsons problems sit around 6-15 lines.
+ *
+ * 20 is a deliberately generous ceiling rather than a tight one, because the
+ * cost of the two mistakes is not symmetric: offering a slightly-too-long
+ * puzzle wastes a few minutes, while withholding one from a stuck student
+ * removes the scaffold entirely.
+ *
+ * Solutions above the ceiling are still STORED. They are verified content, and
+ * a grouped-card variant (one card per logical block rather than per line)
+ * would make them usable without re-authoring anything.
+ */
+export const MAX_PARSONS_LINES = 20;
+
+/** Fewer than two lines cannot be shuffled at all. */
+const MIN_PARSONS_LINES = 2;
+
+/**
+ * Whether this solution should be offered as a line-ordering exercise.
+ *
+ * The single place that decides. The detail endpoint, the board endpoint and
+ * the grading endpoint all ask this same question, and a problem that answers
+ * "yes" on the list but "no" when opened is worse than one that never appeared.
+ */
+export function isParsonsSuitable(solution: string | null | undefined): solution is string {
+  if (!solution) return false;
+  const lines = toLines(solution).length;
+  return lines >= MIN_PARSONS_LINES && lines <= MAX_PARSONS_LINES;
+}
+
 /** Deterministic 32-bit hash, so one (problem, student) pair always gets one board. */
 export function seedFrom(input: string): number {
   let h = 2166136261;

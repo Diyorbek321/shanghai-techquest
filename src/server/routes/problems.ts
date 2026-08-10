@@ -9,7 +9,7 @@ import { notify } from '../notifications/notify';
 import { competenceContext, competenceMessage } from '../notifications/competence';
 import { executeCode, PistonUnavailableError } from '../code/piston';
 import { judgeSubmission, parseTestCases, type JudgeResult, type TestCaseResult } from '../code/judge';
-import { buildBoard, gradeOrder, seedFrom } from '../parsons/blocks';
+import { buildBoard, gradeOrder, isParsonsSuitable, seedFrom } from '../parsons/blocks';
 import { parsonsPoints } from '../parsons/award';
 
 export const problemsRouter = Router();
@@ -96,9 +96,10 @@ problemsRouter.get('/:id', async (req, res) => {
       .filter(([, starter]) => starter !== null)
       .map(([language]) => language),
     solved: !!latestSubmission,
-    // Whether a line-ordering variant exists. A boolean, never the solution
-    // itself — the ordered source must not leave the server.
-    hasParsons: problem.solutionPy !== null,
+    // Whether a line-ordering variant is OFFERED — which is narrower than
+    // "a solution exists": a solution too long to shuffle usefully is stored
+    // but not offered. A boolean, never the solution itself.
+    hasParsons: isParsonsSuitable(problem.solutionPy),
   });
 });
 
@@ -310,7 +311,7 @@ problemsRouter.get('/:id/parsons', async (req, res) => {
   if (!problem) {
     return res.status(404).json({ error: 'Masala topilmadi.' });
   }
-  if (!problem.solutionPy) {
+  if (!isParsonsSuitable(problem.solutionPy)) {
     return res.status(404).json({ error: "Bu masala uchun qatorlarni tartiblash mashqi tayyorlanmagan." });
   }
 
@@ -340,7 +341,7 @@ problemsRouter.post('/:id/parsons', async (req, res) => {
   if (!problem) {
     return res.status(404).json({ error: 'Masala topilmadi.' });
   }
-  if (!problem.solutionPy) {
+  if (!isParsonsSuitable(problem.solutionPy)) {
     return res.status(404).json({ error: "Bu masala uchun qatorlarni tartiblash mashqi tayyorlanmagan." });
   }
 

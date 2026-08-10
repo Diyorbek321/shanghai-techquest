@@ -20,7 +20,7 @@ import { PrismaClient } from '@prisma/client';
 import { backendParsonsSolutions } from '../prisma/lessonsData/backendSolutions';
 import { judgeSubmission, parseTestCases } from '../src/server/code/judge';
 import { PistonUnavailableError } from '../src/server/code/piston';
-import { toLines } from '../src/server/parsons/blocks';
+import { MAX_PARSONS_LINES, toLines } from '../src/server/parsons/blocks';
 
 const prisma = new PrismaClient();
 const APPLY = process.argv.includes('--apply');
@@ -66,7 +66,16 @@ async function verify(record: { key: string; solutionPy: string }): Promise<Outc
   if (APPLY) {
     await prisma.problem.update({ where: { id: problem.id }, data: { solutionPy: record.solutionPy } });
   }
-  return { key: record.key, status: 'ok', detail: `${judged.testsTotal} test o'tdi, ${lines.length} qator` };
+  // Verified and stored either way. The line count decides only whether the
+  // exercise is OFFERED — see isParsonsSuitable in src/server/parsons/blocks.ts.
+  const capped = lines.length > MAX_PARSONS_LINES;
+  return {
+    key: record.key,
+    status: 'ok',
+    detail: `${judged.testsTotal} test o'tdi, ${lines.length} qator${
+      capped ? ` — ${MAX_PARSONS_LINES} dan uzun, mashq taklif qilinmaydi` : ''
+    }`,
+  };
 }
 
 async function main() {
@@ -85,7 +94,13 @@ async function main() {
 
   const ok = outcomes.filter((o) => o.status === 'ok');
   const bad = outcomes.filter((o) => o.status !== 'ok');
+  const capped = ok.filter((o) => o.detail.includes('taklif qilinmaydi'));
   console.log(`\nO'tdi: ${ok.length} | O'tmadi: ${bad.length}`);
+  // Printed even when zero: a silently skipped exercise is an invisible gap,
+  // and the teacher should see the real coverage rather than the stored count.
+  console.log(
+    `Mashq sifatida taklif qilinadi: ${ok.length - capped.length} | juda uzun: ${capped.length}`
+  );
 
   if (APPLY) {
     const total = await prisma.problem.count({ where: { solutionPy: { not: null } } });
