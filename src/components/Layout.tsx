@@ -29,12 +29,15 @@ import {
   Calendar as CalendarIcon,
   LogOut,
   UserCog,
-  Award
+  Award,
+  Lock
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { ViewType, User, Track } from '../types';
 import { audioManager } from '../lib/audio';
 import { useAuth } from '../lib/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../lib/api';
 
 import { StudyTimer } from './StudyTimer';
 import { QuickActions } from './QuickActions';
@@ -97,6 +100,16 @@ export function Layout({ children, currentView, onNavigate, user }: LayoutProps)
       : []),
     { id: 'profile', label: 'Profil', icon: <UserIcon size={20} /> },
   ];
+
+  // Mechanics open over the course rather than all at once — see
+  // src/server/unlocks/stages.ts for why. A locked entry stays VISIBLE with the
+  // lessons remaining on it: hiding it would make the app look smaller every
+  // time a student looked, and give them nothing to aim at.
+  const { data: unlocks } = useQuery({
+    queryKey: ['unlocks'],
+    queryFn: () => api.get<{ unlocked: string[]; locked: { feature: string; remaining: number }[] }>('/unlocks'),
+  });
+  const lockedByFeature = new Map((unlocks?.locked ?? []).map(l => [l.feature, l.remaining]));
 
   const navItems = isStaff
     ? staffNavItems
@@ -171,24 +184,34 @@ export function Layout({ children, currentView, onNavigate, user }: LayoutProps)
         <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
           {navItems.map((item) => {
             const isActive = currentView === item.id;
+            const remaining = lockedByFeature.get(item.id);
+            const isLocked = remaining !== undefined;
             return (
               <button
                 key={item.id}
-                onClick={() => handleNavigate(item.id)}
-                onMouseEnter={() => audioManager.playHover()}
+                onClick={() => !isLocked && handleNavigate(item.id)}
+                onMouseEnter={() => !isLocked && audioManager.playHover()}
+                disabled={isLocked}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group relative",
-                  isActive 
+                  isLocked
+                    ? "text-gray-600 cursor-not-allowed"
+                    : isActive
                     ? "bg-brand-cyan/10 text-brand-cyan neon-glow-cyan" 
                     : item.customColor ? `text-gray-400 hover:bg-white/5 hover:${item.customColor}` : "text-gray-400 hover:bg-white/5 hover:text-white"
                 )}
-                title={!sidebarOpen ? item.label : undefined}
+                title={isLocked ? `Yana ${remaining} ta darsdan keyin ochiladi` : !sidebarOpen ? item.label : undefined}
               >
                 <div className={cn("flex-shrink-0 transition-transform", isActive ? "scale-110" : "group-hover:scale-110")}>
                   {item.icon}
                 </div>
                 {sidebarOpen && (
-                  <span className="font-medium text-sm text-left">{item.label}</span>
+                  <span className="font-medium text-sm text-left flex-1">{item.label}</span>
+                )}
+                {isLocked && sidebarOpen && (
+                  <span className="flex items-center gap-1 text-[10px] font-mono text-gray-600 shrink-0">
+                    <Lock size={11} /> {remaining}
+                  </span>
                 )}
                 {isActive && sidebarOpen && (
                   <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-brand-cyan shadow-[0_0_8px_rgba(0,217,255,0.8)]"></div>

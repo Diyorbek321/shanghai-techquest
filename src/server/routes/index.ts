@@ -29,6 +29,7 @@ import { classGoalsRouter } from './classGoals';
 import { uploadsRouter } from './uploads';
 import { certificatesRouter, certificateVerifyRouter } from './certificates';
 import { parentReportRouter } from './parentReport';
+import { unlocksRouter } from './unlocks';
 
 export const apiRouter = Router();
 
@@ -58,6 +59,7 @@ apiRouter.use('/lessons', lessonsRouter);
 apiRouter.use('/quiz', quizRouter);
 apiRouter.use('/certificates', certificatesRouter);
 apiRouter.use('/parent-report', parentReportRouter);
+apiRouter.use('/unlocks', unlocksRouter);
 // Mounted separately and BEFORE nothing else claims it: verification must work
 // without a session, so it cannot sit under the authenticated router above.
 apiRouter.use('/verify', certificateVerifyRouter);
