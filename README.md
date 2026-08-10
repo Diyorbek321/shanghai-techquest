@@ -85,11 +85,19 @@ npm run dev
 Server runs on `http://localhost:3000`
 
 **Demo Accounts** (from seed data):
-- Teacher: `teacher@techquest.dev` / `password123`
-- Admin: `admin@techquest.dev` / `password123`
-- Student (Frontend): `frontend@techquest.dev` / `password123`
-- Student (Robotics): `robotics@techquest.dev` / `password123`
-- Student (Office): `office@techquest.dev` / `password123`
+- Teacher: `teacher@techquest.dev`
+- Admin: `admin@techquest.dev`
+- Student (Frontend): `frontend@techquest.dev`
+- Student (Robotics): `robotics@techquest.dev`
+- Student (Office): `office@techquest.dev`
+
+They all share the password held in `DEMO_PASSWORD` in [`prisma/seed.ts`](prisma/seed.ts).
+It is a local-development convenience and is deliberately not repeated here, so that
+a public checkout of this repository never doubles as a credential list.
+
+> **Before exposing an instance to the internet, change these passwords.** The seed
+> only sets a password when it creates a user (`update: {}` on the upsert), so a
+> password you change by hand survives every later `npm run db:seed`.
 
 ### 6. (Optional) Explore Database GUI
 ```bash
