@@ -11,6 +11,14 @@
  * Line breaks matter here in a way they do not in ordinary source: each
  * non-blank line becomes one draggable card. Prefer one statement per line, and
  * avoid one-liners that collapse the structure the exercise is meant to teach.
+ *
+ * SCAFFOLDED PROBLEMS ARE DELIBERATELY ABSENT. From the SQL lessons onward many
+ * problems ship a fixed Python harness — it builds the database, runs the query
+ * and prints the result — and the student writes only the SQL string inside it.
+ * The harness says "bu yerni o'zgartirmang" in as many words. Shuffling those
+ * lines would hand the student cards made of code they were just told not to
+ * touch, and drill the ordering of a harness instead of the skill the lesson
+ * teaches. A missing exercise is honest; a misleading one is not.
  */
 export interface ParsonsSolutionRecord {
   /** Problem.key this solution belongs to. */
@@ -1535,5 +1543,82 @@ print("O'n yilliklar:")
 for onyillik in sorted(onyilliklar):
     print(f"{onyillik}-yillar — {onyilliklar[onyillik]} ta")
 print(f"Band: {band} / {n}")`,
+  },
+  // --- Darslar 37-38: Conventional Commits, merge konflikti ---
+  {
+    key: 'backend-dars-37-easy',
+    solutionPy: `n = int(input())
+for i in range(n):
+    xabar = input()
+    if ": " in xabar:
+        tur, tavsif = xabar.split(": ", 1)
+        print(f"tur={tur} | tavsif={tavsif}")
+    else:
+        print("noto'g'ri format")`,
+  },
+  {
+    key: 'backend-dars-37-medium',
+    solutionPy: `TURLAR = ["feat", "fix", "docs", "refactor", "test", "chore"]
+n = int(input())
+togri = 0
+for tartib in range(1, n + 1):
+    xabar = input()
+    xato = None
+    if ": " not in xabar:
+        xato = "format noto'g'ri"
+    else:
+        tur, tavsif = xabar.split(": ", 1)
+        if tur not in TURLAR:
+            xato = "noma'lum tur"
+        elif tavsif[:1].isupper():
+            xato = "tavsif kichik harf bilan boshlanishi kerak"
+        elif tavsif.endswith("."):
+            xato = "oxirida nuqta"
+        elif len(xabar) > 72:
+            xato = "72 belgidan uzun"
+    if xato is None:
+        print(f"{tartib}: OK")
+        togri += 1
+    else:
+        print(f"{tartib}: XATO — {xato}")
+print(f"To'g'ri: {togri} / {n}")`,
+  },
+  {
+    key: 'backend-dars-38-easy',
+    solutionPy: `n = int(input())
+konfliktlar = 0
+toza = 0
+for i in range(n):
+    qator = input()
+    if qator.startswith("<<<<<<<"):
+        konfliktlar += 1
+    elif qator.startswith("=======") or qator.startswith(">>>>>>>"):
+        pass
+    else:
+        toza += 1
+print(f"Konfliktlar: {konfliktlar}")
+print(f"Toza qatorlar: {toza}")`,
+  },
+  {
+    key: 'backend-dars-38-medium',
+    solutionPy: `tomon = input()
+n = int(input())
+natija = []
+hal = 0
+holat = "tashqarida"
+for i in range(n):
+    qator = input()
+    if qator.startswith("<<<<<<<"):
+        holat = "mening"
+        hal += 1
+    elif qator.startswith("=======") and holat != "tashqarida":
+        holat = "ularning"
+    elif qator.startswith(">>>>>>>") and holat != "tashqarida":
+        holat = "tashqarida"
+    elif holat == "tashqarida" or holat.upper() == tomon:
+        natija.append(qator)
+for qator in natija:
+    print(qator)
+print(f"Hal qilindi: {hal}")`,
   },
 ];
