@@ -6,6 +6,7 @@ import { runCodeRateLimiter } from '../middleware/rateLimit';
 import { askGeminiText } from '../ai/gemini';
 import { checkAchievements } from '../achievements/check';
 import { notify } from '../notifications/notify';
+import { competenceContext, competenceMessage } from '../notifications/competence';
 import { executeCode, PistonUnavailableError } from '../code/piston';
 import { judgeSubmission, parseTestCases, type JudgeResult, type TestCaseResult } from '../code/judge';
 
@@ -262,11 +263,14 @@ problemsRouter.post('/:id/submit', async (req, res) => {
   ]);
 
   if (judged.passed && pointsAwarded > 0) {
+    // Read AFTER the submission is written, so the count the student is shown
+    // includes the problem they just solved.
+    const context = await competenceContext(prisma, req.user!.id, problem.tags);
     await notify(prisma, {
       userId: req.user!.id,
       type: 'SUCCESS',
-      title: 'Masala yechildi!',
-      body: `"${problem.title}" masalasi uchun +${pointsAwarded} XP oldingiz.`,
+      title: 'Masala yechildi',
+      body: competenceMessage(problem.title, pointsAwarded, context),
     });
   }
 
