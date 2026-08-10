@@ -201,6 +201,7 @@ model User {
   quizAttempts         QuizAttempt[]
   certificates         Certificate[]
   pairedSubmissions    Submission[]      @relation("SubmissionPartner")
+  peerReviews          PeerReview[]      @relation("PeerReviewer")
 
   @@index([teamId])
 }
@@ -347,6 +348,30 @@ model QuizAttempt {
   @@index([userId, dueAt])
 }
 
+/// One student's review of another's submission.
+///
+/// The author sees the text but not the reviewer's name; the teacher sees both.
+/// Teenagers reviewing each other by name in a class they sit in every week
+/// turns honest criticism into a social cost, and the review stops being
+/// honest. Accountability is preserved where it belongs — with the teacher.
+model PeerReview {
+  id           String   @id @default(cuid())
+  submissionId String
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  reviewerId   String
+  reviewer     User     @relation("PeerReviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+  /// What worked. Asked for first, and required, because a review that opens
+  /// with faults reads as an attack to the person who wrote the code.
+  strengths    String
+  /// One concrete thing to improve.
+  suggestions  String
+  createdAt    DateTime @default(now())
+
+  /// One review per (reviewer, submission) — resubmitting edits it in place.
+  @@unique([submissionId, reviewerId])
+  @@index([reviewerId])
+}
+
 /// An issued certificate. Rows are immutable once written: a certificate that
 /// can change after the fact is not evidence of anything.
 model Certificate {
@@ -408,6 +433,7 @@ model Submission {
   showcased    Boolean  @default(false)
   /// One line from the author about what they built.
   showcaseNote String   @default("")
+  peerReviews  PeerReview[]
 
   @@unique([assignmentId, userId])
   @@index([userId])

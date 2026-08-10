@@ -31,6 +31,7 @@ import { certificatesRouter, certificateVerifyRouter } from './certificates';
 import { parentReportRouter } from './parentReport';
 import { unlocksRouter } from './unlocks';
 import { galleryRouter } from './gallery';
+import { peerReviewRouter } from './peerReview';
 
 export const apiRouter = Router();
 
@@ -62,6 +63,7 @@ apiRouter.use('/certificates', certificatesRouter);
 apiRouter.use('/parent-report', parentReportRouter);
 apiRouter.use('/unlocks', unlocksRouter);
 apiRouter.use('/gallery', galleryRouter);
+apiRouter.use('/peer-review', peerReviewRouter);
 // Mounted separately and BEFORE nothing else claims it: verification must work
 // without a session, so it cannot sit under the authenticated router above.
 apiRouter.use('/verify', certificateVerifyRouter);

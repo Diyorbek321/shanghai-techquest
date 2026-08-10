@@ -11,6 +11,7 @@ import {
   FileText
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { PeerReviewPanel } from '../components/PeerReviewPanel';
 import { api } from '../lib/api';
 import { formatRelativeTime } from '../lib/utils';
 import { trackLabel } from '../lib/tracks';
@@ -269,6 +270,15 @@ export function AssignmentDetail({ assignmentId, onBack, onTriggerSuccess }: Ass
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Peer review opens only once this student has handed in — otherwise the
+          queue is a way to read worked solutions before writing your own. The
+          server enforces this too; this just avoids showing a locked panel. */}
+      {assignment?.submission && (
+        <div className="glass-panel p-6">
+          <PeerReviewPanel assignmentId={assignment.id} />
         </div>
       )}
     </div>
