@@ -2588,4 +2588,134 @@ for i in range(n):
     else:
         print(foydalanuvchilar[username] if username in foydalanuvchilar else "404")`,
   },
+  // --- Darslar 68-71: JWT, ruxsatlar, bog'langan serializerlar ---
+  {
+    key: 'backend-dars-68-hard',
+    solutionPy: `import base64
+import hashlib
+import hmac
+import json
+secret = input()[7:]
+hozir = int(input()[6:])
+bolaklar = input().split(".")
+if len(bolaklar) != 3:
+    print("xato: format")
+else:
+    imzolanadigan = bolaklar[0] + "." + bolaklar[1]
+    xom = hmac.new(secret.encode(), imzolanadigan.encode(), hashlib.sha256).digest()
+    kutilgan = base64.urlsafe_b64encode(xom).decode().rstrip("=")
+    if kutilgan != bolaklar[2]:
+        print("xato: imzo")
+    else:
+        toldirish = "=" * (-len(bolaklar[1]) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(bolaklar[1] + toldirish))
+        if "exp" not in payload or payload["exp"] <= hozir:
+            print("xato: muddati tugagan")
+        elif payload.get("token_type") != "access":
+            print("xato: turi noto'g'ri")
+        else:
+            print(f"ok user_id={payload['user_id']}")`,
+  },
+  {
+    key: 'backend-dars-69-easy',
+    solutionPy: `XAVFSIZ = ["GET", "HEAD", "OPTIONS"]
+n = int(input())
+for i in range(n):
+    token, rol, metod = input().split(";")
+    if token == "yoq":
+        print("401 Autentifikatsiya kerak")
+    elif metod in XAVFSIZ or rol == "admin":
+        print("200 OK")
+    else:
+        print("403 Ruxsat yo'q")`,
+  },
+  {
+    key: 'backend-dars-69-medium',
+    solutionPy: `XAVFSIZ = ["GET", "HEAD", "OPTIONS"]
+n = int(input())
+postlar = {}
+for i in range(n):
+    post_id, egasi = input().split(";")
+    postlar[post_id] = egasi
+m = int(input())
+for i in range(m):
+    foydalanuvchi, metod, post_id = input().split(";")
+    if foydalanuvchi == "anonim":
+        kod = 401
+    elif post_id not in postlar:
+        kod = 404
+    elif metod in XAVFSIZ or postlar[post_id] == foydalanuvchi:
+        kod = 200
+    else:
+        kod = 403
+    print(f"{metod} /post/{post_id} -> {kod}")`,
+  },
+  {
+    key: 'backend-dars-70-easy',
+    solutionPy: `n = int(input())
+kategoriyalar = {}
+for i in range(n):
+    kategoriya_id, nom = input().split(";")
+    kategoriyalar[kategoriya_id] = nom
+m = int(input())
+for i in range(m):
+    post_id, sarlavha, kategoriya_id = input().split(";")
+    nom = kategoriyalar.get(kategoriya_id, "noma'lum")
+    print(f"{post_id}. {sarlavha} [{nom}]")`,
+  },
+  {
+    key: 'backend-dars-70-medium',
+    solutionPy: `import json
+n = int(input())
+kategoriyalar = {}
+for i in range(n):
+    kategoriya_id, nom = input().split(";")
+    kategoriyalar[kategoriya_id] = nom
+m = int(input())
+for i in range(m):
+    post_id, sarlavha, kategoriya_id = input().split(";")
+    if kategoriya_id in kategoriyalar:
+        kategoriya = {"id": int(kategoriya_id), "nom": kategoriyalar[kategoriya_id]}
+    else:
+        kategoriya = None
+    natija = {"id": int(post_id), "sarlavha": sarlavha, "kategoriya": kategoriya}
+    print(json.dumps(natija, ensure_ascii=False))`,
+  },
+  {
+    key: 'backend-dars-71-easy',
+    solutionPy: `p = int(input())
+postlar = []
+for i in range(p):
+    post_id, sarlavha = input().split(";")
+    postlar.append((post_id, sarlavha))
+t = int(input())
+teglar = {}
+for i in range(t):
+    teg_id, nom = input().split(";")
+    teglar[teg_id] = nom
+l = int(input())
+bogliqlik = {}
+for i in range(l):
+    post_id, teg_id = input().split(";")
+    bogliqlik.setdefault(post_id, set()).add(teglar[teg_id])
+for post_id, sarlavha in postlar:
+    nomlar = sorted(bogliqlik.get(post_id, set()))
+    print(f"{sarlavha}: " + (", ".join(nomlar) if nomlar else "teglar yo'q"))`,
+  },
+  {
+    key: 'backend-dars-71-medium',
+    solutionPy: `n = int(input())
+postlar = []
+for i in range(n):
+    post_id, sarlavha, matn = input().split(";")
+    postlar.append((post_id, sarlavha, matn))
+m = int(input())
+izohlar = {}
+for i in range(m):
+    post_id = input()
+    izohlar[post_id] = izohlar.get(post_id, 0) + 1
+for post_id, sarlavha, matn in postlar:
+    qisqartma = matn if len(matn) <= 20 else matn[:20] + "..."
+    print(f"{sarlavha} | qisqacha: {qisqartma} | izohlar: {izohlar.get(post_id, 0)}")`,
+  },
 ];
