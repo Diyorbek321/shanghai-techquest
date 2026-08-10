@@ -1621,4 +1621,131 @@ for qator in natija:
     print(qator)
 print(f"Hal qilindi: {hal}")`,
   },
+  // --- Darslar 46-49: sqlite3, parametrli so'rovlar, URL tahlili ---
+  {
+    key: 'backend-dars-46-easy',
+    solutionPy: `import sqlite3
+n = int(input())
+conn = sqlite3.connect(":memory:")
+conn.execute("CREATE TABLE kitob (id INTEGER PRIMARY KEY, nom TEXT, yil INTEGER)")
+for i in range(n):
+    kitob_id, nom, yil = input().split(";")
+    conn.execute("INSERT INTO kitob VALUES (?, ?, ?)", (int(kitob_id), nom, int(yil)))
+for qator in conn.execute("SELECT id, nom, yil FROM kitob ORDER BY id"):
+    print("|".join(str(x) for x in qator))
+print(f"JAMI: {n}")`,
+  },
+  {
+    key: 'backend-dars-46-medium',
+    solutionPy: `import sqlite3
+n = int(input())
+conn = sqlite3.connect(":memory:")
+conn.execute("CREATE TABLE kitob (id INTEGER PRIMARY KEY, nom TEXT, yil INTEGER)")
+for i in range(1, n + 1):
+    nom, yil = input().split(";")
+    conn.execute("INSERT INTO kitob VALUES (?, ?, ?)", (i, nom, int(yil)))
+for nom, yil in conn.execute("SELECT nom, yil FROM kitob ORDER BY yil DESC, nom ASC"):
+    print(f"{nom} ({yil})")
+print(f"Jami: {n} ta kitob")`,
+  },
+  {
+    key: 'backend-dars-46-hard',
+    solutionPy: `import sqlite3
+import sys
+conn = sqlite3.connect(":memory:")
+conn.execute("CREATE TABLE mahsulot (id INTEGER PRIMARY KEY, nom TEXT, narx INTEGER)")
+for satr in sys.stdin.read().splitlines():
+    if satr == "":
+        continue
+    bolaklar = satr.split(";")
+    buyruq = bolaklar[0]
+    if buyruq == "QOSH":
+        conn.execute("INSERT INTO mahsulot (nom, narx) VALUES (?, ?)", (bolaklar[1], int(bolaklar[2])))
+        print(f"QOSHILDI: {bolaklar[1]}")
+    elif buyruq == "YANGILA":
+        kursor = conn.execute("UPDATE mahsulot SET narx = ? WHERE id = ?", (int(bolaklar[2]), int(bolaklar[1])))
+        print(f"YANGILANDI: {bolaklar[1]}" if kursor.rowcount else f"TOPILMADI: {bolaklar[1]}")
+    elif buyruq == "OCHIR":
+        kursor = conn.execute("DELETE FROM mahsulot WHERE id = ?", (int(bolaklar[1]),))
+        print(f"OCHIRILDI: {bolaklar[1]}" if kursor.rowcount else f"TOPILMADI: {bolaklar[1]}")
+    else:
+        qatorlar = list(conn.execute("SELECT id, nom, narx FROM mahsulot ORDER BY id"))
+        if not qatorlar:
+            print("BOSH")
+        for qator in qatorlar:
+            print("|".join(str(x) for x in qator))`,
+  },
+  {
+    key: 'backend-dars-47-easy',
+    solutionPy: `import sqlite3
+n = int(input())
+conn = sqlite3.connect(":memory:")
+conn.execute("CREATE TABLE odam (id INTEGER PRIMARY KEY, ism TEXT, shahar TEXT)")
+for i in range(1, n + 1):
+    ism, shahar = input().split(";")
+    conn.execute("INSERT INTO odam VALUES (?, ?, ?)", (i, ism, shahar))
+qidiruv = input()
+topildi = list(conn.execute("SELECT ism, shahar FROM odam WHERE ism = ? ORDER BY id", (qidiruv,)))
+if not topildi:
+    print("TOPILMADI")
+for ism, shahar in topildi:
+    print(f"{ism}|{shahar}")`,
+  },
+  {
+    key: 'backend-dars-47-medium',
+    solutionPy: `import sqlite3
+n = int(input())
+conn = sqlite3.connect(":memory:")
+conn.execute("CREATE TABLE foydalanuvchi (id INTEGER PRIMARY KEY, login TEXT, parol TEXT)")
+for i in range(1, n + 1):
+    login, parol = input().split(";")
+    conn.execute("INSERT INTO foydalanuvchi VALUES (?, ?, ?)", (i, login, parol))
+kirish_login = input()
+kirish_parol = input()
+qator = conn.execute("SELECT login FROM foydalanuvchi WHERE login = ? AND parol = ?", (kirish_login, kirish_parol)).fetchone()
+if qator:
+    print(f"KIRISH: {qator[0]}")
+else:
+    print("RAD ETILDI")`,
+  },
+  {
+    key: 'backend-dars-47-hard',
+    solutionPy: `import sqlite3
+n = int(input())
+conn = sqlite3.connect(":memory:")
+conn.execute("CREATE TABLE odam (id INTEGER PRIMARY KEY, ism TEXT, shahar TEXT)")
+for i in range(1, n + 1):
+    ism, shahar = input().split(";")
+    conn.execute("INSERT INTO odam VALUES (?, ?, ?)", (i, ism, shahar))
+m = int(input())
+shaharlar = [input() for i in range(m)]
+topildi = []
+if shaharlar:
+    belgilar = ",".join("?" * len(shaharlar))
+    topildi = list(conn.execute(f"SELECT ism, shahar FROM odam WHERE shahar IN ({belgilar}) ORDER BY id", shaharlar))
+if not topildi:
+    print("TOPILMADI")
+for ism, shahar in topildi:
+    print(f"{ism}|{shahar}")`,
+  },
+  {
+    key: 'backend-dars-49-easy',
+    solutionPy: `url = input()
+protokol, qolgan = url.split("://", 1)
+if "/" in qolgan:
+    host, yol = qolgan.split("/", 1)
+    manzil = "/" + yol
+else:
+    host = qolgan
+    manzil = "/"
+if ":" in host:
+    domen, port = host.split(":", 1)
+else:
+    domen = host
+    port = "443" if protokol == "https" else "80"
+print(f"Protokol: {protokol}")
+print(f"Domen: {domen}")
+print(f"Port: {port}")
+print(f"Manzil: {manzil}")`,
+  },
 ];
