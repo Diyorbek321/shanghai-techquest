@@ -2430,4 +2430,162 @@ for i in range(n):
     else:
         print(f"201 {nom}")`,
   },
+  // --- Darslar 65-67: CRUD, pagination/filter, autentifikatsiya ---
+  {
+    key: 'backend-dars-65-hard',
+    solutionPy: `def maydonlar(matn):
+    natija = {}
+    for bolak in matn.split(";"):
+        if "=" in bolak:
+            kalit, qiymat = bolak.split("=", 1)
+            natija[kalit] = qiymat
+    return natija
+n = int(input())
+obyektlar = {}
+keyingi_id = 1
+for i in range(n):
+    bolaklar = input().split(" ", 2)
+    metod = bolaklar[0]
+    if metod == "POST":
+        yangi = maydonlar(bolaklar[1]) if len(bolaklar) > 1 else {}
+        if "nom" not in yangi or "narx" not in yangi:
+            print("400 nom va narx kerak")
+        else:
+            obyektlar[keyingi_id] = yangi
+            print(f"201 {keyingi_id}")
+            keyingi_id += 1
+        continue
+    obyekt_id = int(bolaklar[1])
+    if obyekt_id not in obyektlar:
+        print("404")
+        continue
+    if metod == "GET":
+        obyekt = obyektlar[obyekt_id]
+        print(f"200 nom={obyekt['nom']} narx={obyekt['narx']}")
+    elif metod == "DELETE":
+        del obyektlar[obyekt_id]
+        print("204")
+    else:
+        yangi = maydonlar(bolaklar[2])
+        if metod == "PUT" and ("nom" not in yangi or "narx" not in yangi):
+            print("400 nom va narx kerak")
+        else:
+            obyektlar[obyekt_id].update(yangi)
+            obyekt = obyektlar[obyekt_id]
+            print(f"200 nom={obyekt['nom']} narx={obyekt['narx']}")`,
+  },
+  {
+    key: 'backend-dars-66-easy',
+    solutionPy: `page_size = int(input())
+page = int(input())
+n = int(input())
+elementlar = [input() for i in range(n)]
+boshi = (page - 1) * page_size
+sahifa = elementlar[boshi:boshi + page_size]
+if page > 1 and not sahifa:
+    print("404")
+else:
+    print(f"count={n}")
+    print("next=bor" if boshi + page_size < n else "next=yo'q")
+    print("previous=bor" if page > 1 else "previous=yo'q")
+    for element in sahifa:
+        print(element)`,
+  },
+  {
+    key: 'backend-dars-66-medium',
+    solutionPy: `qidiruv = input()[7:].lower()
+n = int(input())
+elementlar = [input() for i in range(n)]
+mos = [e for e in elementlar if qidiruv in e.lower()]
+print(f"count={len(mos)}")
+for element in mos:
+    print(element)`,
+  },
+  {
+    key: 'backend-dars-66-hard',
+    solutionPy: `qidiruv = input()[7:].lower()
+tartib = input()[9:]
+page = int(input()[5:])
+page_size = int(input()[10:])
+n = int(input())
+elementlar = []
+for i in range(n):
+    nom, narx = input().split(";")
+    elementlar.append((nom, int(narx)))
+mos = [e for e in elementlar if qidiruv in e[0].lower()]
+teskari = tartib.startswith("-")
+maydon = tartib.lstrip("-")
+if maydon == "nom":
+    mos.sort(key=lambda e: e[0], reverse=teskari)
+else:
+    mos.sort(key=lambda e: e[1], reverse=teskari)
+boshi = (page - 1) * page_size
+sahifa = mos[boshi:boshi + page_size]
+if page > 1 and not sahifa:
+    print("404")
+else:
+    print(f"count={len(mos)}")
+    print("next=bor" if boshi + page_size < len(mos) else "next=yo'q")
+    print("previous=bor" if page > 1 else "previous=yo'q")
+    for nom, narx in sahifa:
+        print(f"{nom} {narx}")`,
+  },
+  {
+    key: 'backend-dars-67-easy',
+    solutionPy: `n = int(input())
+for i in range(n):
+    parol = input()
+    if len(parol) < 8:
+        print("xato: kamida 8 belgi")
+    elif not any(belgi.isdigit() for belgi in parol):
+        print("xato: kamida bitta raqam")
+    elif not any(belgi.isupper() for belgi in parol):
+        print("xato: kamida bitta katta harf")
+    else:
+        print("ok")`,
+  },
+  {
+    key: 'backend-dars-67-medium',
+    solutionPy: `n = int(input())
+band = set()
+for i in range(n):
+    username, email, parol = input().split(";")
+    username = username.strip()
+    if username == "":
+        print("400 username")
+    elif username in band:
+        print("400 username band")
+    elif "@" not in email:
+        print("400 email")
+    elif len(parol) < 8:
+        print("400 parol")
+    else:
+        band.add(username)
+        print(f"201 username={username} email={email}")`,
+  },
+  {
+    key: 'backend-dars-67-hard',
+    solutionPy: `import hashlib
+def hash_qil(parol):
+    return hashlib.sha256(("techquest" + parol).encode()).hexdigest()
+n = int(input())
+foydalanuvchilar = {}
+for i in range(n):
+    bolaklar = input().split(" ")
+    buyruq = bolaklar[0]
+    username = bolaklar[1]
+    if buyruq == "REGISTER":
+        if username in foydalanuvchilar:
+            print("400 bu username band")
+        else:
+            foydalanuvchilar[username] = hash_qil(bolaklar[2])
+            print(f"201 {username}")
+    elif buyruq == "LOGIN":
+        if username in foydalanuvchilar and foydalanuvchilar[username] == hash_qil(bolaklar[2]):
+            print("200 kirish muvaffaqiyatli")
+        else:
+            print("400 login yoki parol xato")
+    else:
+        print(foydalanuvchilar[username] if username in foydalanuvchilar else "404")`,
+  },
 ];
