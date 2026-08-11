@@ -18,7 +18,10 @@ export function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [track, setTrack] = useState<Track>('frontend');
+  // Nothing pre-selected: the track a student registers with decides which
+  // course they see for good (it is only rewritten by staff), so it has to be a
+  // deliberate choice rather than whichever card happened to be first.
+  const [track, setTrack] = useState<Track | ''>('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -30,6 +33,10 @@ export function AuthScreen() {
       if (mode === 'login') {
         await login(email, password);
       } else {
+        if (!track) {
+          setError("Yo'nalishingizni tanlang.");
+          return;
+        }
         await register(email, password, name, track);
       }
     } catch (err) {

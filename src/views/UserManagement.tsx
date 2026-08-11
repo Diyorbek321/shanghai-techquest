@@ -44,6 +44,15 @@ export function UserManagement() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-users'] }),
   });
 
+  // A student's track decides which course they see, and it is otherwise written
+  // only once, when the account is created (src/server/routes/classes.ts). This
+  // is the single-student repair; moving a whole cohort belongs on the class.
+  const trackMutation = useMutation({
+    mutationFn: ({ id, track }: { id: string; track: Track | null }) => api.patch(`/users/${id}`, { track }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-users'] }),
+    onError: (err) => window.alert(err instanceof ApiError ? err.message : 'Xatolik yuz berdi.'),
+  });
+
   const visibleUsers = users.filter(
     (u) => u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase())
   );
@@ -104,7 +113,25 @@ export function UserManagement() {
                         {ROLE_LABEL[u.role]}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-xs text-gray-400">{u.track ? TRACK_LABEL[u.track] : '—'}</td>
+                    <td className="px-6 py-4">
+                      {u.role === 'student' ? (
+                        <select
+                          value={u.track ?? ''}
+                          disabled={trackMutation.isPending}
+                          onChange={(e) =>
+                            trackMutation.mutate({ id: u.id, track: (e.target.value || null) as Track | null })
+                          }
+                          className="bg-black/30 border border-brand-border rounded-lg px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-brand-cyan disabled:opacity-50"
+                        >
+                          <option value="" className="bg-brand-bg">—</option>
+                          {Object.entries(TRACK_LABEL).map(([value, label]) => (
+                            <option key={value} value={value} className="bg-brand-bg">{label}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-xs text-gray-500">—</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4">
                       <button
                         onClick={() => handleDelete(u)}

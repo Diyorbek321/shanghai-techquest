@@ -6,7 +6,7 @@ import { User } from '../types';
 import { api, ApiError } from '../lib/api';
 import { ParentReportCard } from '../components/ParentReportCard';
 import { formatDate, formatRelativeTime } from '../lib/utils';
-import { trackLabel } from '../lib/tracks';
+import { trackLabel, trackBio } from '../lib/tracks';
 
 const ROLE_LABELS: Record<User['role'], string> = {
   student: "O'quvchi",
@@ -670,7 +670,7 @@ export function Profile({ user, onRoleToggle }: ProfileProps) {
           <BadgeCaseOverlay isOpen={isBadgeCaseOpen} onClose={() => setIsBadgeCaseOpen(false)} />
 
           <p className="text-gray-300 max-w-3xl text-sm leading-relaxed mb-8">
-            Dizayn va kod chorrahasini o'rganayotgan ishtiyoqli frontend dasturchi. Hozirda Reactni chuqur o'rganmoqda va UI animatsiyalariga sho'ng'imoqda. Ko'nikmalarini sinash uchun doimo yangi hakatonlar izlaydi.
+            {trackBio(user.track)}
           </p>
 
           {/* Stats Grid */}

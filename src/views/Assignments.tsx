@@ -145,7 +145,9 @@ function CreateAssignmentModal({ isOpen, onClose }: { isOpen: boolean; onClose: 
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [track, setTrack] = useState<Track>('frontend');
+  // No default: a pre-selected track is how cohorts and assignments ended up
+  // filed under 'frontend' by teachers who never opened the dropdown.
+  const [track, setTrack] = useState<Track | ''>('');
   const [classId, setClassId] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [xpReward, setXpReward] = useState(50);
@@ -171,7 +173,7 @@ function CreateAssignmentModal({ isOpen, onClose }: { isOpen: boolean; onClose: 
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
       setTitle('');
       setDescription('');
-      setTrack('frontend');
+      setTrack('');
       setClassId('');
       setDueDate('');
       setXpReward(50);
@@ -232,13 +234,15 @@ function CreateAssignmentModal({ isOpen, onClose }: { isOpen: boolean; onClose: 
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">Yo'nalish</label>
                   <select
+                    required
                     value={track}
                     onChange={(e) => setTrack(e.target.value as Track)}
                     className="w-full bg-black/30 border border-brand-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-cyan"
                   >
-                    <option value="frontend" className="bg-brand-bg">Frontend</option>
-                    <option value="robotics" className="bg-brand-bg">Robototexnika</option>
-                    <option value="office" className="bg-brand-bg">Ofis</option>
+                    <option value="" disabled className="bg-brand-bg">Yo'nalishni tanlang</option>
+                    {Object.entries(TRACK_LABEL).map(([value, label]) => (
+                      <option key={value} value={value} className="bg-brand-bg">{label}</option>
+                    ))}
                   </select>
                 </div>
                 <div>

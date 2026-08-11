@@ -2,16 +2,17 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Clock, PlayCircle, Star, Target, Zap, ChevronRight, Activity, ArrowUpRight, Code, CheckSquare, Trophy, Gift, LayoutList, RefreshCw } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { User } from '../types';
+import { User, ViewType } from '../types';
 import { TaskSequencer } from '../components/TaskSequencer';
 import { api } from '../lib/api';
 import { formatRelativeTime } from '../lib/utils';
-import { trackLabel } from '../lib/tracks';
+import { trackLabel, TRACK_STYLE } from '../lib/tracks';
 import { ClassGoalWidget } from '../components/ClassGoalWidget';
+import { DailyExerciseCard } from '../components/DailyExerciseCard';
 
 interface DashboardProps {
   user: User;
-  onNavigate: (view: any) => void;
+  onNavigate: (view: ViewType) => void;
   onTriggerSuccess: () => void;
 }
 
@@ -91,6 +92,9 @@ export function Dashboard({ user, onNavigate, onTriggerSuccess }: DashboardProps
     .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
     .slice(0, 3);
   const questsCompleted = quests.filter((q) => q.completed).length;
+  // The student's own course. Hardcoding one here sent every track to the same
+  // curriculum, which is the whole reason backend students were reading frontend.
+  const courseView: ViewType = user.track ? TRACK_STYLE[user.track].view : 'classes';
 
   const handleClaim = () => {
     setClaimed(true);
@@ -216,7 +220,7 @@ export function Dashboard({ user, onNavigate, onTriggerSuccess }: DashboardProps
                   </div>
                 </div>
                 <button
-                  onClick={() => onNavigate('backend_course')}
+                  onClick={() => onNavigate(courseView)}
                   className="shrink-0 px-4 py-2 bg-brand-purple text-white font-bold rounded hover:bg-brand-purple/90 transition-colors text-sm"
                 >
                   Darsga o'tish
@@ -225,60 +229,8 @@ export function Dashboard({ user, onNavigate, onTriggerSuccess }: DashboardProps
             </section>
           )}
 
-          {/* Daily Coding Katas */}
-          <section className="glass-panel p-5 relative overflow-hidden group border-brand-orange/30">
-            <div className="absolute left-0 top-0 bottom-0 w-1 bg-brand-orange"></div>
-            
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex items-center gap-2">
-                <Code className="text-brand-orange" size={18} />
-                <h2 className="font-semibold text-lg text-glow text-brand-orange">Kunlik dasturlash mashqlari</h2>
-              </div>
-              <span className="text-xs font-mono bg-brand-orange/20 text-brand-orange px-2 py-1 rounded">Vaqt cheklangan</span>
-            </div>
-
-            <div className="flex flex-col gap-4">
-              <p className="text-sm text-gray-400">Bonus XP va tangalar ishlash uchun ushbu qisqa frontend topshiriqlarini bajaring. Tezlik va toza kod mukofotlanadi!</p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-black/30 border border-brand-orange/20 rounded-lg p-4 hover:border-brand-orange/50 transition-colors">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-bold text-sm">Divni markazga joylashtirish</h4>
-                    <span className="text-xs text-[#FFD700] font-bold">+25 Tanga</span>
-                  </div>
-                  <div className="flex justify-between items-end mt-4">
-                    <div className="text-[10px] text-gray-400 flex items-center gap-1">
-                      <Clock size={10} /> O'rtacha 2 daqiqa
-                    </div>
-                    <button
-                      onClick={() => onNavigate('codelab')}
-                      className="text-xs bg-brand-orange hover:bg-brand-orange/80 text-black font-bold px-3 py-1.5 rounded"
-                    >
-                      Mashqni boshlash
-                    </button>
-                  </div>
-                </div>
-
-                <div className="bg-black/30 border border-brand-orange/20 rounded-lg p-4 hover:border-brand-orange/50 transition-colors">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-bold text-sm">Tugma hover effekti</h4>
-                    <span className="text-xs text-[#FFD700] font-bold">+50 Tanga</span>
-                  </div>
-                  <div className="flex justify-between items-end mt-4">
-                    <div className="text-[10px] text-gray-400 flex items-center gap-1">
-                      <Clock size={10} /> O'rtacha 5 daqiqa
-                    </div>
-                    <button
-                      onClick={() => onNavigate('codelab')}
-                      className="text-xs bg-brand-orange hover:bg-brand-orange/80 text-black font-bold px-3 py-1.5 rounded"
-                    >
-                      Mashqni boshlash
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
+          {/* Today's drill, drawn from the student's own track. */}
+          <DailyExerciseCard track={user.track} onNavigate={onNavigate} />
 
           {/* Today's Tasks */}
           <section className="glass-panel p-5">

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BookOpen, Users, Clock, PlayCircle, Plus } from 'lucide-react';
+import { motion } from 'motion/react';
+import { useQuery } from '@tanstack/react-query';
+import { BookOpen, Users, Clock, PlayCircle, Plus, Pencil } from 'lucide-react';
 import { ViewType, Track, User } from '../types';
-import { api, ApiError } from '../lib/api';
+import { api } from '../lib/api';
 import { TRACK_LABEL, TRACK_STYLE } from '../lib/tracks';
+import { ClassFormModal, EditableClass } from '../components/ClassFormModal';
 
 interface ClassGroup {
   id: string;
@@ -18,7 +19,18 @@ interface ClassGroup {
 
 export function Classes({ user, onNavigate }: { user: User; onNavigate: (view: ViewType) => void }) {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editing, setEditing] = useState<EditableClass | undefined>(undefined);
   const canCreate = user.role === 'teacher' || user.role === 'admin';
+
+  const openCreate = () => {
+    setEditing(undefined);
+    setIsFormOpen(true);
+  };
+
+  const openEdit = (cls: ClassGroup) => {
+    setEditing({ id: cls.id, title: cls.title, track: cls.track, schedule: cls.schedule });
+    setIsFormOpen(true);
+  };
 
   const { data: classes = [], isLoading } = useQuery({
     queryKey: ['classes'],
@@ -36,7 +48,7 @@ export function Classes({ user, onNavigate }: { user: User; onNavigate: (view: V
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => setIsFormOpen(true)}
+            onClick={openCreate}
             className="flex items-center gap-2 bg-brand-cyan/20 hover:bg-brand-cyan/30 text-brand-cyan border border-brand-cyan/50 font-medium px-4 py-2 rounded-lg text-sm transition-colors"
           >
             <Plus size={16} /> Yangi sinf
@@ -54,6 +66,15 @@ export function Classes({ user, onNavigate }: { user: User; onNavigate: (view: V
             <div key={cls.id} className="glass-panel overflow-hidden group hover:-translate-y-1 transition-transform">
               <div className={`h-32 flex items-center justify-center border-b border-brand-border relative ${style.bg}`}>
                 <BookOpen size={48} className={`opacity-50 ${style.text}`} />
+                {canCreate && (
+                  <button
+                    onClick={() => openEdit(cls)}
+                    title="Sinfni tahrirlash"
+                    className="absolute top-3 right-3 p-2 bg-black/50 rounded-lg text-gray-300 hover:text-white border border-white/10 transition-colors"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                )}
               </div>
 
               <div className="p-5">
@@ -87,103 +108,7 @@ export function Classes({ user, onNavigate }: { user: User; onNavigate: (view: V
         })}
       </div>
 
-      <CreateClassModal isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} />
+      <ClassFormModal isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} editing={editing} />
     </div>
-  );
-}
-
-function CreateClassModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  const queryClient = useQueryClient();
-  const [title, setTitle] = useState('');
-  const [track, setTrack] = useState<Track>('frontend');
-  const [schedule, setSchedule] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  const createMutation = useMutation({
-    mutationFn: () => api.post('/classes', { title, track, schedule: schedule || undefined }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['classes'] });
-      setTitle('');
-      setTrack('frontend');
-      setSchedule('');
-      onClose();
-    },
-    onError: (err) => setError(err instanceof ApiError ? err.message : 'Xatolik yuz berdi.'),
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    createMutation.mutate();
-  };
-
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-          />
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            className="relative w-full max-w-md glass-panel p-8 border border-white/20 shadow-[0_0_50px_rgba(0,0,0,0.5)]"
-          >
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-heading font-bold text-white">Yangi sinf yaratish</h2>
-              <button onClick={onClose} className="text-gray-500 hover:text-white p-2">&times;</button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">Sinf nomi</label>
-                <input
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full bg-black/30 border border-brand-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-cyan"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">Yo'nalish</label>
-                <select
-                  value={track}
-                  onChange={(e) => setTrack(e.target.value as Track)}
-                  className="w-full bg-black/30 border border-brand-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-cyan"
-                >
-                  {Object.entries(TRACK_LABEL).map(([value, label]) => (
-                    <option key={value} value={value} className="bg-brand-bg">{label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">Jadval (ixtiyoriy)</label>
-                <input
-                  value={schedule}
-                  onChange={(e) => setSchedule(e.target.value)}
-                  placeholder="Masalan: Dush/Chor/Juma 16:00"
-                  className="w-full bg-black/30 border border-brand-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-cyan"
-                />
-              </div>
-
-              {error && <p className="text-xs text-brand-red">{error}</p>}
-
-              <button
-                type="submit"
-                disabled={createMutation.isPending}
-                className="w-full bg-brand-cyan/20 hover:bg-brand-cyan/30 text-brand-cyan border border-brand-cyan/50 font-medium py-2.5 rounded-lg text-sm transition-colors disabled:opacity-50"
-              >
-                {createMutation.isPending ? 'Yaratilmoqda...' : 'Sinf yaratish'}
-              </button>
-            </form>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
   );
 }

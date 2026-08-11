@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { prisma } from '../db';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { resolveTrackFilter } from '../utils/trackScope';
 import { teacherOwnsClass } from '../utils/teacherScope';
 import { TRACK_VALUES, toClientTrack, toPrismaTrack } from '../serializers/track';
 import { syncLessonAssignments } from '../lessons/syncAssignments';
+import { retrackClass } from '../classes/retrack';
 import { STUDENT_LOGIN_DOMAIN, buildLogin, generatePassword } from '../users/credentials';
 import { avatarUrlForEmail } from '../avatar';
 
@@ -77,6 +78,10 @@ classesRouter.post('/', requireRole(Role.TEACHER, Role.ADMIN), async (req, res) 
 
 const updateSchema = z.object({
   title: z.string().min(1).max(200).optional(),
+  // Editable because the create form used to default to one track, so cohorts
+  // exist that were filed under the wrong one — and the students inside them
+  // inherited it. See classes/retrack.ts for what a change has to drag along.
+  track: z.enum(TRACK_VALUES).optional(),
   schedule: z.string().max(200).nullable().optional(),
   startDate: z.coerce.date().nullable().optional(),
   lessonDays: lessonDaysSchema.optional(),
@@ -95,13 +100,41 @@ classesRouter.patch('/:id', requireRole(Role.TEACHER, Role.ADMIN), async (req, r
     return res.status(403).json({ error: "Bu sinfni tahrirlash huquqingiz yo'q." });
   }
 
-  const updated = await prisma.classGroup.update({ where: { id: req.params.id }, data: parsed.data });
+  const { track, ...rest } = parsed.data;
+  const nextTrack = track ? toPrismaTrack(track) : undefined;
+  const movingTrack = nextTrack !== undefined && nextTrack !== existing.track;
 
-  // Moving the start date shifts every deadline; existing submissions keep their
-  // assignment because sync updates in place rather than recreating.
-  await syncLessonAssignments(prisma, updated.id);
+  // One transaction so a cohort can never be left half-moved: students on the
+  // new track while their homework still sits on the old one is worse than the
+  // edit simply failing.
+  let result;
+  try {
+    result = await prisma.$transaction(async (tx) => {
+      const group = await tx.classGroup.update({
+        where: { id: req.params.id },
+        data: { ...rest, ...(nextTrack ? { track: nextTrack } : {}) },
+      });
+      const retrack = movingTrack ? await retrackClass(tx, group.id, existing.track, nextTrack!) : null;
 
-  res.json({ ...updated, track: toClientTrack(updated.track) });
+      // Moving the start date shifts every deadline; existing submissions keep
+      // their assignment because sync updates in place rather than recreating.
+      // After a track change this is also what lays down the new curriculum.
+      await syncLessonAssignments(tx, group.id);
+      return { updated: group, retrack };
+    });
+  } catch (err) {
+    // Assignment is unique on (track, classId, moduleKey), so a cohort that
+    // already holds a module task under the same key on the destination track
+    // cannot absorb the one being carried over. Nothing was written.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return res.status(409).json({
+        error: "Bu sinfda yangi yo'nalishda shu nomdagi vazifa allaqachon bor. Avval uni o'chiring.",
+      });
+    }
+    throw err;
+  }
+
+  res.json({ ...result.updated, track: toClientTrack(result.updated.track), retrack: result.retrack });
 });
 
 classesRouter.get('/:id/students', requireRole(Role.TEACHER, Role.ADMIN), async (req, res) => {

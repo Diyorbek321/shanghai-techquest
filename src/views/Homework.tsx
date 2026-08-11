@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../lib/api';
+import { TRACK_LABEL } from '../lib/tracks';
 import { formatRelativeTime } from '../lib/utils';
 import { Track, User } from '../types';
 
@@ -137,7 +138,9 @@ function CreateHomeworkModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
   const [course, setCourse] = useState('');
-  const [track, setTrack] = useState<Track>('frontend');
+  // No default: a pre-selected track is how work kept landing on 'frontend'
+  // when the teacher never opened the dropdown.
+  const [track, setTrack] = useState<Track | ''>('');
   const [dueDate, setDueDate] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -147,7 +150,7 @@ function CreateHomeworkModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       queryClient.invalidateQueries({ queryKey: ['homework'] });
       setTitle('');
       setCourse('');
-      setTrack('frontend');
+      setTrack('');
       setDueDate('');
       onClose();
     },
@@ -205,13 +208,15 @@ function CreateHomeworkModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
               <div>
                 <label className="block text-xs text-gray-400 mb-1">Yo'nalish</label>
                 <select
+                  required
                   value={track}
                   onChange={(e) => setTrack(e.target.value as Track)}
                   className="w-full bg-black/30 border border-brand-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"
                 >
-                  <option value="frontend" className="bg-brand-bg">Frontend</option>
-                  <option value="robotics" className="bg-brand-bg">Robototexnika</option>
-                  <option value="office" className="bg-brand-bg">Ofis</option>
+                  <option value="" disabled className="bg-brand-bg">Yo'nalishni tanlang</option>
+                  {Object.entries(TRACK_LABEL).map(([value, label]) => (
+                    <option key={value} value={value} className="bg-brand-bg">{label}</option>
+                  ))}
                 </select>
               </div>
               <div>

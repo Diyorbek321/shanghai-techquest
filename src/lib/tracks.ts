@@ -14,6 +14,26 @@ export function trackLabel(track: string | null | undefined): string {
   return TRACK_LABEL[track as Track] ?? track;
 }
 
+/**
+ * Profile blurb per track. This used to be one hardcoded paragraph describing a
+ * frontend developer, printed on every student's profile whatever they studied.
+ */
+export const TRACK_BIO: Record<Track, string> = {
+  frontend:
+    "Dizayn va kod chorrahasini o'rganayotgan ishtiyoqli frontend dasturchi. HTML, CSS va JavaScript'ni egallab, interfeyslarni jonlantirmoqda.",
+  robotics:
+    "Sxema va kodni birlashtirayotgan robototexnika kursanti. Arduino, sensorlar va harakat mexanizmlari ustida ishlamoqda.",
+  office:
+    "Ma'lumotni tartibga solishni o'rganayotgan ofis dasturlari tahlilchisi. Word, Excel va PowerPoint vositalarini chuqur egallamoqda.",
+  backend:
+    "Server tomonini quruvchi Python backend dasturchi. Ma'lumotlar bazasi, SQL, Django va API'lar ustida ishlamoqda.",
+};
+
+export function trackBio(track: Track | null | undefined): string {
+  if (!track) return "Yo'nalish tanlanmagan. Kursni boshlash uchun Mening Sinflarim bo'limiga o'ting.";
+  return TRACK_BIO[track];
+}
+
 export const TRACK_BADGE: Record<Track, string> = {
   frontend: 'bg-brand-cyan/20 text-brand-cyan',
   robotics: 'bg-brand-purple/20 text-brand-purple',
