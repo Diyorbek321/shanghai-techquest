@@ -2718,4 +2718,696 @@ for post_id, sarlavha, matn in postlar:
     qisqartma = matn if len(matn) <= 20 else matn[:20] + "..."
     print(f"{sarlavha} | qisqacha: {qisqartma} | izohlar: {izohlar.get(post_id, 0)}")`,
   },
+  {
+    key: 'backend-dars-58-easy',
+    solutionPy: `import sys
+import json
+import re
+lines = sys.stdin.read().split("\\n")
+context = json.loads(lines[0])
+n = int(lines[1])
+for qator in lines[2:2 + n]:
+    natija = re.sub("{{ ([A-Za-z0-9_]+) }}", lambda m: str(context.get(m.group(1), "")), qator)
+    print(natija)`,
+  },
+  {
+    key: 'backend-dars-62-easy',
+    solutionPy: `n = int(input())
+for i in range(n):
+    metod = input().strip()
+    if metod in ("GET", "POST"):
+        print("200 OK")
+    else:
+        print("405 Method Not Allowed")`,
+  },
+  {
+    key: 'backend-dars-62-medium',
+    solutionPy: `n = int(input())
+for i in range(n):
+    metod, yol = input().split(" ")
+    qismlar = yol.split("/")
+    if yol == "/api/kitoblar/":
+        javoblar = {"GET": "200 ro'yxat", "POST": "201 yaratildi"}
+    elif len(qismlar) == 5 and yol.startswith("/api/kitoblar/") and qismlar[3].isdigit() and qismlar[4] == "":
+        javoblar = {"GET": f"200 kitob-{qismlar[3]}", "DELETE": "204 o'chirildi"}
+    else:
+        print("404 Not Found")
+        continue
+    print(javoblar.get(metod, "405 Method Not Allowed"))`,
+  },
+  {
+    key: 'backend-dars-65-easy',
+    solutionPy: `obyekt = {'nom': 'Kitob', 'narx': '100', 'yil': '2020'}
+n = int(input())
+for i in range(n):
+    maydon, qiymat = input().split("=", 1)
+    obyekt[maydon] = qiymat
+    print(f"nom={obyekt['nom']} narx={obyekt['narx']} yil={obyekt['yil']}")`,
+  },
+  {
+    key: 'backend-dars-65-medium',
+    solutionPy: `obyekt = {'nom': 'Kitob', 'narx': '100', 'yil': '2020'}
+n = int(input())
+for i in range(n):
+    metod, _, qism = input().partition(" ")
+    maydonlar = {}
+    for juft in qism.strip().split(";"):
+        if "=" in juft:
+            kalit, qiymat = juft.split("=", 1)
+            maydonlar[kalit] = qiymat
+    if metod == "PUT" and set(maydonlar) != {"nom", "narx", "yil"}:
+        print("400 barcha maydonlar kerak")
+        continue
+    obyekt.update(maydonlar)
+    print(f"200 nom={obyekt['nom']} narx={obyekt['narx']} yil={obyekt['yil']}")`,
+  },
+  {
+    key: 'backend-dars-68-easy',
+    solutionPy: `import base64
+import json
+def b64url_ochish(bolak):
+    bolak += '=' * (-len(bolak) % 4)
+    return base64.urlsafe_b64decode(bolak)
+token = input().strip()
+header, payload, imzo = token.split(".")
+malumot = json.loads(b64url_ochish(payload))
+for kalit in sorted(malumot):
+    print(f"{kalit}={malumot[kalit]}")`,
+  },
+  {
+    key: 'backend-dars-68-medium',
+    solutionPy: `import base64
+import hashlib
+import hmac
+def b64url_yopish(baytlar):
+    return base64.urlsafe_b64encode(baytlar).decode().rstrip('=')
+kalit = input().strip()
+header, payload, imzo = input().strip().split(".")
+hisob = hmac.new(kalit.encode(), (header + '.' + payload).encode(), hashlib.sha256).digest()
+if b64url_yopish(hisob) == imzo:
+    print("imzo to'g'ri")
+else:
+    print("imzo xato")`,
+  },
+  {
+    key: 'backend-dars-73-easy',
+    solutionPy: `n = int(input())
+otdi = 0
+for i in range(n):
+    nom, olingan, kutilgan = input().split(";")
+    if olingan == kutilgan:
+        otdi += 1
+        print(f"{nom}: OK")
+    else:
+        print(f"{nom}: XATO (kutilgan={kutilgan}, olingan={olingan})")
+print(f"{otdi}/{n} test o'tdi")`,
+  },
+  {
+    key: 'backend-dars-73-medium',
+    solutionPy: `def chegirma(narx, foiz):
+    if narx < 0:
+        raise ValueError("narx manfiy")
+    if foiz < 0 or foiz > 100:
+        raise ValueError("foiz 0-100 oralig'ida emas")
+    return narx - narx * foiz / 100
+n = int(input())
+for i in range(n):
+    narx, foiz = input().split(";")
+    try:
+        print(f"{chegirma(float(narx), float(foiz)):.2f}")
+    except ValueError as xato:
+        print(f"XATO: {xato}")`,
+  },
+  {
+    key: 'backend-dars-73-hard',
+    solutionPy: `n = int(input())
+guruhlar = {}
+otganlar = 0
+for i in range(n):
+    guruh, nom, holat = input().split(";")
+    malumot = guruhlar.setdefault(guruh, {"jami": 0, "otdi": 0, "yiqildi": []})
+    malumot["jami"] += 1
+    if holat == "otdi":
+        malumot["otdi"] += 1
+        otganlar += 1
+    else:
+        malumot["yiqildi"].append(nom)
+for guruh in sorted(guruhlar):
+    malumot = guruhlar[guruh]
+    print(f"{guruh}: {malumot['otdi']}/{malumot['jami']}")
+    for nom in malumot["yiqildi"]:
+        print(f"  - {nom}")
+print(f"Jami: {otganlar}/{n} ({otganlar / n * 100:.1f}%)")`,
+  },
+  {
+    key: 'backend-dars-74-medium',
+    solutionPy: `n = int(input())
+fixturelar = {}
+for i in range(n):
+    nom, boglar = input().split(";")
+    fixturelar[nom] = [] if boglar == "-" else boglar.split(",")
+tayyor = []
+def tayyorla(nom):
+    if nom not in fixturelar:
+        raise KeyError(nom)
+    if nom in tayyor:
+        return
+    for bog in fixturelar[nom]:
+        tayyorla(bog)
+    tayyor.append(nom)
+try:
+    for nom in input().split(","):
+        tayyorla(nom)
+except KeyError as xato:
+    print(f"XATO: fixture topilmadi: {xato.args[0]}")
+else:
+    for nom in tayyor:
+        print(f"SETUP {nom}")
+    print("RUN test")
+    for nom in reversed(tayyor):
+        print(f"TEARDOWN {nom}")`,
+  },
+  {
+    key: 'backend-dars-75-easy',
+    solutionPy: `import sys
+qatorlar = [q for q in sys.stdin.read().split("\\n") if q.strip()]
+oxirgi = qatorlar[-1].strip()
+if ": " in oxirgi:
+    tur, xabar = oxirgi.split(": ", 1)
+else:
+    tur, xabar = oxirgi, "-"
+kadr = [q for q in qatorlar if q.strip().startswith("File ")][-1]
+fayl_qism, line_qism, in_qism = kadr.strip().split(", ")
+fayl = fayl_qism[len('File "'):-1]
+raqam = line_qism[len("line "):]
+funksiya = in_qism[len("in "):]
+print(f"Xato turi: {tur}")
+print(f"Xabar: {xabar}")
+print(f"Manba: {fayl}, {raqam}-qator, {funksiya}()")`,
+  },
+  {
+    key: 'backend-dars-75-medium',
+    solutionPy: `def parol_kuchi(parol):
+    ball = 0
+    if len(parol) >= 8:
+        ball += 1
+    if any(belgi.isdigit() for belgi in parol):
+        ball += 1
+    if any(belgi.isupper() for belgi in parol):
+        ball += 1
+    if any(belgi in "!@#$%" for belgi in parol):
+        ball += 1
+    return ball
+n = int(input())
+for i in range(n):
+    parol = input().strip()
+    ball = parol_kuchi(parol)
+    daraja = "kuchli" if ball == 4 else "o'rtacha" if ball == 3 else "zaif"
+    print(f"{parol} -> {daraja} ({ball}/4)")`,
+  },
+  {
+    key: 'backend-dars-76-easy',
+    solutionPy: `n = int(input())
+sozlamalar = {}
+for i in range(n):
+    kalit, _, qiymat = input().partition("=")
+    sozlamalar[kalit] = qiymat
+qidirilgan = input().strip()
+print(sozlamalar.get(qidirilgan, "TOPILMADI"))`,
+  },
+  {
+    key: 'backend-dars-76-medium',
+    solutionPy: `n = int(input())
+jami = 0
+for i in range(n):
+    qator = input().strip()
+    if not qator or qator.startswith("#") or "=" not in qator:
+        continue
+    kalit, _, qiymat = qator.partition("=")
+    kalit = kalit.strip()
+    qiymat = qiymat.strip()
+    if len(qiymat) >= 2 and qiymat[0] in "'\\"" and qiymat[-1] == qiymat[0]:
+        qiymat = qiymat[1:-1]
+    print(f"{kalit}={qiymat}")
+    jami += 1
+print(f"Jami: {jami}")`,
+  },
+  {
+    key: 'backend-dars-76-hard',
+    solutionPy: `MAXFIY = ["SECRET", "PASSWORD", "TOKEN", "KEY", "API"]
+n = int(input())
+maxfiylar = 0
+for i in range(n):
+    kalit, _, qiymat = input().partition("=")
+    if any(bolak in kalit.upper() for bolak in MAXFIY):
+        maxfiylar += 1
+        print(f"{kalit}=")
+    else:
+        print(f"{kalit}={qiymat}")
+print(f"Maxfiy: {maxfiylar}")`,
+  },
+  {
+    key: 'backend-dars-77-easy',
+    solutionPy: `n = int(input())
+kesh = set()
+hit = 0
+for i in range(n):
+    kalit = input().strip()
+    if kalit in kesh:
+        hit += 1
+        print(f"HIT: {kalit}")
+    else:
+        kesh.add(kalit)
+        print(f"MISS: {kalit}")
+print(f"Jami: {hit} HIT, {n - hit} MISS")`,
+  },
+  {
+    key: 'backend-dars-77-medium',
+    solutionPy: `n = int(input())
+kesh = {}
+for i in range(n):
+    qismlar = input().split()
+    vaqt = int(qismlar[0])
+    if qismlar[1] == "SET":
+        kesh[qismlar[2]] = (qismlar[3], vaqt + int(qismlar[4]))
+        continue
+    kalit = qismlar[2]
+    if kalit in kesh and vaqt < kesh[kalit][1]:
+        print(f"{kalit}={kesh[kalit][0]}")
+    else:
+        print(f"MISS: {kalit}")`,
+  },
+  {
+    key: 'backend-dars-77-hard',
+    solutionPy: `sigim = int(input())
+n = int(input())
+kesh = {}
+for i in range(n):
+    qismlar = input().split()
+    kalit = qismlar[1]
+    if qismlar[0] == "GET":
+        if kalit in kesh:
+            kesh[kalit] = kesh.pop(kalit)
+            print(f"{kalit}={kesh[kalit]}")
+        else:
+            print(f"MISS: {kalit}")
+        continue
+    if kalit not in kesh and len(kesh) >= sigim:
+        eski = next(iter(kesh))
+        kesh.pop(eski)
+        print(f"Chiqarildi: {eski}")
+    kesh.pop(kalit, None)
+    kesh[kalit] = qismlar[2]
+print("Keshda: " + (" ".join(kesh) if kesh else "-"))`,
+  },
+  {
+    key: 'backend-dars-78-easy',
+    solutionPy: `n = int(input())
+navbat = []
+for i in range(n):
+    buyruq = input().split()
+    if buyruq[0] == "ADD":
+        navbat.append(buyruq[1])
+        print(f"Navbatga qo'shildi: {buyruq[1]}")
+    elif navbat:
+        print(f"Bajarildi: {navbat.pop(0)}")
+    else:
+        print("Navbat bo'sh")
+print(f"Kutayotgan vazifalar: {len(navbat)}")`,
+  },
+  {
+    key: 'backend-dars-78-medium',
+    solutionPy: `r = int(input())
+n = int(input())
+for i in range(n):
+    nom, natijalar = input().split()
+    urinishlar = natijalar[:r + 1]
+    if "S" in urinishlar:
+        print(f"{nom}: {urinishlar.index('S') + 1}-urinishda bajarildi")
+    else:
+        print(f"{nom}: {r + 1} urinishdan keyin bekor qilindi")`,
+  },
+  {
+    key: 'backend-dars-80-easy',
+    solutionPy: `from fnmatch import fnmatch
+p = int(input())
+shablonlar = [input().strip() for i in range(p)]
+f = int(input())
+nusxa = 0
+for i in range(f):
+    yol = input().strip()
+    if any(fnmatch(yol, s) or yol.startswith(s + "/") for s in shablonlar):
+        continue
+    print(yol)
+    nusxa += 1
+print(f"Nusxalanadi: {nusxa}")`,
+  },
+  {
+    key: 'backend-dars-80-medium',
+    solutionPy: `n = int(input())
+qatlamlar = [input().split() for i in range(n)]
+m = int(input())
+ozgargan = [input().strip() for i in range(m)]
+buzildi = False
+qayta = 0
+for i, qatlam in enumerate(qatlamlar, start=1):
+    if qatlam[0] == "COPY":
+        manba = qatlam[1]
+        if manba in ozgargan or (manba == "." and m > 0):
+            buzildi = True
+    if buzildi:
+        qayta += 1
+        print(f"{i}: QAYTA QURILADI")
+    else:
+        print(f"{i}: CACHED")
+print(f"Qayta quriladi: {qayta} ta qatlam")`,
+  },
+  {
+    key: 'backend-dars-81-easy',
+    solutionPy: `n = int(input())
+mustaqil = []
+for i in range(n):
+    xizmat, _, boglar = input().partition(":")
+    if boglar.strip() == "-":
+        mustaqil.append(xizmat.strip())
+for xizmat in sorted(mustaqil):
+    print(xizmat)
+print(f"Jami: {len(mustaqil)}")`,
+  },
+  {
+    key: 'backend-dars-81-medium',
+    solutionPy: `n = int(input())
+boglar = {}
+for i in range(n):
+    xizmat, _, qolgan = input().partition(":")
+    royxat = qolgan.split()
+    boglar[xizmat.strip()] = set() if royxat == ["-"] else set(royxat)
+tartib = []
+while len(tartib) < n:
+    tayyor = [x for x in boglar if x not in tartib and boglar[x] <= set(tartib)]
+    if not tayyor:
+        tartib = None
+        break
+    tartib.append(min(tayyor))
+if tartib is None:
+    print("SIKL")
+else:
+    for xizmat in tartib:
+        print(xizmat)`,
+  },
+  {
+    key: 'backend-dars-82-easy',
+    solutionPy: `QIYMAT = {"r": 4, "w": 2, "x": 1, "-": 0}
+n = int(input())
+for i in range(n):
+    ruxsat = input().strip()
+    raqamlar = ""
+    for boshi in range(0, 9, 3):
+        uchlik = ruxsat[boshi:boshi + 3]
+        raqamlar += str(sum(QIYMAT[belgi] for belgi in uchlik))
+    print(raqamlar)`,
+  },
+  {
+    key: 'backend-dars-82-medium',
+    solutionPy: `t = int(input())
+n = int(input())
+urinishlar = {}
+for i in range(n):
+    qator = input().split()
+    if "Failed" in qator:
+        ip = qator[-1]
+        urinishlar[ip] = urinishlar.get(ip, 0) + 1
+bloklar = [(ip, soni) for ip, soni in urinishlar.items() if soni >= t]
+bloklar.sort(key=lambda juft: (-juft[1], juft[0]))
+if not bloklar:
+    print("Bloklash shart emas")
+for ip, soni in bloklar:
+    print(f"{ip} {soni}")`,
+  },
+  {
+    key: 'backend-dars-83-medium',
+    solutionPy: `n = int(input())
+locationlar = []
+for i in range(n):
+    prefiks, manzil = input().split()
+    locationlar.append((prefiks, manzil))
+m = int(input())
+for i in range(m):
+    url = input().strip()
+    mos = [(len(p), manzil) for p, manzil in locationlar if url.startswith(p)]
+    manzil = max(mos)[1] if mos else "404"
+    print(f"{url} -> {manzil}")`,
+  },
+  {
+    key: 'backend-dars-84-easy',
+    solutionPy: `import sys
+lines = sys.stdin.read().split("\\n")
+chegara = lines.index("---")
+sozlamalar = {}
+for qator in lines[:chegara]:
+    qator = qator.strip()
+    if not qator or qator.startswith("#") or "=" not in qator:
+        continue
+    kalit, qiymat = qator.split("=", 1)
+    sozlamalar[kalit.strip()] = qiymat.strip()
+for kalit in lines[chegara + 1:]:
+    kalit = kalit.strip()
+    if kalit:
+        qiymat = sozlamalar.get(kalit, "YO'Q")
+        print(f"{kalit}={qiymat}")`,
+  },
+  {
+    key: 'backend-dars-84-medium',
+    solutionPy: `import sys
+cfg = {}
+for qator in sys.stdin.read().split("\\n"):
+    if "=" in qator:
+        kalit, qiymat = qator.split("=", 1)
+        cfg[kalit.strip()] = qiymat.strip()
+ogohlar = []
+if cfg.get("DEBUG") != "False":
+    ogohlar.append("DEBUG=False bo'lishi kerak")
+if len(cfg.get("SECRET_KEY", "")) < 20:
+    ogohlar.append("SECRET_KEY juda qisqa yoki yo'q")
+if not cfg.get("ALLOWED_HOSTS"):
+    ogohlar.append("ALLOWED_HOSTS bo'sh")
+for ogoh in ogohlar:
+    print(f"OGOHLANTIRISH: {ogoh}")
+print(f"Jami: {len(ogohlar)} ta ogohlantirish")`,
+  },
+  {
+    key: 'backend-dars-86-medium',
+    solutionPy: `n = int(input())
+junction = 0
+for i in range(n):
+    a, kardinallik, b = input().split()
+    if kardinallik == "1:1":
+        print(f"{b} jadvaliga {a}_id (UNIQUE FK)")
+    elif kardinallik == "1:N":
+        print(f"{b} jadvaliga {a}_id (FK)")
+    elif kardinallik == "N:1":
+        print(f"{a} jadvaliga {b}_id (FK)")
+    else:
+        junction += 1
+        print(f"{a}{b} junction jadvali")
+print(f"Junction jadvallar: {junction}")`,
+  },
+  {
+    key: 'backend-dars-87-medium',
+    solutionPy: `import sys
+sozlamalar = {}
+for qator in sys.stdin.read().split("\\n"):
+    qator = qator.strip()
+    if qator == "END":
+        break
+    if "=" in qator:
+        kalit, qiymat = qator.split("=", 1)
+        sozlamalar[kalit.strip()] = qiymat.strip()
+for kalit in sorted(sozlamalar):
+    print(f"{kalit}={sozlamalar[kalit]}")`,
+  },
+  {
+    key: 'backend-dars-88-easy',
+    solutionPy: `n = int(input())
+yaroqli = 0
+for raqam in range(1, n + 1):
+    title, pages, year = input().split("|")
+    xatolar = []
+    if not title.strip():
+        xatolar.append("title bo'sh bo'lmasin")
+    if not (pages.isdigit() and int(pages) > 0):
+        xatolar.append("pages musbat butun son bo'lsin")
+    if not (year.isdigit() and 1900 <= int(year) <= 2026):
+        xatolar.append("year 1900-2026 oralig'ida bo'lsin")
+    if xatolar:
+        print(f"Yozuv {raqam}: " + "; ".join(xatolar))
+    else:
+        yaroqli += 1
+        print(f"Yozuv {raqam}: OK")
+print(f"Yaroqli: {yaroqli} / {n}")`,
+  },
+  {
+    key: 'backend-dars-88-medium',
+    solutionPy: `ROYXAT = {"GET": "list", "POST": "create"}
+BITTA = {"GET": "retrieve", "PUT": "update", "PATCH": "partial_update", "DELETE": "destroy"}
+n = int(input())
+for i in range(n):
+    metod, manzil = input().split()
+    qismlar = manzil.split("/")
+    amal = "404"
+    if manzil == "/api/books/":
+        amal = ROYXAT.get(metod, "404")
+    elif len(qismlar) == 5 and manzil.startswith("/api/books/") and qismlar[3].isdigit() and qismlar[4] == "":
+        amal = BITTA.get(metod, "404")
+    print(f"{metod} {manzil} -> {amal}")`,
+  },
+  {
+    key: 'backend-dars-89-medium',
+    solutionPy: `p = int(input())
+ombor = {}
+for i in range(p):
+    nom, miqdor = input().split()
+    ombor[nom] = int(miqdor)
+b = int(input())
+for raqam in range(1, b + 1):
+    k = int(input())
+    kerak = {}
+    yetmadi = None
+    for j in range(k):
+        nom, miqdor = input().split()
+        kerak[nom] = kerak.get(nom, 0) + int(miqdor)
+        if yetmadi is None and kerak[nom] > ombor.get(nom, -1):
+            yetmadi = nom
+    if yetmadi:
+        print(f"Buyurtma {raqam}: bekor qilindi ({yetmadi} yetarli emas)")
+        continue
+    for nom, miqdor in kerak.items():
+        ombor[nom] -= miqdor
+    print(f"Buyurtma {raqam}: qabul qilindi")
+for nom in sorted(ombor):
+    print(f"{nom}: {ombor[nom]}")`,
+  },
+  {
+    key: 'backend-dars-90-easy',
+    solutionPy: `n = int(input())
+yozuvlar = [input().split() for i in range(n)]
+joriy = input().strip()
+topildi = False
+for yozuv_id, egasi, sarlavha in yozuvlar:
+    if egasi == joriy:
+        topildi = True
+        print(f"{yozuv_id} {sarlavha}")
+if not topildi:
+    print("Ma'lumot yo'q")`,
+  },
+  {
+    key: 'backend-dars-90-medium',
+    solutionPy: `n = int(input())
+egalar = {}
+for i in range(n):
+    yozuv_id, egasi = input().split()
+    egalar[yozuv_id] = egasi
+m = int(input())
+for i in range(m):
+    foydalanuvchi, yozuv_id = input().split()
+    if egalar.get(yozuv_id) == foydalanuvchi:
+        print(200)
+    else:
+        print(404)`,
+  },
+  {
+    key: 'backend-dars-90-hard',
+    solutionPy: `limit, oyna = [int(x) for x in input().split()]
+n = int(input())
+qabul = {}
+for i in range(n):
+    vaqt, foydalanuvchi = input().split()
+    t = int(vaqt)
+    tarix = qabul.setdefault(foydalanuvchi, [])
+    oynada = [v for v in tarix if v > t - oyna]
+    if len(oynada) < limit:
+        tarix.append(t)
+        print("OK")
+    else:
+        print(429)`,
+  },
+  {
+    key: 'backend-dars-91-easy',
+    solutionPy: `n = int(input())
+otdi = 0
+for i in range(n):
+    nom, kutilgan, olingan = input().split()
+    if kutilgan == olingan:
+        otdi += 1
+        print(f"{nom}: PASS")
+    else:
+        print(f"{nom}: FAIL (kutilgan={kutilgan}, olingan={olingan})")
+print(f"Natija: {otdi}/{n} o'tdi")`,
+  },
+  {
+    key: 'backend-dars-91-medium',
+    solutionPy: `n = int(input())
+bajarilgan = set(int(x) for x in input().split())
+foiz = len(bajarilgan) / n * 100
+qamralmagan = [str(i) for i in range(1, n + 1) if i not in bajarilgan]
+print(f"Qamrov: {format(foiz, '.1f')}%")
+if qamralmagan:
+    print("Qamralmagan: " + " ".join(qamralmagan))
+else:
+    print("Qamralmagan: yo'q")
+if foiz >= 80:
+    print("Natija: YETARLI")
+else:
+    print("Natija: YETARLI EMAS")`,
+  },
+  {
+    key: 'backend-dars-92-easy',
+    solutionPy: `n = int(input())
+sorovlar = []
+for i in range(n):
+    sorovlar.append(input())
+print(f"Jami so'rov: {len(sorovlar)}")
+print(f"Noyob so'rov: {len(set(sorovlar))}")`,
+  },
+  {
+    key: 'backend-dars-92-medium',
+    solutionPy: `import re
+n = int(input())
+shakllar = {}
+for i in range(n):
+    shakl = re.sub("[0-9]+", "?", input())
+    shakllar[shakl] = shakllar.get(shakl, 0) + 1
+shubhali = [(soni, shakl) for shakl, soni in shakllar.items() if soni >= 3]
+shubhali.sort(key=lambda juft: (-juft[0], juft[1]))
+if not shubhali:
+    print("N+1 topilmadi")
+for soni, shakl in shubhali:
+    print(f"{soni} x {shakl}")`,
+  },
+  {
+    key: 'backend-dars-93-easy',
+    solutionPy: `n = int(input())
+sanoq = {"INFO": 0, "WARNING": 0, "ERROR": 0}
+for i in range(n):
+    daraja = input().split()[2]
+    sanoq[daraja] += 1
+for daraja in ["INFO", "WARNING", "ERROR"]:
+    print(f"{daraja}: {sanoq[daraja]}")`,
+  },
+  {
+    key: 'backend-dars-93-medium',
+    solutionPy: `n = int(input())
+xatolar = []
+for i in range(n):
+    metod, yol, kod = input().split()
+    if not 200 <= int(kod) <= 399:
+        xatolar.append(f"Xato: {metod} {yol} {kod}")
+print(f"Muvaffaqiyatli: {n - len(xatolar)}/{n}")
+for xato in xatolar:
+    print(xato)
+if xatolar:
+    print("Smoke test: MUVAFFAQIYATSIZ")
+else:
+    print("Smoke test: MUVAFFAQIYATLI")`,
+  },
 ];
