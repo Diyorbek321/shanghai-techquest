@@ -70,6 +70,9 @@ authRouter.post('/login', authRateLimiter, async (req, res) => {
   if (!passwordMatches) {
     return res.status(401).json({ error: "Email yoki parol noto'g'ri." });
   }
+  if (user.disabledAt) {
+    return res.status(403).json({ error: "Hisobingiz to'xtatilgan. O'quv markaz ma'muriyatiga murojaat qiling." });
+  }
 
   const token = signToken({ sub: user.id, role: user.role, track: user.track });
   setAuthCookie(res, token);

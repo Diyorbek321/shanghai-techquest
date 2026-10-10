@@ -30,6 +30,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     if (!user) {
       return res.status(401).json({ error: 'Not authenticated.' });
     }
+    // Checked on every request, not only at sign-in: a cookie issued before
+    // Eduly marked the student as left must stop working too.
+    if (user.disabledAt) {
+      return res.status(403).json({ error: "Hisobingiz to'xtatilgan. O'quv markaz ma'muriyatiga murojaat qiling." });
+    }
     req.user = user;
     next();
   } catch {

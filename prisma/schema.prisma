@@ -172,6 +172,16 @@ model User {
   lastSeenAt     DateTime?
   eloRating      Int      @default(1200)
 
+  /// Eduly (the centre's management system) is the source of truth for who is
+  /// enrolled. These link a TechQuest account to its Eduly record; null for
+  /// accounts created by hand. See server/integration/eduly.
+  edulyStudentId Int?     @unique
+  edulyTeacherId Int?     @unique
+  /// Set when Eduly says the student left or is frozen. The account and all
+  /// its progress stay; only signing in is refused, so a returning student
+  /// picks up exactly where they stopped.
+  disabledAt     DateTime?
+
   teamId   String?
   team     Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
   teamRole TeamRole?
@@ -218,6 +228,8 @@ model ClassGroup {
   /// Weekdays lessons are held on (0 = Sunday). Defaults to Mon/Wed/Fri.
   lessonDays  Int[]    @default([1, 3, 5])
   createdAt   DateTime @default(now())
+  /// The Eduly group this cohort mirrors; null for classes created by hand.
+  edulyGroupId Int?    @unique
 
   enrollments Enrollment[]
   assignments Assignment[]
@@ -802,4 +814,13 @@ model DailyExerciseLog {
 
   @@unique([userId, date])
   @@index([exerciseId])
+}
+
+/// One-time SSO tokens already spent. A token is valid for seconds, so a row
+/// only has to outlive its token's expiry; older rows are pruned on insert.
+model SsoNonce {
+  jti       String   @id
+  expiresAt DateTime
+
+  @@index([expiresAt])
 }

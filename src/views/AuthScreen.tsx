@@ -12,6 +12,22 @@ const TRACK_OPTIONS: { id: Track; label: string; desc: string; icon: React.React
   { id: 'backend', label: 'Python Backend', desc: 'Python, SQL, Django va DRF', icon: <Server size={20} /> },
 ];
 
+/** Reasons /api/integration/eduly-sso puts in ?sso_error= when it bounces. */
+const SSO_ERRORS: Record<string, string> = {
+  invalid: "Shanghai ilovasidan kirish havolasi eskirgan. Ilovada tugmani qaytadan bosing.",
+  used: "Bu havola allaqachon ishlatilgan. Ilovada tugmani qaytadan bosing.",
+  unknown: "Hisobingiz hali tayyor emas. Bir necha daqiqadan so'ng qayta urinib ko'ring.",
+  disabled: "Hisobingiz to'xtatilgan. O'quv markaz ma'muriyatiga murojaat qiling.",
+  server: "Kirishda xatolik yuz berdi. Birozdan so'ng qayta urinib ko'ring.",
+};
+
+function initialSsoError(): string | null {
+  const reason = new URLSearchParams(window.location.search).get('sso_error');
+  if (!reason) return null;
+  window.history.replaceState(null, '', window.location.pathname);
+  return SSO_ERRORS[reason] ?? SSO_ERRORS.server;
+}
+
 export function AuthScreen() {
   const { login, register } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -22,7 +38,7 @@ export function AuthScreen() {
   // course they see for good (it is only rewritten by staff), so it has to be a
   // deliberate choice rather than whichever card happened to be first.
   const [track, setTrack] = useState<Track | ''>('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialSsoError);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {

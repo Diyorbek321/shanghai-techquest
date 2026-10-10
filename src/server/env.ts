@@ -19,6 +19,10 @@ export const env = {
   cookieSecure,
   geminiApiKey: process.env.GEMINI_API_KEY,
   pistonUrl: process.env.PISTON_URL || 'http://localhost:2000',
+  /// Shared with Eduly (its TECHQUEST_SECRET). Unset means the integration is
+  /// off: every /api/integration/eduly call answers 503 rather than trusting
+  /// an empty secret.
+  edulySecret: process.env.EDULY_INTEGRATION_SECRET || '',
 };
 
 export function expiresInToMs(expiresIn: string): number {

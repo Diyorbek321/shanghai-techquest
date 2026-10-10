@@ -4,9 +4,14 @@ import { apiRouter } from './routes';
 import { mountDevMiddleware, mountProdStatic } from './viteDev';
 import { apiRateLimiter } from './middleware/rateLimit';
 import { verifyOrigin } from './middleware/csrf';
+import { integrationRouter } from './routes/integration';
 
 export function createApp(): express.Express {
   const app = express();
+
+  // Before express.json(): an Eduly snapshot is larger than its 100kb default,
+  // and the service calls must not draw on the browser rate limit below.
+  app.use('/api/integration', integrationRouter);
 
   app.use(express.json());
   app.use(cookieParser());
