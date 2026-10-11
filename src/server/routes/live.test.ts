@@ -7,7 +7,7 @@ import { Role, Track } from '@prisma/client';
 import { prisma } from '../db';
 import { signToken } from '../auth/jwt';
 import { AUTH_COOKIE_NAME } from '../auth/cookies';
-import { createLiveRouter } from './live';
+import { createLiveRouter, GUEST_COOKIE_NAME } from './live';
 import { createRegistry } from '../live/registry';
 import { persistLiveGame } from '../live/persist';
 import type { LiveView } from '../live/views';
@@ -131,5 +131,80 @@ describe('live quiz API', () => {
     ]);
     expect(ali.xp).toBeGreaterThan(vali.xp);
     expect(vali.xp).toBe(10);
+  });
+});
+
+describe('live quiz API — guests', () => {
+  const guestCookieFrom = (res: request.Response): string => {
+    const raw = ([] as string[]).concat(res.headers['set-cookie'] ?? []);
+    const cookie = raw.find((c) => c.startsWith(`${GUEST_COOKIE_NAME}=`));
+    expect(cookie).toBeDefined();
+    expect(cookie).toContain('HttpOnly');
+    expect(cookie).toContain('Path=/api/live');
+    return cookie!.split(';')[0];
+  };
+
+  async function openGame(): Promise<string> {
+    const res = await request(app).post('/api/live').set('Cookie', cookies.teacher).send({ lessonKey }).expect(201);
+    return res.body.pin;
+  }
+
+  it('lets someone without an account join, play, and leaves them out of saved results', async () => {
+    const pin = await openGame();
+    await request(app).post(`/api/live/${pin}/join`).set('Cookie', cookies.ali).expect(200);
+
+    // Without a cookie the stream is closed to strangers.
+    await request(app).get(`/api/live/${pin}/events`).expect(401);
+    await request(app).post(`/api/live/${pin}/guest`).send({ name: 'x' }).expect(400);
+    await request(app).post(`/api/live/${pin}/guest`).send({ name: 'live-ali' }).expect(409);
+
+    const joined = await request(app).post(`/api/live/${pin}/guest`).send({ name: '  Mehmon   Bola ' }).expect(201);
+    const guestCookie = guestCookieFrom(joined);
+    const guestId: string = joined.body.playerId;
+    expect(guestId).toMatch(/^guest_/);
+
+    // Rejoining with the same cookie is the same player, not a second one.
+    const again = await request(app).post(`/api/live/${pin}/guest`).set('Cookie', guestCookie).send({ name: 'Boshqa' }).expect(200);
+    expect(again.body.playerId).toBe(guestId);
+    expect(Object.keys(registry.get(pin)!.players)).toHaveLength(2);
+    expect(registry.get(pin)!.players[guestId].name).toBe('Mehmon Bola');
+
+    // A guest can neither host nor use a staff route.
+    await request(app).post(`/api/live/${pin}/next`).set('Cookie', guestCookie).expect(401);
+    await request(app).get('/api/live/lessons').set('Cookie', guestCookie).expect(401);
+
+    await request(app).post(`/api/live/${pin}/next`).set('Cookie', cookies.teacher).expect(200);
+    await request(app).post(`/api/live/${pin}/answer`).set('Cookie', guestCookie).send({ questionIndex: 0, choiceIndex: CORRECT }).expect(202);
+    expect(registry.get(pin)!.players[guestId].answers[0]).toBeDefined();
+    await request(app).post(`/api/live/${pin}/answer`).set('Cookie', cookies.ali).send({ questionIndex: 0, choiceIndex: 0 }).expect(202);
+
+    const before = await prisma.liveGame.count({ where: { lessonId } });
+    await request(app).post(`/api/live/${pin}/end`).set('Cookie', cookies.teacher).expect(204);
+    await vi.waitFor(async () => expect(await prisma.liveGame.count({ where: { lessonId } })).toBe(before + 1));
+
+    const saved = await prisma.liveGame.findFirstOrThrow({ where: { lessonId }, orderBy: { finishedAt: 'desc' }, include: { results: true } });
+    expect(saved.results.map((r) => r.userId)).toEqual([ids.ali]);
+    // The guest beat Ali, so Ali's saved rank is 2 — ranks are against everyone.
+    expect(saved.results[0].rank).toBe(2);
+  });
+
+  it("refuses a guest token outside its own game", async () => {
+    const first = await openGame();
+    const joined = await request(app).post(`/api/live/${first}/guest`).send({ name: 'Sayyoh' }).expect(201);
+    const guestCookie = guestCookieFrom(joined);
+
+    // Opening a second game closes the teacher's first one and the guest's token with it.
+    const second = await openGame();
+    await request(app).get(`/api/live/${second}/events`).set('Cookie', guestCookie).expect(401);
+    await request(app).post(`/api/live/${second}/answer`).set('Cookie', guestCookie).send({ questionIndex: 0, choiceIndex: 0 }).expect(401);
+  });
+
+  it('lets the host kick a player from the lobby', async () => {
+    const pin = await openGame();
+    const joined = await request(app).post(`/api/live/${pin}/guest`).send({ name: 'Yomon Ism' }).expect(201);
+    await request(app).post(`/api/live/${pin}/kick`).set('Cookie', cookies.ali).send({ playerId: joined.body.playerId }).expect(403);
+    await request(app).post(`/api/live/${pin}/kick`).set('Cookie', cookies.teacher).send({ playerId: joined.body.playerId }).expect(204);
+    expect(registry.get(pin)!.players[joined.body.playerId]).toBeUndefined();
+    await request(app).get(`/api/live/${pin}/events`).set('Cookie', guestCookieFrom(joined)).expect(403);
   });
 });

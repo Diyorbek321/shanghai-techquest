@@ -176,6 +176,13 @@ export function AuthScreen() {
           {mode === 'login' ? "Hisobingiz yo'qmi? " : 'Hisobingiz bormi? '}
           <span className="text-brand-cyan font-semibold">{mode === 'login' ? "Ro'yxatdan o'tish" : 'Kirish'}</span>
         </button>
+
+        <a
+          href="/play"
+          className="mt-4 block w-full rounded-lg border border-brand-green/40 py-2.5 text-center text-sm font-semibold text-brand-green transition-colors hover:bg-brand-green/10"
+        >
+          PIN bilan jonli viktorinaga qo'shilish
+        </a>
       </motion.div>
     </div>
   );

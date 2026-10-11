@@ -50,7 +50,10 @@ import { audioManager } from './lib/audio';
 audioManager.init();
 
 export default function App({ user }: { user: User }) {
-  const [currentView, setCurrentView] = useState<ViewType>('dashboard');
+  // A signed-in user opening the public /play link lands straight on the quiz.
+  const [currentView, setCurrentView] = useState<ViewType>(() =>
+    window.location.pathname.replace(/\/+$/, '') === '/play' ? 'live_quiz' : 'dashboard'
+  );
   const [showSuccess, setShowSuccess] = useState(false);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [selectedBattleId, setSelectedBattleId] = useState<string | null>(null);

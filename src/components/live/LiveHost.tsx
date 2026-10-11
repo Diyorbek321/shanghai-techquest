@@ -138,6 +138,11 @@ function HostGame({ pin, onClose }: { pin: string; onClose: () => void }) {
   const seconds = useCountdown(view?.phase === 'question' ? view.question?.endsAt ?? null : null, clockOffset);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const kick = useMutation({
+    mutationFn: (playerId: string) => api.post(`/live/${pin}/kick`, { playerId }),
+    onMutate: () => setActionError(null),
+    onError: (err) => setActionError((err as ApiError).message),
+  });
   const act = useMutation({
     mutationFn: (action: 'next' | 'skip' | 'end') => api.post(`/live/${pin}/${action}`),
     onMutate: () => setActionError(null),
@@ -186,7 +191,9 @@ function HostGame({ pin, onClose }: { pin: string; onClose: () => void }) {
 
       <AnimatePresence mode="wait">
         <motion.div key={`${view.phase}-${view.question?.index ?? -1}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-          {view.phase === 'lobby' && <Lobby view={view} onStart={() => act.mutate('next')} starting={act.isPending} />}
+          {view.phase === 'lobby' && (
+            <Lobby view={view} onStart={() => act.mutate('next')} starting={act.isPending} onKick={(id) => kick.mutate(id)} />
+          )}
           {view.phase === 'question' && <OpenQuestion view={view} seconds={seconds} onSkip={() => act.mutate('skip')} />}
           {view.phase === 'reveal' && <Reveal view={view} onNext={() => act.mutate('next')} busy={act.isPending} />}
           {view.phase === 'finished' && <Finished view={view} onNew={onClose} />}
@@ -196,13 +203,22 @@ function HostGame({ pin, onClose }: { pin: string; onClose: () => void }) {
   );
 }
 
-function Lobby({ view, onStart, starting }: { view: HostView; onStart: () => void; starting: boolean }) {
+interface LobbyProps {
+  view: HostView;
+  onStart: () => void;
+  starting: boolean;
+  onKick: (playerId: string) => void;
+}
+
+function Lobby({ view, onStart, starting, onKick }: LobbyProps) {
+  const joinUrl = `${window.location.host}/play`;
   return (
     <div className="space-y-8 text-center">
       <div className="rounded-2xl border border-brand-border bg-brand-card p-8">
         <p className="text-gray-400">
-          TechQuest'ga kiring → <b className="text-white">Jonli viktorina</b> → PIN kiriting
+          Telefonda oching: <b className="text-white">{joinUrl}</b>
         </p>
+        <p className="mt-1 text-xs text-gray-500">Akkaunt shart emas — PIN va ism yetarli. O'quvchilar o'z akkauntidan ham kira oladi.</p>
         <p className="mt-4 font-heading text-7xl font-bold tracking-[0.2em] text-brand-cyan text-glow sm:text-8xl">{view.pin}</p>
         <p className="mt-4 text-sm text-gray-500">
           {view.questionCount} savol · har biriga {view.timeLimitMs / 1000} soniya
@@ -217,9 +233,18 @@ function Lobby({ view, onStart, starting }: { view: HostView; onStart: () => voi
               key={p.userId}
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              className="rounded-full border border-brand-border bg-brand-card px-4 py-2 font-medium"
+              className="flex items-center gap-2 rounded-full border border-brand-border bg-brand-card py-2 pl-4 pr-2 font-medium"
             >
               {p.name}
+              {p.guest && <span className="rounded bg-white/10 px-1.5 text-[10px] uppercase tracking-wider text-gray-400">mehmon</span>}
+              <button
+                type="button"
+                onClick={() => window.confirm(`${p.name} o'yindan chiqarilsinmi?`) && onKick(p.userId)}
+                className="rounded-full p-1 text-gray-500 hover:bg-red-500/20 hover:text-red-400"
+                aria-label={`${p.name}ni chiqarish`}
+              >
+                <X size={14} />
+              </button>
             </motion.span>
           ))}
         </AnimatePresence>

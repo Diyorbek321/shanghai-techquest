@@ -7,7 +7,9 @@ import {
   createGame,
   GameRuleError,
   MAX_POINTS,
+  normalizeGuestName,
   pointsFor,
+  removePlayer,
   reveal,
   settled,
   standings,
@@ -164,7 +166,34 @@ describe('end of game', () => {
   });
 
   it('pays participation, score and podium XP — but no podium for zero', () => {
-    expect(xpFor({ userId: 'a', name: 'a', avatarUrl: null, score: 1950, correctCount: 2, rank: 1 })).toBe(10 + 19 + 50);
-    expect(xpFor({ userId: 'b', name: 'b', avatarUrl: null, score: 0, correctCount: 0, rank: 1 })).toBe(10);
+    expect(xpFor({ userId: 'a', name: 'a', avatarUrl: null, guest: false, score: 1950, correctCount: 2, rank: 1 })).toBe(10 + 19 + 50);
+    expect(xpFor({ userId: 'b', name: 'b', avatarUrl: null, guest: false, score: 0, correctCount: 0, rank: 1 })).toBe(10);
+  });
+});
+
+describe('guests', () => {
+  const guest = (userId: string, name: string) => ({ userId, name, avatarUrl: null, guest: true });
+
+  it('normalizes and bounds guest names', () => {
+    expect(normalizeGuestName('  Ali   Valiyev ')).toBe('Ali Valiyev');
+    expect(normalizeGuestName('A')).toBeNull();
+    expect(normalizeGuestName('x'.repeat(25))).toBeNull();
+  });
+
+  it('refuses a guest name already in the game, ignoring case', () => {
+    expect(() => addPlayer(lobby(), guest('g1', 'ALI'))).toThrow('Bu ism band. Boshqa ism tanlang.');
+    const game = addPlayer(lobby(), guest('g1', 'Sardor'));
+    expect(game.players.g1.guest).toBe(true);
+  });
+
+  it('marks guests in the standings so persistence can skip them', () => {
+    const game = addPlayer(lobby(), guest('g1', 'Mehmon'));
+    expect(standings(game).find((s) => s.userId === 'g1')?.guest).toBe(true);
+    expect(standings(game).find((s) => s.userId === 'ali')?.guest).toBe(false);
+  });
+
+  it('lets the host remove a player only before the game starts', () => {
+    expect(removePlayer(lobby(), 'ali').players.ali).toBeUndefined();
+    expect(() => removePlayer(started(), 'ali')).toThrow(GameRuleError);
   });
 });

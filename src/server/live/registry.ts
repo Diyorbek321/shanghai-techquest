@@ -7,8 +7,8 @@
  * docker-compose.yml guarantees today; a second replica would need the rooms
  * moved to Redis.
  */
-import { randomInt } from 'node:crypto';
-import { ANSWER_GRACE_MS, allAnswered, finish, questionEndsAt, reveal, standings, type Game, type Standing } from './game';
+import { randomBytes, randomInt } from 'node:crypto';
+import { addPlayer, ANSWER_GRACE_MS, allAnswered, finish, questionEndsAt, reveal, standings, type Game, type Standing } from './game';
 import { hostView, playerView, type LiveView } from './views';
 
 /** One open SSE stream. `send` is injected so the registry never sees Express. */
@@ -36,6 +36,12 @@ export const FINISHED_ROOM_TTL_MS = 15 * 60 * 1000;
 export function createRegistry(deps: { persist: PersistFn; now?: () => number }) {
   const now = deps.now ?? Date.now;
   const rooms = new Map<string, Room>();
+  /**
+   * Guest session token → who they are. The token sits in an httpOnly cookie;
+   * the player id it maps to is what everyone else sees, so knowing a guest's
+   * id (it is in every standings list) never lets you act as them.
+   */
+  const guests = new Map<string, { pin: string; playerId: string }>();
 
   function viewFor(game: Game, userId: string): LiveView {
     return userId === game.hostId ? hostView(game, now()) : playerView(game, userId, now());
@@ -43,6 +49,13 @@ export function createRegistry(deps: { persist: PersistFn; now?: () => number })
 
   function broadcast(room: Room): void {
     for (const sub of room.subscribers) {
+      // Removed by the host: end their stream. EventSource then reconnects,
+      // gets 403, and the phone falls back to the join form.
+      if (sub.userId !== room.game.hostId && !room.game.players[sub.userId]) {
+        room.subscribers.delete(sub);
+        sub.close();
+        continue;
+      }
       try {
         sub.send(viewFor(room.game, sub.userId));
       } catch {
@@ -102,6 +115,18 @@ export function createRegistry(deps: { persist: PersistFn; now?: () => number })
     clearTimer(room);
     for (const sub of room.subscribers) sub.close();
     rooms.delete(pin);
+    for (const [token, guest] of guests) {
+      if (guest.pin === pin) guests.delete(token);
+    }
+  }
+
+  /** Apply a rule from ./game. Throws whatever the rule throws, before any state changes. */
+  function update(pin: string, change: (game: Game, at: number) => Game): Game {
+    const room = rooms.get(pin);
+    if (!room) throw new RoomNotFoundError();
+    const next = change(room.game, now());
+    if (next !== room.game) commit(room, next);
+    return room.game;
   }
 
   return {
@@ -126,13 +151,20 @@ export function createRegistry(deps: { persist: PersistFn; now?: () => number })
       return undefined;
     },
 
-    /** Apply a rule from ./game. Throws whatever the rule throws, before any state changes. */
-    update(pin: string, change: (game: Game, at: number) => Game): Game {
-      const room = rooms.get(pin);
-      if (!room) throw new RoomNotFoundError();
-      const next = change(room.game, now());
-      if (next !== room.game) commit(room, next);
-      return room.game;
+    update,
+
+    /** Adds a guest to a lobby and returns the secret that identifies them from now on. */
+    joinAsGuest(pin: string, name: string): { token: string; playerId: string } {
+      const token = randomBytes(32).toString('base64url');
+      const playerId = `guest_${randomBytes(9).toString('base64url')}`;
+      update(pin, (g) => addPlayer(g, { userId: playerId, name, avatarUrl: null, guest: true }));
+      guests.set(token, { pin, playerId });
+      return { token, playerId };
+    },
+
+    /** The guest a token belongs to, if their room still exists. */
+    resolveGuest(token: string): { pin: string; playerId: string } | undefined {
+      return guests.get(token);
     },
 
     end(pin: string): void {

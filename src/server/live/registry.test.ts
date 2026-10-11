@@ -102,3 +102,16 @@ describe('live registry', () => {
     expect(() => registry.update('111111', advance)).toThrow(RoomNotFoundError);
   });
 });
+
+describe('live registry — kicked players', () => {
+  it('closes the stream of a player the host removed', async () => {
+    const { removePlayer } = await import('./game');
+    const registry = createRegistry({ persist: vi.fn<PersistFn>().mockResolvedValue(undefined) });
+    registry.open(newGame());
+    registry.update('111111', (g) => addPlayer(g, { userId: 'ali', name: 'Ali', avatarUrl: null }));
+    const close = vi.fn();
+    registry.subscribe('111111', { userId: 'ali', send: () => {}, close });
+    registry.update('111111', (g) => removePlayer(g, 'ali'));
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+});

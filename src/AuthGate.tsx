@@ -2,6 +2,10 @@ import React from 'react';
 import { useAuth } from './lib/AuthContext';
 import { AuthScreen } from './views/AuthScreen';
 import App from './App';
+import { GuestPlay } from './views/GuestPlay';
+
+/** /play is the public join page for the live quiz; it needs no account. */
+const isPlayPath = () => window.location.pathname.replace(/\/+$/, '') === '/play';
 
 export function AuthGate() {
   const { user, isLoading } = useAuth();
@@ -15,7 +19,7 @@ export function AuthGate() {
   }
 
   if (!user) {
-    return <AuthScreen />;
+    return isPlayPath() ? <GuestPlay /> : <AuthScreen />;
   }
 
   return <App user={user} />;

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useMutation } from '@tanstack/react-query';
 import { CheckCircle2, Flame, Loader2, LogIn, XCircle } from 'lucide-react';
@@ -9,58 +9,91 @@ import { cn } from '../../lib/utils';
 import { CHOICE_STYLES, ChoiceIcon, ConnectionBanner, CountdownBadge, Podium, StandingsList } from './shared';
 import { useCountdown, useLiveGame } from './useLiveGame';
 
-/** Remembered per tab so a reload drops the student back into the same game. */
-const PIN_KEY = 'techquest.livePin';
+/** Remembered per tab so a reload drops the player back into the same game. */
+const SESSION_KEY = 'techquest.liveSession';
 
-function readStoredPin(): string | null {
+interface LiveSession {
+  pin: string;
+  /** Whose row to highlight: the user id, or the guest's player id. */
+  playerId: string;
+}
+
+function readSession(): LiveSession | null {
   try {
-    return sessionStorage.getItem(PIN_KEY);
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Partial<LiveSession>) : null;
+    return parsed?.pin && parsed.playerId ? { pin: parsed.pin, playerId: parsed.playerId } : null;
   } catch {
     return null;
   }
 }
 
-function storePin(pin: string | null): void {
+function storeSession(session: LiveSession | null): void {
   try {
-    if (pin) sessionStorage.setItem(PIN_KEY, pin);
-    else sessionStorage.removeItem(PIN_KEY);
+    if (session) sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    else sessionStorage.removeItem(SESSION_KEY);
   } catch {
     // Storage blocked (private mode): rejoining after a reload just needs the PIN again.
   }
 }
 
-export function LivePlayer({ userId }: { userId: string }) {
-  const [pin, setPin] = useState<string | null>(readStoredPin);
+/** A PIN handed over in the link (/play?pin=123456) saves typing it on a phone. */
+function pinFromUrl(): string {
+  try {
+    const pin = new URLSearchParams(window.location.search).get('pin') ?? '';
+    return /^\d{6}$/.test(pin) ? pin : '';
+  } catch {
+    return '';
+  }
+}
+
+type LivePlayerProps = { guest: true; userId?: undefined } | { guest?: false; userId: string };
+
+export function LivePlayer(props: LivePlayerProps) {
+  const [session, setSession] = useState<LiveSession | null>(readSession);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const leave = (message: string | null) => {
-    storePin(null);
-    setPin(null);
+  const leave = useCallback((message: string | null) => {
+    storeSession(null);
+    setSession(null);
     setNotice(message);
-  };
+  }, []);
 
-  if (!pin) {
+  if (!session) {
     return (
       <JoinForm
+        guest={props.guest === true}
         notice={notice}
-        onJoined={(p) => {
-          storePin(p);
+        onJoined={(pin, playerId) => {
+          const next = { pin, playerId: props.userId ?? playerId };
+          storeSession(next);
           setNotice(null);
-          setPin(p);
+          setSession(next);
         }}
       />
     );
   }
-  return <PlayerGame pin={pin} userId={userId} onLeave={leave} />;
+  return <PlayerGame pin={session.pin} userId={session.playerId} onLeave={leave} />;
 }
 
-function JoinForm({ notice, onJoined }: { notice: string | null; onJoined: (pin: string) => void }) {
-  const [value, setValue] = useState('');
+interface JoinFormProps {
+  guest: boolean;
+  notice: string | null;
+  onJoined: (pin: string, playerId: string) => void;
+}
+
+function JoinForm({ guest, notice, onJoined }: JoinFormProps) {
+  const [pin, setPin] = useState(pinFromUrl);
+  const [name, setName] = useState('');
   const join = useMutation({
-    mutationFn: (pin: string) => api.post<{ role: 'player' | 'host' }>(`/live/${pin}/join`),
-    onSuccess: (_res, pin) => onJoined(pin),
+    mutationFn: () =>
+      guest
+        ? api.post<{ playerId: string }>(`/live/${pin}/guest`, { name })
+        : api.post<{ role: 'player' | 'host' }>(`/live/${pin}/join`).then(() => ({ playerId: '' })),
+    onSuccess: ({ playerId }) => onJoined(pin, playerId),
   });
-  const valid = /^\d{6}$/.test(value);
+  const nameOk = !guest || name.trim().length >= 2;
+  const valid = /^\d{6}$/.test(pin) && nameOk;
 
   return (
     <div className="mx-auto mt-8 max-w-sm space-y-6 text-center">
@@ -70,7 +103,7 @@ function JoinForm({ notice, onJoined }: { notice: string | null; onJoined: (pin:
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (valid) join.mutate(value);
+          if (valid) join.mutate();
         }}
         className="space-y-3"
       >
@@ -78,12 +111,23 @@ function JoinForm({ notice, onJoined }: { notice: string | null; onJoined: (pin:
           inputMode="numeric"
           autoComplete="off"
           maxLength={6}
-          value={value}
-          onChange={(e) => setValue(e.target.value.replace(/\D/g, ''))}
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
           placeholder="PIN"
           aria-label="O'yin PIN kodi"
           className="w-full rounded-xl border border-brand-border bg-brand-card px-4 py-4 text-center font-mono text-3xl tracking-[0.3em] text-white placeholder:text-gray-600 focus:border-brand-cyan focus:outline-none"
         />
+        {guest && (
+          <input
+            autoComplete="nickname"
+            maxLength={24}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ismingiz"
+            aria-label="Ismingiz"
+            className="w-full rounded-xl border border-brand-border bg-brand-card px-4 py-3 text-center text-lg text-white placeholder:text-gray-600 focus:border-brand-cyan focus:outline-none"
+          />
+        )}
         {join.error && <p className="text-sm text-red-400">{(join.error as ApiError).message}</p>}
         <button
           type="submit"
@@ -257,7 +301,9 @@ function Final({ view, userId, onLeave }: { view: PlayerView; userId: string; on
       <p className="text-lg">
         Siz <b className="text-brand-cyan">{view.me.rank}</b>-o'rin · <span className="font-mono">{view.me.score}</span> ball
       </p>
-      <p className="text-sm text-gray-500">XP hisobingizga qo'shildi.</p>
+      <p className="text-sm text-gray-500">
+        {view.me.guest ? "Ro'yxatdan o'tgan o'quvchilar o'yin uchun XP ham oladi." : "XP hisobingizga qo'shildi."}
+      </p>
       <div className="text-left">
         <StandingsList rows={view.top} highlightId={userId} />
       </div>

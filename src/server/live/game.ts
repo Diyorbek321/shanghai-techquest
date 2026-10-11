@@ -29,6 +29,8 @@ export interface Player {
   userId: string;
   name: string;
   avatarUrl: string | null;
+  /** Joined with a PIN and a name only — no account, so no XP and no saved result. */
+  guest: boolean;
   score: number;
   /** Consecutive correct answers; resets on a wrong or missing answer. */
   streak: number;
@@ -88,7 +90,23 @@ export function createGame(input: {
  * a leaderboard they can never catch up on. Re-joining (a reload, a dropped
  * connection) is always allowed and keeps the player's score.
  */
-export function addPlayer(game: Game, player: { userId: string; name: string; avatarUrl: string | null }): Game {
+export interface NewPlayer {
+  userId: string;
+  name: string;
+  avatarUrl: string | null;
+  guest?: boolean;
+}
+
+export const MAX_GUEST_NAME_LENGTH = 24;
+
+/** Trims and collapses whitespace; returns null when nothing usable is left. */
+export function normalizeGuestName(raw: string): string | null {
+  const name = raw.replace(/\s+/g, ' ').trim();
+  if (name.length < 2 || name.length > MAX_GUEST_NAME_LENGTH) return null;
+  return name;
+}
+
+export function addPlayer(game: Game, player: NewPlayer): Game {
   if (game.players[player.userId]) return game;
   if (player.userId === game.hostId) {
     throw new GameRuleError("O'yin boshlovchisi ishtirokchi bo'la olmaydi.");
@@ -99,12 +117,20 @@ export function addPlayer(game: Game, player: { userId: string; name: string; av
   if (Object.keys(game.players).length >= MAX_PLAYERS) {
     throw new GameRuleError("O'yin to'lgan.");
   }
-  const fresh: Player = { ...player, score: 0, streak: 0, correctCount: 0, answers: {} };
+  // Two guests called "Ali" would be indistinguishable on the projector, and a
+  // guest copying a registered student's name could pass as them.
+  if (player.guest) {
+    const taken = Object.values(game.players).some((p) => p.name.toLowerCase() === player.name.toLowerCase());
+    if (taken) throw new GameRuleError("Bu ism band. Boshqa ism tanlang.");
+  }
+  const fresh: Player = { ...player, guest: player.guest ?? false, score: 0, streak: 0, correctCount: 0, answers: {} };
   return { ...game, players: { ...game.players, [player.userId]: fresh } };
 }
 
+/** Host removes a player — only in the lobby, where nobody has scored yet. */
 export function removePlayer(game: Game, userId: string): Game {
-  if (game.phase !== 'lobby' || !game.players[userId]) return game;
+  if (!game.players[userId]) return game;
+  if (game.phase !== 'lobby') throw new GameRuleError("O'yin boshlangach ishtirokchini chiqarib bo'lmaydi.");
   const { [userId]: _removed, ...rest } = game.players;
   return { ...game, players: rest };
 }
@@ -227,6 +253,7 @@ export interface Standing {
   userId: string;
   name: string;
   avatarUrl: string | null;
+  guest: boolean;
   score: number;
   correctCount: number;
   rank: number;
@@ -235,7 +262,7 @@ export interface Standing {
 /** Ties share a rank (1, 2, 2, 4) so equal scores are never split arbitrarily. */
 export function standings(game: Game): Standing[] {
   const sorted = Object.values(game.players)
-    .map(({ userId, name, avatarUrl, score, correctCount }) => ({ userId, name, avatarUrl, score, correctCount }))
+    .map(({ userId, name, avatarUrl, guest, score, correctCount }) => ({ userId, name, avatarUrl, guest, score, correctCount }))
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
   return sorted.map((p, i) => ({
     ...p,

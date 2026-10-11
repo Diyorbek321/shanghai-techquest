@@ -33,7 +33,7 @@ interface BaseView {
 
 export interface HostView extends BaseView {
   role: 'host';
-  players: { userId: string; name: string; avatarUrl: string | null }[];
+  players: { userId: string; name: string; avatarUrl: string | null; guest: boolean }[];
   answeredCount: number;
   standings: Standing[];
 }
@@ -41,6 +41,8 @@ export interface HostView extends BaseView {
 export interface PlayerView extends BaseView {
   role: 'player';
   me: {
+    name: string;
+    guest: boolean;
     score: number;
     streak: number;
     rank: number;
@@ -79,7 +81,7 @@ export function hostView(game: Game, now: number): HostView {
   return {
     ...baseView(game, now),
     role: 'host',
-    players: players.map(({ userId, name, avatarUrl }) => ({ userId, name, avatarUrl })),
+    players: players.map(({ userId, name, avatarUrl, guest }) => ({ userId, name, avatarUrl, guest })),
     answeredCount: game.phase === 'question' ? players.filter((p) => p.answers[game.index]).length : 0,
     standings: game.phase === 'lobby' ? [] : standings(settled(game)),
   };
@@ -95,6 +97,8 @@ export function playerView(game: Game, userId: string, now: number): PlayerView 
     ...baseView(game, now),
     role: 'player',
     me: {
+      name: player?.name ?? '',
+      guest: player?.guest ?? false,
       score: player?.score ?? 0,
       streak: player?.streak ?? 0,
       rank: table.find((s) => s.userId === userId)?.rank ?? 0,
