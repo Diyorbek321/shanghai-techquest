@@ -9,6 +9,7 @@
 import type { LessonQuizRecord } from './types';
 import { backendQuizM1a } from './backendQuiz.m1a';
 import { backendQuizM1b } from './backendQuiz.m1b';
+import { backendQuizM1c } from './backendQuiz.m1c';
 import { backendQuizB01 } from './backendQuiz.b01';
 import { backendQuizB02 } from './backendQuiz.b02';
 import { backendQuizB03 } from './backendQuiz.b03';
@@ -26,6 +27,8 @@ export const backendLessonQuiz: LessonQuizRecord[] = [
   // Oy 1 — darslar 1..12
   ...backendQuizM1a,
   ...backendQuizM1b,
+  // Darslar 1..3 uchun 6..10-savollar (jonli viktorina uchun 10 tadan)
+  ...backendQuizM1c,
   // Darslar 13..96, har bir fayl 7 ta darsni qamrab oladi
   ...backendQuizB01,
   ...backendQuizB02,

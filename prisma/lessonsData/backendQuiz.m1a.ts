@@ -17,7 +17,7 @@
 export interface LessonQuizRecord {
   /** Lesson `key` this question belongs to, e.g. `backend-dars-01`. */
   lessonKey: string;
-  /** 1..5 — position of the question inside the lesson. Unique per lesson. */
+  /** 1-based position of the question inside the lesson (1..5, or 1..10 where m1c adds more). Unique per lesson. */
   order: number;
   /** The question text, in Uzbek. */
   prompt: string;
