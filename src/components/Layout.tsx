@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Gamepad2,
   LayoutDashboard,
   BookOpen,
   CheckSquare,
@@ -77,6 +78,7 @@ export function Layout({ children, currentView, onNavigate, user }: LayoutProps)
     { id: 'problems', label: 'Masalalar', icon: <BrainCircuit size={20} /> },
     { id: 'codelab', label: 'Kod Laboratoriyasi', icon: <Code size={20} /> },
     { id: 'robotics_lab', label: 'Robototexnika', icon: <Cpu size={20} />, customColor: 'text-brand-cyan shadow-[0_0_10px_rgba(0,217,255,0.3)]', trackRequirement: 'robotics' },
+    { id: 'live_quiz', label: 'Jonli viktorina', icon: <Gamepad2 size={20} />, customColor: 'text-brand-green' },
     { id: 'arena', label: 'Arena', icon: <Swords size={20} />, customColor: 'text-brand-red shadow-[0_0_10px_rgba(239,68,68,0.5)]' },
     { id: 'leaderboard', label: 'Reyting', icon: <Trophy size={20} /> },
     { id: 'teams', label: 'Jamoalar', icon: <Users size={20} />, customColor: 'text-brand-orange' },
@@ -91,6 +93,7 @@ export function Layout({ children, currentView, onNavigate, user }: LayoutProps)
     { id: 'dashboard', label: 'Boshqaruv paneli', icon: <LayoutDashboard size={20} /> },
     { id: 'teacher_portal', label: "O'qituvchi paneli", icon: <ShieldCheck size={20} />, customColor: 'text-brand-purple' },
     { id: 'classes', label: 'Sinflar', icon: <BookOpen size={20} /> },
+    { id: 'live_quiz', label: 'Jonli viktorina', icon: <Gamepad2 size={20} />, customColor: 'text-brand-green' },
     { id: 'assignments', label: 'Vazifalar', icon: <CheckSquare size={20} /> },
     { id: 'homework', label: 'Uy vazifasi', icon: <BookText size={20} />, customColor: 'text-brand-orange' },
     { id: 'attendance', label: 'Davomat', icon: <CalendarDays size={20} /> },

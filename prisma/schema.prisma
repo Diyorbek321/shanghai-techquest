@@ -212,6 +212,8 @@ model User {
   certificates         Certificate[]
   pairedSubmissions    Submission[]      @relation("SubmissionPartner")
   peerReviews          PeerReview[]      @relation("PeerReviewer")
+  hostedLiveGames      LiveGame[]
+  liveGameResults      LiveGameResult[]
 
   @@index([teamId])
 }
@@ -311,6 +313,7 @@ model Lesson {
   problems      Problem[]
   quizQuestions QuizQuestion[]
   projectRubric ProjectRubric?
+  liveGames     LiveGame[]
 
   @@unique([track, order])
   @@index([track, month])
@@ -823,4 +826,36 @@ model SsoNonce {
   expiresAt DateTime
 
   @@index([expiresAt])
+}
+
+/// A finished Kahoot-style live quiz. The game itself runs in server memory
+/// (src/server/live); only the outcome is written here, once, when it ends.
+model LiveGame {
+  id         String   @id @default(cuid())
+  hostId     String
+  host       User     @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  lessonId   String
+  lesson     Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  questionCount Int
+  startedAt  DateTime
+  finishedAt DateTime @default(now())
+
+  results LiveGameResult[]
+
+  @@index([hostId, finishedAt])
+}
+
+model LiveGameResult {
+  id           String   @id @default(cuid())
+  gameId       String
+  game         LiveGame @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rank         Int
+  score        Int
+  correctCount Int
+  xpAwarded    Int
+
+  @@unique([gameId, userId])
+  @@index([userId])
 }

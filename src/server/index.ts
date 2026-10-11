@@ -5,6 +5,7 @@ import { mountDevMiddleware, mountProdStatic } from './viteDev';
 import { apiRateLimiter } from './middleware/rateLimit';
 import { verifyOrigin } from './middleware/csrf';
 import { integrationRouter } from './routes/integration';
+import { liveRouter } from './routes/live';
 
 export function createApp(): express.Express {
   const app = express();
@@ -16,6 +17,9 @@ export function createApp(): express.Express {
   app.use(express.json());
   app.use(cookieParser());
 
+  // Ahead of the per-IP limiter: a whole class plays from one school IP, so
+  // the live quiz is rate-limited per user inside its own router instead.
+  app.use('/api/live', verifyOrigin, liveRouter);
   app.use('/api', verifyOrigin, apiRateLimiter, apiRouter);
 
   return app;

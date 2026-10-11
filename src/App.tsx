@@ -37,6 +37,7 @@ import { Notifications } from './views/Notifications';
 import { Grades } from './views/Grades';
 import { Calendar } from './views/Calendar';
 import { UserManagement } from './views/UserManagement';
+import { LiveQuiz } from './views/LiveQuiz';
 import { AIMentorChat } from './components/AIMentorChat';
 import { SuccessParticles } from './components/SuccessParticles';
 import { Companion } from './components/Companion';
@@ -130,6 +131,8 @@ export default function App({ user }: { user: User }) {
         return <Teams user={mockUser} />;
       case 'help':
         return <HelpCenter />;
+      case 'live_quiz':
+        return <LiveQuiz user={mockUser} />;
       case 'battle':
         return <Battle user={mockUser} onNavigate={setCurrentView} battleId={selectedBattleId} />;
       case 'robotics_lab':
