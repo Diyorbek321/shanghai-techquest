@@ -86,6 +86,32 @@ describe('live quiz API', () => {
     await request(app).post('/api/live/abc/join').set('Cookie', cookies.ali).expect(404);
   });
 
+  it('opens a game from a question pack and saves it without a lesson', async () => {
+    const listed = await request(app).get('/api/live/lessons').set('Cookie', cookies.teacher).expect(200);
+    expect(listed.body.packs).toContainEqual(
+      expect.objectContaining({ key: 'en-so-neither', section: 'Ingliz tili', questionCount: 25 })
+    );
+
+    // Exactly one source: neither or both is a bad request; an unknown pack is 404.
+    await request(app).post('/api/live').set('Cookie', cookies.teacher).send({}).expect(400);
+    await request(app).post('/api/live').set('Cookie', cookies.teacher).send({ lessonKey, packKey: 'en-so-neither' }).expect(400);
+    await request(app).post('/api/live').set('Cookie', cookies.teacher).send({ packKey: 'no-such-pack' }).expect(404);
+
+    const created = await request(app).post('/api/live').set('Cookie', cookies.teacher).send({ packKey: 'en-so-neither' }).expect(201);
+    const pin: string = created.body.pin;
+    expect(registry.get(pin)!.lessonTitle).toBe('So / Neither');
+    expect(registry.get(pin)!.questions).toHaveLength(25);
+
+    await request(app).post(`/api/live/${pin}/join`).set('Cookie', cookies.late).expect(200, { role: 'player' });
+    await request(app).post(`/api/live/${pin}/next`).set('Cookie', cookies.teacher).expect(200, { phase: 'question' });
+    await request(app).post(`/api/live/${pin}/end`).set('Cookie', cookies.teacher).expect(204);
+
+    await vi.waitFor(async () => {
+      const saved = await prisma.liveGame.findFirst({ where: { hostId: ids.teacher, packKey: 'en-so-neither' } });
+      expect(saved?.lessonId).toBeNull();
+    });
+  });
+
   it('plays a full game, keeps the key secret, and pays XP at the end', async () => {
     const created = await request(app).post('/api/live').set('Cookie', cookies.teacher).send({ lessonKey, timeLimitSec: 30 }).expect(201);
     const pin: string = created.body.pin;

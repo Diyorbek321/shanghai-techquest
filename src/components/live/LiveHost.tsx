@@ -16,6 +16,25 @@ interface PlayableLesson {
   questionCount: number;
 }
 
+interface QuestionPackOption {
+  key: string;
+  title: string;
+  section: string;
+  questionCount: number;
+}
+
+/** The picker holds lessons and packs in one <select>, so each value names its kind. */
+type RoundChoice = { lessonKey: string } | { packKey: string };
+
+function parseRoundChoice(value: string): RoundChoice | null {
+  const colon = value.indexOf(':');
+  if (colon < 0 || colon === value.length - 1) return null;
+  const [kind, key] = [value.slice(0, colon), value.slice(colon + 1)];
+  if (kind === 'lesson') return { lessonKey: key };
+  if (kind === 'pack') return { packKey: key };
+  return null;
+}
+
 const TIME_LIMITS = [10, 20, 30, 60] as const;
 const TRACK_LABELS: Record<string, string> = {
   FRONTEND: 'Frontend',
@@ -44,19 +63,24 @@ export function LiveHost() {
 }
 
 function CreateGame({ onCreated }: { onCreated: (pin: string) => void }) {
-  const [lessonKey, setLessonKey] = useState('');
+  const [selected, setSelected] = useState('');
   const [timeLimitSec, setTimeLimitSec] = useState<number>(20);
   const { data, isLoading, error } = useQuery({
     queryKey: ['live', 'lessons'],
-    queryFn: () => api.get<{ lessons: PlayableLesson[] }>('/live/lessons'),
+    queryFn: () => api.get<{ lessons: PlayableLesson[]; packs?: QuestionPackOption[] }>('/live/lessons'),
   });
+  const round = parseRoundChoice(selected);
   const create = useMutation({
-    mutationFn: () => api.post<{ pin: string }>('/live', { lessonKey, timeLimitSec }),
+    mutationFn: () => api.post<{ pin: string }>('/live', { ...round, timeLimitSec }),
     onSuccess: ({ pin }) => onCreated(pin),
   });
 
   const byTrack = (data?.lessons ?? []).reduce<Record<string, PlayableLesson[]>>(
     (acc, l) => ({ ...acc, [l.track]: [...(acc[l.track] ?? []), l] }),
+    {}
+  );
+  const bySection = (data?.packs ?? []).reduce<Record<string, QuestionPackOption[]>>(
+    (acc, p) => ({ ...acc, [p.section]: [...(acc[p.section] ?? []), p] }),
     {}
   );
 
@@ -71,23 +95,32 @@ function CreateGame({ onCreated }: { onCreated: (pin: string) => void }) {
 
       <div className="space-y-4 rounded-xl border border-brand-border bg-brand-card p-6">
         <label className="block">
-          <span className="text-sm font-medium text-gray-300">Dars</span>
+          <span className="text-sm font-medium text-gray-300">Dars yoki savollar to'plami</span>
           {isLoading ? (
             <p className="mt-2 text-sm text-gray-500">Darslar yuklanmoqda...</p>
           ) : error ? (
             <p className="mt-2 text-sm text-red-400">Darslarni yuklab bo'lmadi.</p>
           ) : (
             <select
-              value={lessonKey}
-              onChange={(e) => setLessonKey(e.target.value)}
+              value={selected}
+              onChange={(e) => setSelected(e.target.value)}
               className="mt-2 w-full rounded-lg border border-brand-border bg-brand-bg px-3 py-2 text-white"
             >
-              <option value="">— Darsni tanlang —</option>
+              <option value="">— Tanlang —</option>
               {Object.entries(byTrack).map(([track, lessons]) => (
                 <optgroup key={track} label={TRACK_LABELS[track] ?? track}>
                   {lessons.map((l) => (
-                    <option key={l.key} value={l.key}>
+                    <option key={l.key} value={`lesson:${l.key}`}>
                       {l.order}. {l.title} ({l.questionCount} savol)
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+              {Object.entries(bySection).map(([section, packs]) => (
+                <optgroup key={`pack-${section}`} label={section}>
+                  {packs.map((p) => (
+                    <option key={p.key} value={`pack:${p.key}`}>
+                      {p.title} ({p.questionCount} savol)
                     </option>
                   ))}
                 </optgroup>
@@ -121,7 +154,7 @@ function CreateGame({ onCreated }: { onCreated: (pin: string) => void }) {
 
         <button
           type="button"
-          disabled={!lessonKey || create.isPending}
+          disabled={!round || create.isPending}
           onClick={() => create.mutate()}
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-cyan px-4 py-3 font-bold text-black transition-opacity disabled:opacity-40"
         >

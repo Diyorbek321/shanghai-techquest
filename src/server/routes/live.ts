@@ -19,6 +19,7 @@ import {
 } from '../live/game';
 import { createRegistry, RoomNotFoundError, type Registry } from '../live/registry';
 import { persistLiveGame } from '../live/persist';
+import { findPack, QUESTION_PACKS } from '../live/packs';
 
 /**
  * Kahoot-style live quiz over lesson questions.
@@ -86,10 +87,14 @@ const guestJoinLimiter = rateLimit({
   message: TOO_MANY,
 });
 
-const createSchema = z.object({
-  lessonKey: z.string().min(1).max(100),
-  timeLimitSec: z.number().int().min(5).max(120).default(DEFAULT_TIME_LIMIT_SEC),
-});
+/** A round comes from exactly one source: a lesson's quiz or a question pack. */
+const createSchema = z
+  .object({
+    lessonKey: z.string().min(1).max(100).optional(),
+    packKey: z.string().min(1).max(100).optional(),
+    timeLimitSec: z.number().int().min(5).max(120).default(DEFAULT_TIME_LIMIT_SEC),
+  })
+  .refine((b) => (b.lessonKey === undefined) !== (b.packKey === undefined));
 
 const answerSchema = z.object({
   questionIndex: z.number().int().nonnegative(),
@@ -158,7 +163,7 @@ export function createLiveRouter(registry: Registry): Router {
     return game;
   }
 
-  /** GET /api/live/lessons — lessons that have questions to play. */
+  /** GET /api/live/lessons — lessons that have questions to play, plus the question packs. */
   router.get('/lessons', ...staff, async (_req, res) => {
     const lessons = await prisma.lesson.findMany({
       where: { quizQuestions: { some: {} } },
@@ -167,6 +172,7 @@ export function createLiveRouter(registry: Registry): Router {
     });
     res.json({
       lessons: lessons.map(({ _count, ...l }) => ({ ...l, questionCount: _count.quizQuestions })),
+      packs: QUESTION_PACKS.map((p) => ({ key: p.key, title: p.title, section: p.section, questionCount: p.questions.length })),
     });
   });
 
@@ -176,13 +182,14 @@ export function createLiveRouter(registry: Registry): Router {
     res.json({ pin: game?.pin ?? null });
   });
 
-  /** POST /api/live — open a lobby for one lesson's questions. */
-  router.post('/', ...staff, async (req, res) => {
-    const parsed = createSchema.safeParse(req.body ?? {});
-    if (!parsed.success) return res.status(400).json({ error: "Ma'lumotlar noto'g'ri." });
-
+  /** Questions and title for the requested round, or null when it does not exist. */
+  async function roundSource(body: z.infer<typeof createSchema>) {
+    if (body.packKey !== undefined) {
+      const pack = findPack(body.packKey);
+      return pack && { lessonId: null, packKey: pack.key, lessonTitle: pack.title, questions: pack.questions };
+    }
     const lesson = await prisma.lesson.findUnique({
-      where: { key: parsed.data.lessonKey },
+      where: { key: body.lessonKey },
       select: {
         id: true,
         title: true,
@@ -192,15 +199,22 @@ export function createLiveRouter(registry: Registry): Router {
         },
       },
     });
-    if (!lesson) return res.status(404).json({ error: 'Dars topilmadi.' });
+    return lesson && { lessonId: lesson.id, packKey: null, lessonTitle: lesson.title, questions: lesson.quizQuestions };
+  }
+
+  /** POST /api/live — open a lobby for one lesson's questions or one question pack. */
+  router.post('/', ...staff, async (req, res) => {
+    const parsed = createSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ error: "Ma'lumotlar noto'g'ri." });
+
+    const source = await roundSource(parsed.data);
+    if (!source) return res.status(404).json({ error: "Dars yoki to'plam topilmadi." });
 
     try {
       const game = createGame({
         pin: registry.generatePin(),
         hostId: req.user!.id,
-        lessonId: lesson.id,
-        lessonTitle: lesson.title,
-        questions: lesson.quizQuestions,
+        ...source,
         timeLimitMs: parsed.data.timeLimitSec * 1000,
       });
       registry.open(game);

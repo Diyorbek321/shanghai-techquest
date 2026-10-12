@@ -42,7 +42,10 @@ export interface Player {
 export interface Game {
   pin: string;
   hostId: string;
-  lessonId: string;
+  /** Exactly one of lessonId / packKey is set: the round comes from a lesson or a question pack. */
+  lessonId: string | null;
+  packKey: string | null;
+  /** Shown on the projector and phones — the lesson or pack title. */
   lessonTitle: string;
   questions: readonly LiveQuestion[];
   timeLimitMs: number;
@@ -67,7 +70,8 @@ export class GameRuleError extends Error {}
 export function createGame(input: {
   pin: string;
   hostId: string;
-  lessonId: string;
+  lessonId?: string | null;
+  packKey?: string | null;
   lessonTitle: string;
   questions: readonly LiveQuestion[];
   timeLimitMs: number;
@@ -77,6 +81,8 @@ export function createGame(input: {
   }
   return {
     ...input,
+    lessonId: input.lessonId ?? null,
+    packKey: input.packKey ?? null,
     phase: 'lobby',
     index: -1,
     questionStartedAt: 0,

@@ -15,6 +15,7 @@ export async function persistLiveGame(game: Game, table: Standing[]): Promise<vo
       data: {
         hostId: game.hostId,
         lessonId: game.lessonId,
+        packKey: game.packKey,
         questionCount: game.questions.length,
         startedAt: new Date(game.startedAt ?? Date.now()),
         results: {
