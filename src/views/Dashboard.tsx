@@ -8,12 +8,13 @@ import { api } from '../lib/api';
 import { formatRelativeTime } from '../lib/utils';
 import { trackLabel, TRACK_STYLE } from '../lib/tracks';
 import { ClassGoalWidget } from '../components/ClassGoalWidget';
-import { DailyExerciseCard } from '../components/DailyExerciseCard';
+import { DailyPlanCard } from '../components/DailyPlanCard';
 
 interface DashboardProps {
   user: User;
   onNavigate: (view: ViewType) => void;
   onTriggerSuccess: () => void;
+  onOpenProblem: (problemId: string) => void;
 }
 
 interface ModuleProgressRow {
@@ -56,7 +57,7 @@ function moduleTitle(moduleKey: string): string {
 }
 
 
-export function Dashboard({ user, onNavigate, onTriggerSuccess }: DashboardProps) {
+export function Dashboard({ user, onNavigate, onTriggerSuccess, onOpenProblem }: DashboardProps) {
   const [claimed, setClaimed] = useState(false);
 
   const { data: moduleProgress = [] } = useQuery({
@@ -229,8 +230,9 @@ export function Dashboard({ user, onNavigate, onTriggerSuccess }: DashboardProps
             </section>
           )}
 
-          {/* Today's drill, drawn from the student's own track. */}
-          <DailyExerciseCard track={user.track} onNavigate={onNavigate} />
+          {/* Today's auto-checked plan; falls back to the older drill when the
+              student's class has no timetable to plan against. */}
+          <DailyPlanCard user={user} onNavigate={onNavigate} onOpenProblem={onOpenProblem} />
 
           {/* Today's Tasks */}
           <section className="glass-panel p-5">

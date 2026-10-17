@@ -32,7 +32,18 @@ interface CommittedAnswer {
   result: AnswerResult;
 }
 
-export function LessonQuiz({ lessonKey }: { lessonKey: string }) {
+interface LessonQuizProps {
+  lessonKey: string;
+  /**
+   * Where the questions come from. Defaults to the lesson's own session; the
+   * daily plan passes its day's question set here so the same player is used.
+   */
+  sourcePath?: string;
+  /** Called after every answer, so a parent can refresh what the answer ticked off. */
+  onAnswered?: () => void;
+}
+
+export function LessonQuiz({ lessonKey, sourcePath, onAnswered }: LessonQuizProps) {
   const queryClient = useQueryClient();
   const [index, setIndex] = useState(0);
   const [committed, setCommitted] = useState<CommittedAnswer | null>(null);
@@ -42,7 +53,7 @@ export function LessonQuiz({ lessonKey }: { lessonKey: string }) {
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['quiz', lessonKey],
-    queryFn: () => api.get<QuizSession>(`/quiz/${lessonKey}`),
+    queryFn: () => api.get<QuizSession>(sourcePath ?? `/quiz/${lessonKey}`),
   });
 
   const questions = useMemo(() => data?.questions ?? [], [data]);
@@ -58,6 +69,7 @@ export function LessonQuiz({ lessonKey }: { lessonKey: string }) {
       // The mastery gate and the due-badge both depend on this attempt.
       queryClient.invalidateQueries({ queryKey: ['lessons'] });
       queryClient.invalidateQueries({ queryKey: ['quiz', 'due'] });
+      onAnswered?.();
     },
   });
 

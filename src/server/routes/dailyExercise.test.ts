@@ -6,6 +6,7 @@ import { createApp } from '../index';
 import { prisma } from '../db';
 import { signToken } from '../auth/jwt';
 import { AUTH_COOKIE_NAME } from '../auth/cookies';
+import { dayKey } from '../utils/dayKey';
 
 const app = createApp();
 const uniqueEmail = (label: string) => `${label}-${Date.now()}-${Math.random().toString(36).slice(2)}@vitest.local`;
@@ -16,9 +17,7 @@ function cookieFor(userId: string, role: Role, track: Track | null): string {
 }
 
 function offsetKey(days: number): string {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
+  return dayKey(new Date(Date.now() + days * 24 * 60 * 60 * 1000));
 }
 
 let officeStudentId: string;

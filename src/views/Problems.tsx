@@ -170,8 +170,13 @@ function TestResultRow({ test }: { test: SubmitTestResult }) {
   );
 }
 
-export function Problems() {
-  const [activeProblemId, setActiveProblemId] = useState<string | null>(null);
+interface ProblemsProps {
+  /** Opens straight into one problem, e.g. from the daily plan card. */
+  initialProblemId?: string | null;
+}
+
+export function Problems({ initialProblemId = null }: ProblemsProps) {
+  const [activeProblemId, setActiveProblemId] = useState<string | null>(initialProblemId);
   const [showParsons, setShowParsons] = useState(false);
   const [language, setLanguage] = useState<Language>('javascript');
   const [code, setCode] = useState('');
@@ -233,6 +238,9 @@ export function Problems() {
       setRunResult(null);
       setSubmitFailure(null);
       queryClient.invalidateQueries({ queryKey: ['problems'] });
+      // A pass may have just closed today's plan on the server.
+      queryClient.invalidateQueries({ queryKey: ['daily-plan'] });
+      queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
     },
     onError: (error: unknown) => {
       setSubmitFailure(toSubmitFailure(error));

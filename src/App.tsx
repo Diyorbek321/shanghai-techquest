@@ -57,6 +57,19 @@ export default function App({ user }: { user: User }) {
   const [showSuccess, setShowSuccess] = useState(false);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [selectedBattleId, setSelectedBattleId] = useState<string | null>(null);
+  const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
+
+  // The menu always opens the problem list, never the last problem the daily
+  // plan jumped into.
+  const navigateFromMenu = (view: ViewType) => {
+    setSelectedProblemId(null);
+    setCurrentView(view);
+  };
+
+  const openProblem = (problemId: string) => {
+    setSelectedProblemId(problemId);
+    setCurrentView('problems');
+  };
 
   const triggerSuccess = () => {
     setShowSuccess(true);
@@ -72,7 +85,14 @@ export default function App({ user }: { user: User }) {
   const renderView = () => {
     switch (currentView) {
       case 'dashboard':
-        return <Dashboard user={mockUser} onNavigate={setCurrentView} onTriggerSuccess={triggerSuccess} />;
+        return (
+          <Dashboard
+            user={mockUser}
+            onNavigate={setCurrentView}
+            onTriggerSuccess={triggerSuccess}
+            onOpenProblem={openProblem}
+          />
+        );
       case 'classes':
         return <Classes user={mockUser} onNavigate={setCurrentView} />;
       case 'assignments':
@@ -113,7 +133,8 @@ export default function App({ user }: { user: User }) {
       case 'backend_course':
         return <BackendCourse onNavigate={setCurrentView} onSelectAssignment={setSelectedAssignmentId} />;
       case 'problems':
-        return <Problems />;
+        // Keyed so opening a different problem from the daily plan remounts it.
+        return <Problems key={selectedProblemId ?? 'list'} initialProblemId={selectedProblemId} />;
       case 'leaderboard':
         return <Leaderboard user={mockUser} onNavigate={setCurrentView} onSelectBattle={setSelectedBattleId} />;
       case 'mission_log':
@@ -153,12 +174,19 @@ export default function App({ user }: { user: User }) {
       case 'user_management':
         return <UserManagement />;
       default:
-        return <Dashboard user={mockUser} onNavigate={setCurrentView} onTriggerSuccess={triggerSuccess} />;
+        return (
+          <Dashboard
+            user={mockUser}
+            onNavigate={setCurrentView}
+            onTriggerSuccess={triggerSuccess}
+            onOpenProblem={openProblem}
+          />
+        );
     }
   };
 
   return (
-    <Layout currentView={currentView} onNavigate={setCurrentView} user={mockUser}>
+    <Layout currentView={currentView} onNavigate={navigateFromMenu} user={mockUser}>
       <div className="scanlines"></div>
       <SuccessParticles active={showSuccess} />
       <ShortcutManager />

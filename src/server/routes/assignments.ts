@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { prisma } from '../db';
+import { scheduleSubmissionReview } from '../ai/reviewSubmission';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { resolveTrackFilter } from '../utils/trackScope';
 import { TRACK_VALUES, toClientTrack, toPrismaTrack } from '../serializers/track';
@@ -34,6 +35,19 @@ function serializeAssignment(a: {
   };
 }
 
+/**
+ * A student's own submission as they may see it. The AI suggestion is for the
+ * teacher only: showing an unconfirmed machine score to the student would make
+ * it the grade in all but name.
+ */
+function forStudent<T extends { aiReview?: unknown; aiReviewedAt?: unknown }>(
+  submission: T | null
+): Omit<T, 'aiReview' | 'aiReviewedAt'> | null {
+  if (!submission) return null;
+  const { aiReview: _review, aiReviewedAt: _reviewedAt, ...rest } = submission;
+  return rest;
+}
+
 assignmentsRouter.get('/', async (req, res) => {
   const track = resolveTrackFilter(req);
   const moduleKey = typeof req.query.moduleKey === 'string' ? req.query.moduleKey : undefined;
@@ -48,7 +62,7 @@ assignmentsRouter.get('/', async (req, res) => {
     });
     const byAssignment = new Map(submissions.map((s) => [s.assignmentId, s]));
     return res.json(
-      assignments.map((a) => ({ ...serializeAssignment(a), submission: byAssignment.get(a.id) ?? null }))
+      assignments.map((a) => ({ ...serializeAssignment(a), submission: forStudent(byAssignment.get(a.id) ?? null) }))
     );
   }
 
@@ -66,7 +80,7 @@ assignmentsRouter.get('/:id', async (req, res) => {
       where: { assignmentId_userId: { assignmentId: assignment.id, userId: req.user!.id } },
     });
   }
-  res.json({ ...serializeAssignment(assignment), submission });
+  res.json({ ...serializeAssignment(assignment), submission: forStudent(submission) });
 });
 
 const createSchema = z.object({
@@ -186,6 +200,9 @@ assignmentsRouter.post('/:id/submissions', requireRole(Role.STUDENT), async (req
       partnerId,
       status: 'SUBMITTED',
       submittedAt: new Date(),
+      // New work, new review: the old suggestion was about different text.
+      aiReview: Prisma.DbNull,
+      aiReviewedAt: null,
     },
     create: {
       assignmentId: assignment.id,
@@ -214,12 +231,15 @@ assignmentsRouter.post('/:id/submissions', requireRole(Role.STUDENT), async (req
       partnerId: req.user!.id,
       status: 'SUBMITTED' as const,
       submittedAt: new Date(),
+      aiReview: Prisma.DbNull,
+      aiReviewedAt: null,
     };
-    await prisma.submission.upsert({
+    const mirror = await prisma.submission.upsert({
       where: { assignmentId_userId: { assignmentId: assignment.id, userId: partnerId } },
       update: shared,
       create: { assignmentId: assignment.id, userId: partnerId, ...shared },
     });
+    scheduleSubmissionReview(mirror.id);
     await notify(prisma, {
       userId: partnerId,
       type: 'INFO',
@@ -240,8 +260,9 @@ assignmentsRouter.post('/:id/submissions', requireRole(Role.STUDENT), async (req
   }
 
   await checkAchievements(req.user!.id);
+  scheduleSubmissionReview(submission.id);
 
-  res.status(201).json(submission);
+  res.status(201).json(forStudent(submission));
 });
 
 assignmentsRouter.get('/:id/submissions', requireRole(Role.TEACHER, Role.ADMIN), async (req, res) => {

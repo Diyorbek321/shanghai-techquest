@@ -24,6 +24,7 @@ import { Track } from '../types';
 import { StudentAccountsPanel } from '../components/teacher/StudentAccountsPanel';
 import { HomeworkPanel } from '../components/teacher/HomeworkPanel';
 import { ClassGoalsPanel } from '../components/teacher/ClassGoalsPanel';
+import { DailyPlanPanel } from '../components/teacher/DailyPlanPanel';
 
 interface ClassGroup {
   id: string;
@@ -42,7 +43,7 @@ interface StudentRow {
   lastSubmittedAt: string | null;
 }
 
-type TeacherTab = 'overview' | 'students' | 'accounts' | 'homework' | 'goals';
+type TeacherTab = 'overview' | 'students' | 'accounts' | 'homework' | 'daily' | 'goals';
 
 export function TeacherPortal() {
   const [activeTab, setActiveTab] = useState<TeacherTab>('overview');
@@ -98,12 +99,13 @@ export function TeacherPortal() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 p-1 bg-white/5 border border-white/10 rounded-2xl w-fit">
+      <div className="flex flex-wrap gap-2 p-1 bg-white/5 border border-white/10 rounded-2xl w-fit">
         {[
           { id: 'overview', label: 'Umumiy ko\'rinish', icon: LayoutDashboard },
           { id: 'students', label: 'O\'quvchilar', icon: Users },
           { id: 'accounts', label: 'Login/parol', icon: KeyRound },
           { id: 'homework', label: 'Uy vazifasi', icon: BookText },
+          { id: 'daily', label: 'Kunlik reja', icon: CalendarCheck },
           { id: 'goals', label: 'Sinf maqsadi', icon: Target },
         ].map(tab => (
           <button
@@ -224,6 +226,8 @@ export function TeacherPortal() {
       {activeTab === 'accounts' && <StudentAccountsPanel classId={selectedClassId} />}
 
       {activeTab === 'goals' && <ClassGoalsPanel classId={selectedClassId} />}
+
+      {activeTab === 'daily' && <DailyPlanPanel classId={selectedClassId} />}
 
       {activeTab === 'homework' && (
         <HomeworkPanel

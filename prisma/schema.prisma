@@ -208,6 +208,7 @@ model User {
   sentMessages         DirectMessage[]   @relation("DMSender")
   receivedMessages     DirectMessage[]   @relation("DMRecipient")
   dailyExerciseLogs    DailyExerciseLog[]
+  dailyPlans           DailyPlan[]
   quizAttempts         QuizAttempt[]
   certificates         Certificate[]
   pairedSubmissions    Submission[]      @relation("SubmissionPartner")
@@ -228,6 +229,8 @@ model ClassGroup {
   /// First lesson date. Lesson N's deadline is derived from this plus lessonDays.
   startDate   DateTime?
   /// Weekdays lessons are held on (0 = Sunday). Defaults to Mon/Wed/Fri.
+  /// A weekday listed twice holds two lessons back to back: [6, 0, 0] is one
+  /// lesson on Saturday and a double lesson on Sunday.
   lessonDays  Int[]    @default([1, 3, 5])
   createdAt   DateTime @default(now())
   /// The Eduly group this cohort mirrors; null for classes created by hand.
@@ -448,6 +451,11 @@ model Submission {
   showcased    Boolean  @default(false)
   /// One line from the author about what they built.
   showcaseNote String   @default("")
+  /// Gemini's suggested mark for the written part of the work, made when it is
+  /// handed in: { score, summary, strengths[], improvements[] }. Advisory only —
+  /// the grade a student sees is still the one a teacher confirms.
+  aiReview     Json?
+  aiReviewedAt DateTime?
   peerReviews  PeerReview[]
 
   @@unique([assignmentId, userId])
@@ -817,6 +825,30 @@ model DailyExerciseLog {
 
   @@unique([userId, date])
   @@index([exerciseId])
+}
+
+/// One student's auto-checked work for one day, fixed the first time the day
+/// is opened so "done" means the same thing all day long.
+///
+/// `items` is [{ kind: 'problem', problemId } | { kind: 'quiz', questionIds }].
+/// Nothing here is self-reported: completion is worked out from
+/// ProblemSubmission and QuizAttempt rows (see server/dailyPlan/evaluate.ts).
+model DailyPlan {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  classId     String?
+  /// UTC day, YYYY-MM-DD — same keying as DailyExerciseLog.
+  date        String
+  items       Json      @default("[]")
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+  /// Finished on a later day: still credited, but it does not carry the streak.
+  late        Boolean   @default(false)
+  xpAwarded   Int       @default(0)
+
+  @@unique([userId, date])
+  @@index([classId, date])
 }
 
 /// One-time SSO tokens already spent. A token is valid for seconds, so a row

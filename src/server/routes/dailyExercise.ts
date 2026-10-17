@@ -5,6 +5,8 @@ import { prisma } from '../db';
 import { requireAuth } from '../middleware/auth';
 import { notify } from '../notifications/notify';
 import { eligiblePool, reachedLessonOrder } from '../dailyExercise/progress';
+import { streakChange } from '../dailyPlan/streak';
+import { dayBefore, todayKey } from '../utils/dayKey';
 
 export const dailyExerciseRouter = Router();
 
@@ -14,16 +16,6 @@ const completeSchema = z.object({
   fileUrl: z.string().refine((v) => v.startsWith('/api/uploads/'), { message: 'Fayl manzili yaroqsiz.' }).optional(),
   fileName: z.string().min(1).max(255).optional(),
 });
-
-function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function dayBefore(dateKey: string): string {
-  const d = new Date(`${dateKey}T00:00:00.000Z`);
-  d.setUTCDate(d.getUTCDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
 
 function hashSeed(input: string): number {
   let h = 0;
@@ -98,17 +90,10 @@ dailyExerciseRouter.post('/complete', async (req, res) => {
     return res.status(409).json({ error: 'Bugungi mashq allaqachon bajarilgan.' });
   }
 
-  const yesterdayLog = await prisma.dailyExerciseLog.findUnique({
-    where: { userId_date: { userId: req.user!.id, date: dayBefore(date) } },
-  });
-
-  // A missed day normally drops the streak back to 1. A freeze bought from the
-  // shop absorbs that, but only when there is a real streak to save: a first-day
-  // student has nothing at risk and must not have one silently burned.
-  const missedYesterday = !yesterdayLog?.completed;
-  const streakAtRisk = missedYesterday && req.user!.streak > 0;
-  const usesFreeze = streakAtRisk && req.user!.streakFreezes > 0;
-  const continuesStreak = !missedYesterday || usesFreeze;
+  // Read before the log row below is written, which would otherwise make today
+  // look already counted.
+  const streak = await streakChange(prisma, req.user!, date, dayBefore(date));
+  const usesFreeze = streak.usedFreeze;
 
   await prisma.dailyExerciseLog.upsert({
     where: { userId_date: { userId: req.user!.id, date } },
@@ -134,8 +119,7 @@ dailyExerciseRouter.post('/complete', async (req, res) => {
     where: { id: req.user!.id },
     data: {
       xp: { increment: exercise.xpReward },
-      streak: continuesStreak ? { increment: 1 } : 1,
-      ...(usesFreeze ? { streakFreezes: { decrement: 1 } } : {}),
+      ...streak.data,
     },
   });
 

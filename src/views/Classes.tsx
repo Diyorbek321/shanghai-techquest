@@ -6,6 +6,7 @@ import { ViewType, Track, User } from '../types';
 import { api } from '../lib/api';
 import { TRACK_LABEL, TRACK_STYLE } from '../lib/tracks';
 import { ClassFormModal, EditableClass } from '../components/ClassFormModal';
+import { describeLessonDays } from '../lib/lessonDays';
 
 interface ClassGroup {
   id: string;
@@ -13,6 +14,8 @@ interface ClassGroup {
   track: Track;
   teacherName: string;
   schedule: string | null;
+  startDate: string | null;
+  lessonDays: number[];
   studentCount: number;
 }
 
@@ -28,7 +31,14 @@ export function Classes({ user, onNavigate }: { user: User; onNavigate: (view: V
   };
 
   const openEdit = (cls: ClassGroup) => {
-    setEditing({ id: cls.id, title: cls.title, track: cls.track, schedule: cls.schedule });
+    setEditing({
+      id: cls.id,
+      title: cls.title,
+      track: cls.track,
+      schedule: cls.schedule,
+      startDate: cls.startDate,
+      lessonDays: cls.lessonDays,
+    });
     setIsFormOpen(true);
   };
 
@@ -92,6 +102,10 @@ export function Classes({ user, onNavigate }: { user: User; onNavigate: (view: V
                     <Clock size={14} className="text-brand-orange" />
                     {cls.schedule}
                   </div>
+                )}
+
+                {cls.startDate && cls.lessonDays.length > 0 && (
+                  <p className="text-xs text-gray-500 mb-4">{describeLessonDays(cls.lessonDays)}</p>
                 )}
 
                 <motion.button

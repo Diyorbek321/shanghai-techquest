@@ -42,8 +42,20 @@ classesRouter.get('/', async (req, res) => {
   );
 });
 
-/** 0 = Sunday .. 6 = Saturday. */
-const lessonDaysSchema = z.array(z.coerce.number().int().min(0).max(6)).min(1).max(7);
+/** Most lessons one weekday can hold — a 4.5-hour day is three back to back. */
+const MAX_LESSONS_PER_DAY = 3;
+
+/**
+ * 0 = Sunday .. 6 = Saturday. A weekday listed twice is a double lesson, so
+ * [6, 0, 0] is one lesson on Saturday and two on Sunday.
+ */
+const lessonDaysSchema = z
+  .array(z.coerce.number().int().min(0).max(6))
+  .min(1)
+  .max(7 * MAX_LESSONS_PER_DAY)
+  .refine((days) => days.every((day) => days.filter((d) => d === day).length <= MAX_LESSONS_PER_DAY), {
+    message: `Bir kunda ${MAX_LESSONS_PER_DAY} tadan ortiq dars bo'lishi mumkin emas.`,
+  });
 
 const createSchema = z.object({
   title: z.string().min(1).max(200),

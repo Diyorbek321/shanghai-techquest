@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../db';
 import { requireAuth } from '../middleware/auth';
 import { nextReview, selectReviewQuestions, type DueCandidate } from '../quiz/schedule';
+import { settleOpenPlans } from '../dailyPlan/service';
 
 export const quizRouter = Router();
 
@@ -216,6 +217,8 @@ quizRouter.post('/:questionId/answer', async (req, res) => {
       ? [prisma.user.update({ where: { id: user.id }, data: { xp: { increment: xpAwarded } } })]
       : []),
   ]);
+
+  if (correct) await settleOpenPlans(user.id);
 
   // The answer key is revealed only here, after the student has committed.
   res.json({

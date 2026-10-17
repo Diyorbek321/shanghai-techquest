@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Github, ExternalLink, CheckCircle2, Clock, FileText, Star } from 'lucide-react';
+import { ArrowLeft, Github, ExternalLink, CheckCircle2, Clock, FileText, Loader2, Sparkles, Star } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../lib/api';
 import { formatRelativeTime } from '../lib/utils';
@@ -17,6 +17,14 @@ interface SubmissionRow {
   status: SubmissionStatus;
   submittedAt: string | null;
   user: { id: string; name: string; avatarUrl: string | null };
+  aiReview: AiReview | null;
+}
+
+interface AiReview {
+  score: number;
+  summary: string;
+  strengths: string[];
+  improvements: string[];
 }
 
 interface AssignmentSummary {
@@ -70,6 +78,16 @@ export function AssignmentSubmissions({ assignmentId, onBack }: AssignmentSubmis
   const gradeSubmission = useMutation({
     mutationFn: ({ id, score }: { id: string; score: number }) =>
       api.patch(`/submissions/${id}`, { status: 'GRADED', score, maxScore: 100 }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assignments', assignmentId, 'submissions'] });
+    },
+  });
+
+  // Scores the teacher chose to copy from the AI panel into the grade box.
+  const [applied, setApplied] = useState<Record<string, number>>({});
+
+  const aiReview = useMutation({
+    mutationFn: (id: string) => api.post<{ aiReview: AiReview }>(`/submissions/${id}/ai-review`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assignments', assignmentId, 'submissions'] });
     },
@@ -172,6 +190,16 @@ export function AssignmentSubmissions({ assignmentId, onBack }: AssignmentSubmis
               <p className="text-gray-400 text-xs whitespace-pre-line border-t border-white/5 pt-3">{s.content}</p>
             )}
 
+            {s.content && (
+              <AiReviewPanel
+                review={s.aiReview}
+                isPending={aiReview.isPending && aiReview.variables === s.id}
+                error={aiReview.isError && aiReview.variables === s.id ? aiReview.error : null}
+                onRequest={() => aiReview.mutate(s.id)}
+                onApply={(score) => setApplied((prev) => ({ ...prev, [s.id]: score }))}
+              />
+            )}
+
             <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-white/5">
               <div className="flex items-center gap-2">
                 <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Holat:</label>
@@ -191,6 +219,8 @@ export function AssignmentSubmissions({ assignmentId, onBack }: AssignmentSubmis
               </div>
 
               <GradeControl
+                key={`${s.id}-${applied[s.id] ?? ''}`}
+                suggestedScore={applied[s.id] ?? null}
                 submissionId={s.id}
                 onGrade={(score) => gradeSubmission.mutate({ id: s.id, score })}
                 isPending={gradeSubmission.isPending}
@@ -204,18 +234,86 @@ export function AssignmentSubmissions({ assignmentId, onBack }: AssignmentSubmis
   );
 }
 
+/**
+ * Gemini's suggestion, shown as a starting point. The score reaches the grade
+ * box only when the teacher copies it there, and is never submitted for them:
+ * the mark a student sees is always the teacher's.
+ */
+function AiReviewPanel({
+  review,
+  isPending,
+  error,
+  onRequest,
+  onApply,
+}: {
+  review: AiReview | null;
+  isPending: boolean;
+  error: unknown;
+  onRequest: () => void;
+  onApply: (score: number) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-brand-purple/30 bg-brand-purple/5 p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] uppercase font-bold tracking-widest text-brand-purple flex items-center gap-1">
+          <Sparkles size={12} /> AI tavsiyasi{review ? `: ${review.score}/100` : ''}
+        </p>
+        <button
+          onClick={onRequest}
+          disabled={isPending}
+          className="text-[10px] text-brand-purple hover:underline disabled:opacity-50 flex items-center gap-1"
+        >
+          {isPending && <Loader2 size={10} className="animate-spin" />}
+          {review ? 'Qayta tekshirish' : 'AI bilan tekshirish'}
+        </button>
+      </div>
+      {review ? (
+        <>
+          <p className="text-xs text-gray-300">{review.summary}</p>
+          {review.strengths.length > 0 && (
+            <ul className="text-[11px] text-brand-green list-disc list-inside">
+              {review.strengths.map((item) => <li key={item}>{item}</li>)}
+            </ul>
+          )}
+          {review.improvements.length > 0 && (
+            <ul className="text-[11px] text-brand-orange list-disc list-inside">
+              {review.improvements.map((item) => <li key={item}>{item}</li>)}
+            </ul>
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onApply(review.score)}
+              className="text-[10px] bg-brand-purple/20 hover:bg-brand-purple/30 text-brand-purple border border-brand-purple/40 px-2 py-1 rounded"
+            >
+              Ballni qo'yish ({review.score})
+            </button>
+            <span className="text-[10px] text-gray-500">Ishni o'zingiz ko'rib, keyin tasdiqlang.</span>
+          </div>
+        </>
+      ) : (
+        <p className="text-[11px] text-gray-500">Hali tekshirilmagan.</p>
+      )}
+      {Boolean(error) && (
+        <p className="text-[10px] text-brand-red">{error instanceof ApiError ? error.message : 'Xatolik.'}</p>
+      )}
+    </div>
+  );
+}
+
 function GradeControl({
   submissionId,
+  suggestedScore,
   onGrade,
   isPending,
   error,
 }: {
   submissionId: string;
+  suggestedScore: number | null;
   onGrade: (score: number) => void;
   isPending: boolean;
   error: unknown;
 }) {
-  const [score, setScore] = useState('');
+  const [score, setScore] = useState(suggestedScore === null ? '' : String(suggestedScore));
 
   const handleSubmit = () => {
     const value = Number(score);

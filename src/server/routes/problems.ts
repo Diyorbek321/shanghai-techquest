@@ -11,6 +11,7 @@ import { executeCode, PistonUnavailableError } from '../code/piston';
 import { judgeSubmission, parseTestCases, type JudgeResult, type TestCaseResult } from '../code/judge';
 import { buildBoard, gradeOrder, isParsonsSuitable, seedFrom } from '../parsons/blocks';
 import { parsonsPoints } from '../parsons/award';
+import { settleOpenPlans } from '../dailyPlan/service';
 
 export const problemsRouter = Router();
 
@@ -281,6 +282,7 @@ problemsRouter.post('/:id/submit', async (req, res) => {
   }
 
   await checkAchievements(req.user!.id);
+  if (judged.passed) await settleOpenPlans(req.user!.id);
 
   const results: TestCaseResult[] = judged.results;
 

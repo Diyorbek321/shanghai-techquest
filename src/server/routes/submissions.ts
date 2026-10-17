@@ -5,6 +5,9 @@ import { prisma } from '../db';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { notify } from '../notifications/notify';
 import { checkAchievements } from '../achievements/check';
+import { teacherOwnsClass } from '../utils/teacherScope';
+import { GeminiNotConfiguredError } from '../ai/gemini';
+import { NothingToReviewError, reviewSubmission } from '../ai/reviewSubmission';
 
 export const submissionsRouter = Router();
 
@@ -99,4 +102,46 @@ submissionsRouter.patch('/:id', requireRole(Role.TEACHER, Role.ADMIN), async (re
   await checkAchievements(submission.userId);
 
   res.json(submission);
+});
+
+const AI_REVIEW_COOLDOWN_MS = 60_000;
+
+/**
+ * POST /api/submissions/:id/ai-review — ask Gemini for a suggested mark again
+ * (the first one runs by itself on hand-in). Advisory: it never grades.
+ */
+submissionsRouter.post('/:id/ai-review', requireRole(Role.TEACHER, Role.ADMIN), async (req, res) => {
+  const submission = await prisma.submission.findUnique({
+    where: { id: req.params.id },
+    select: { id: true, aiReviewedAt: true, assignment: { select: { classId: true } } },
+  });
+  if (!submission) {
+    return res.status(404).json({ error: 'Topshiriq topilmadi.' });
+  }
+  // Track-wide assignments have no class; only an admin may run those.
+  const allowed = submission.assignment.classId
+    ? await teacherOwnsClass(req.user!, submission.assignment.classId)
+    : req.user!.role === Role.ADMIN;
+  if (!allowed) {
+    return res.status(403).json({ error: "Bu topshiriqni ko'rish huquqingiz yo'q." });
+  }
+
+  // Each call is a paid model request; a double click must not be two.
+  if (submission.aiReviewedAt && Date.now() - submission.aiReviewedAt.getTime() < AI_REVIEW_COOLDOWN_MS) {
+    return res.status(429).json({ error: "Bu ish hozirgina tekshirildi. Bir daqiqadan keyin qayta urinib ko'ring." });
+  }
+
+  try {
+    const review = await reviewSubmission(submission.id);
+    res.json({ aiReview: review });
+  } catch (err) {
+    if (err instanceof NothingToReviewError) {
+      return res.status(422).json({ error: err.message });
+    }
+    if (err instanceof GeminiNotConfiguredError) {
+      return res.status(503).json({ error: 'AI xizmati sozlanmagan.' });
+    }
+    console.error('AI review error:', err);
+    return res.status(502).json({ error: "AI baholashni bajarib bo'lmadi. Birozdan keyin qayta urinib ko'ring." });
+  }
 });
