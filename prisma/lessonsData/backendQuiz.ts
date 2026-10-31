@@ -22,6 +22,19 @@ import { backendQuizB09 } from './backendQuiz.b09';
 import { backendQuizB10 } from './backendQuiz.b10';
 import { backendQuizB11 } from './backendQuiz.b11';
 import { backendQuizB12 } from './backendQuiz.b12';
+import { backendQuizM1d } from './backendQuiz.m1d';
+import { backendQuizC01 } from './backendQuiz.c01';
+import { backendQuizC02 } from './backendQuiz.c02';
+import { backendQuizC03 } from './backendQuiz.c03';
+import { backendQuizC04 } from './backendQuiz.c04';
+import { backendQuizC05 } from './backendQuiz.c05';
+import { backendQuizC06 } from './backendQuiz.c06';
+import { backendQuizC07 } from './backendQuiz.c07';
+import { backendQuizC08 } from './backendQuiz.c08';
+import { backendQuizC09 } from './backendQuiz.c09';
+import { backendQuizC10 } from './backendQuiz.c10';
+import { backendQuizC11 } from './backendQuiz.c11';
+import { backendQuizC12 } from './backendQuiz.c12';
 
 export const backendLessonQuiz: LessonQuizRecord[] = [
   // Oy 1 — darslar 1..12
@@ -42,6 +55,21 @@ export const backendLessonQuiz: LessonQuizRecord[] = [
   ...backendQuizB10,
   ...backendQuizB11,
   ...backendQuizB12,
+  // Darslar 4..12 uchun 6..10-savollar
+  ...backendQuizM1d,
+  // Darslar 13..96 uchun 6..10-savollar (har bir dars 10 tadan — to'liq jonli viktorina raundi)
+  ...backendQuizC01,
+  ...backendQuizC02,
+  ...backendQuizC03,
+  ...backendQuizC04,
+  ...backendQuizC05,
+  ...backendQuizC06,
+  ...backendQuizC07,
+  ...backendQuizC08,
+  ...backendQuizC09,
+  ...backendQuizC10,
+  ...backendQuizC11,
+  ...backendQuizC12,
 ];
 
 // `QuizQuestion` is unique on `(lessonId, order)` and the seed upserts on it, so
