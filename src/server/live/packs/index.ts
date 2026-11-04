@@ -1,5 +1,6 @@
 import type { LiveQuestion } from '../game';
 import { SO_NEITHER, USED_TO, type RawPackQuestion } from './englishSoNeitherUsedTo';
+import { VOCAB_TESTS } from './vocabulary';
 
 /**
  * Question packs: ready-made live-quiz rounds that belong to no lesson (e.g. an
@@ -55,11 +56,18 @@ function definePack(key: string, title: string, section: string, raw: readonly R
 }
 
 const ENGLISH = 'Ingliz tili';
+const VOCABULARY = "Ingliz tili — Vocabulary (500 so'z)";
+
+const vocabTestPacks = VOCAB_TESTS.map((raw, i) =>
+  definePack(`en-vocab-${String(i + 1).padStart(2, '0')}`, `Test ${i + 1} · so'zlar ${i * 50 + 1}–${i * 50 + 50}`, VOCABULARY, raw),
+);
 
 export const QUESTION_PACKS: readonly QuestionPack[] = [
   definePack('en-so-neither', 'So / Neither', ENGLISH, SO_NEITHER),
   definePack('en-used-to', 'Used to / Be used to / Get used to', ENGLISH, USED_TO),
   definePack('en-so-neither-used-to', 'So / Neither va Used to — hammasi', ENGLISH, [...SO_NEITHER, ...USED_TO]),
+  ...vocabTestPacks,
+  definePack('en-vocab-all', "Hammasi birga — 500 so'z", VOCABULARY, VOCAB_TESTS.flat()),
 ];
 
 export function findPack(key: string): QuestionPack | undefined {

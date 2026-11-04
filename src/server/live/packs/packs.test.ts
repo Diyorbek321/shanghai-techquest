@@ -58,3 +58,36 @@ describe('question packs', () => {
     expect(findPack('no-such-pack')).toBeUndefined();
   });
 });
+
+describe('vocabulary packs (Shanghai School Test 1–10)', () => {
+  const tests = Array.from({ length: 10 }, (_, i) => findPack(`en-vocab-${String(i + 1).padStart(2, '0')}`)!);
+  const all = findPack('en-vocab-all')!;
+  const answer = (q: { choices: readonly string[]; correctIndex: number }) => q.choices[q.correctIndex];
+
+  it('has ten 50-question tests and one 500-question pack with every word once', () => {
+    for (const pack of tests) expect(pack.questions).toHaveLength(50);
+    expect(all.questions).toHaveLength(500);
+    expect(all.questions.map(answer)).toEqual(tests.flatMap((p) => p.questions.map(answer)));
+  });
+
+  it('keeps answers from the PDFs', () => {
+    expect(tests[0].questions[0].prompt).toContain('I finally ___ my dream');
+    expect(answer(tests[0].questions[0])).toBe('achieved');
+    expect(answer(tests[0].questions[1])).toBe('acquire');
+    expect(answer(tests[0].questions[2])).toBe('adapt');
+    expect(tests[9].questions[49].explanation).toMatch(/^conclusion — xulosa/);
+  });
+
+  it('mixes question types across the words', () => {
+    const kinds = ['😂', '📖', '🔤', '🌐', '🔁', '⚔️'];
+    for (const kind of kinds) {
+      expect(all.questions.filter((q) => q.prompt.startsWith(kind)).length).toBeGreaterThan(30);
+    }
+  });
+
+  it('never shows two case-insensitively equal choices', () => {
+    for (const q of all.questions) {
+      expect(new Set(q.choices.map((c) => c.toLowerCase())).size).toBe(4);
+    }
+  });
+});
