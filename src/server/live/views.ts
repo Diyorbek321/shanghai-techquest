@@ -3,7 +3,7 @@
  * explanation) leaves the server only in the `reveal` phase — during a
  * question it would be one devtools tab away from every student's phone.
  */
-import { answerDistribution, questionEndsAt, settled, standings, type Game, type Phase, type Standing } from './game';
+import { answerDistribution, autoNextAt, questionEndsAt, settled, standings, type Game, type Phase, type Standing } from './game';
 
 export interface PublicQuestion {
   index: number;
@@ -29,6 +29,8 @@ interface BaseView {
   serverNow: number;
   question: PublicQuestion | null;
   reveal: RevealInfo | null;
+  /** When the next question opens by itself (answer screen with auto-advance on), else null. */
+  nextAt: number | null;
 }
 
 export interface HostView extends BaseView {
@@ -73,6 +75,7 @@ function baseView(game: Game, now: number): BaseView {
       q && game.phase === 'reveal'
         ? { correctIndex: q.correctIndex, explanation: q.explanation, distribution: answerDistribution(game) }
         : null,
+    nextAt: autoNextAt(game),
   };
 }
 

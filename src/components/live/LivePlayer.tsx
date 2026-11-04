@@ -144,6 +144,7 @@ function JoinForm({ guest, notice, onJoined }: JoinFormProps) {
 function PlayerGame({ pin, userId, onLeave }: { pin: string; userId: string; onLeave: (message: string | null) => void }) {
   const { view, connection, clockOffset } = useLiveGame<PlayerView>(pin);
   const seconds = useCountdown(view?.phase === 'question' ? view.question?.endsAt ?? null : null, clockOffset);
+  const nextIn = useCountdown(view?.nextAt ?? null, clockOffset);
 
   useEffect(() => {
     // Stream refused or room swept: the PIN is dead, go back to the join form.
@@ -175,7 +176,7 @@ function PlayerGame({ pin, userId, onLeave }: { pin: string; userId: string; onL
         >
           {view.phase === 'lobby' && <Waiting view={view} />}
           {view.phase === 'question' && <Answering view={view} pin={pin} seconds={seconds} />}
-          {view.phase === 'reveal' && <Result view={view} userId={userId} />}
+          {view.phase === 'reveal' && <Result view={view} userId={userId} nextIn={nextIn} />}
           {view.phase === 'finished' && <Final view={view} userId={userId} onLeave={() => onLeave(null)} />}
         </motion.div>
       </AnimatePresence>
@@ -254,7 +255,7 @@ function Answering({ view, pin, seconds }: { view: PlayerView; pin: string; seco
   );
 }
 
-function Result({ view, userId }: { view: PlayerView; userId: string }) {
+function Result({ view, userId, nextIn }: { view: PlayerView; userId: string; nextIn: number }) {
   const answer = view.me.answer;
   const correct = answer?.correct === true;
   const r = view.reveal!;
@@ -289,6 +290,11 @@ function Result({ view, userId }: { view: PlayerView; userId: string }) {
         Siz <b className="text-brand-cyan">{view.me.rank}</b>-o'rindasiz
       </p>
       <StandingsList rows={view.top} highlightId={userId} />
+      {view.nextAt !== null && (
+        <p className="text-center text-sm text-gray-500">
+          {q.index + 1 >= q.total ? 'Natijalar' : 'Keyingi savol'} {nextIn} soniyadan keyin
+        </p>
+      )}
     </div>
   );
 }

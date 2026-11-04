@@ -93,6 +93,8 @@ const createSchema = z
     lessonKey: z.string().min(1).max(100).optional(),
     packKey: z.string().min(1).max(100).optional(),
     timeLimitSec: z.number().int().min(5).max(120).default(DEFAULT_TIME_LIMIT_SEC),
+    /** Seconds on the answer screen before the next question opens by itself; null = host clicks "next". */
+    autoNextSec: z.number().int().min(3).max(60).nullable().default(null),
   })
   .refine((b) => (b.lessonKey === undefined) !== (b.packKey === undefined));
 
@@ -216,6 +218,7 @@ export function createLiveRouter(registry: Registry): Router {
         hostId: req.user!.id,
         ...source,
         timeLimitMs: parsed.data.timeLimitSec * 1000,
+        autoNextMs: parsed.data.autoNextSec === null ? null : parsed.data.autoNextSec * 1000,
       });
       registry.open(game);
       return res.status(201).json({ pin: game.pin });

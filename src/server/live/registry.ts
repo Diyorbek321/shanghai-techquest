@@ -8,7 +8,7 @@
  * moved to Redis.
  */
 import { randomBytes, randomInt } from 'node:crypto';
-import { addPlayer, ANSWER_GRACE_MS, allAnswered, finish, questionEndsAt, reveal, standings, type Game, type Standing } from './game';
+import { addPlayer, advance, ANSWER_GRACE_MS, allAnswered, autoNextAt, finish, questionEndsAt, reveal, standings, type Game, type Standing } from './game';
 import { hostView, playerView, type LiveView } from './views';
 
 /** One open SSE stream. `send` is injected so the registry never sees Express. */
@@ -78,24 +78,37 @@ export function createRegistry(deps: { persist: PersistFn; now?: () => number })
     });
   }
 
+  function arm(room: Room, at: number, fire: () => void): void {
+    clearTimer(room);
+    room.timer = setTimeout(fire, Math.max(at - now(), 0));
+    room.timer.unref?.();
+  }
+
   /** Every state change goes through here: store, re-arm the timer, notify. */
   function commit(room: Room, next: Game): void {
     const prevPhase = room.game.phase;
     const prevIndex = room.game.index;
     room.game = next;
 
-    if (next.phase === 'question' && (prevPhase !== 'question' || prevIndex !== next.index)) {
-      clearTimer(room);
-      const delay = Math.max(questionEndsAt(next) + ANSWER_GRACE_MS - now(), 0);
-      room.timer = setTimeout(() => commit(room, reveal(room.game)), delay);
-      room.timer.unref?.();
-    } else if (next.phase !== 'question') {
+    const enteredQuestion = next.phase === 'question' && (prevPhase !== 'question' || prevIndex !== next.index);
+    const enteredReveal = next.phase === 'reveal' && prevPhase !== 'reveal';
+    const nextAt = autoNextAt(next);
+    if (enteredQuestion) {
+      arm(room, questionEndsAt(next) + ANSWER_GRACE_MS, () => commit(room, reveal(room.game, now())));
+    } else if (enteredReveal) {
+      if (nextAt === null) clearTimer(room);
+      // Guarded by phase and index: if the host already moved on, this timer must not skip a question.
+      else
+        arm(room, nextAt, () => {
+          if (room.game.phase === 'reveal' && room.game.index === next.index) commit(room, advance(room.game, now()));
+        });
+    } else if (next.phase !== 'question' && next.phase !== 'reveal') {
       clearTimer(room);
     }
 
     // Everyone answered: no reason to make the class stare at a countdown.
     if (allAnswered(next)) {
-      commit(room, reveal(next));
+      commit(room, reveal(next, now()));
       return;
     }
     if (next.phase === 'finished' && prevPhase !== 'finished') onFinished(room);

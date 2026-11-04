@@ -112,8 +112,8 @@ describe('answering', () => {
 
   it('resets the streak of a player who stayed silent', () => {
     let game = submitAnswer(started(), 'ali', 0, 1, T0);
-    game = advance(reveal(game), T0 + LIMIT);
-    game = reveal(game);
+    game = advance(reveal(game, T0), T0 + LIMIT);
+    game = reveal(game, T0);
     expect(game.players.ali.streak).toBe(0);
   });
 });
@@ -137,7 +137,7 @@ describe('secrecy until reveal', () => {
 
   it('settled() rolls back exactly the open answers', () => {
     let game = submitAnswer(started(), 'ali', 0, 1, T0);
-    game = advance(reveal(game), T0 + 1);
+    game = advance(reveal(game, T0), T0 + 1);
     game = submitAnswer(game, 'ali', 1, 1, T0 + 1);
     const before = settled(game).players.ali;
     expect(before.score).toBe(MAX_POINTS);
@@ -146,7 +146,7 @@ describe('secrecy until reveal', () => {
   });
 
   it('reveals the key, the distribution and the outcome after the question closes', () => {
-    const game = reveal(submitAnswer(started(), 'ali', 0, 1, T0));
+    const game = reveal(submitAnswer(started(), 'ali', 0, 1, T0), T0);
     const view = playerView(game, 'ali', T0);
     expect(view.reveal).toEqual({ correctIndex: 1, explanation: 'Izoh q1', distribution: [0, 1, 0, 0] });
     expect(view.me.answer).toEqual({ choiceIndex: 1, correct: true, points: MAX_POINTS, });
@@ -155,7 +155,7 @@ describe('secrecy until reveal', () => {
 
 describe('end of game', () => {
   it('finishes after the last question', () => {
-    const game = advance(reveal(advance(reveal(started()), T0)), T0);
+    const game = advance(reveal(advance(reveal(started(), T0), T0), T0), T0);
     expect(game.phase).toBe('finished');
   });
 

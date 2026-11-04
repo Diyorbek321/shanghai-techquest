@@ -36,6 +36,9 @@ function parseRoundChoice(value: string): RoundChoice | null {
 }
 
 const TIME_LIMITS = [10, 20, 30, 60] as const;
+/** Seconds the answer stays on screen before the next question opens by itself; null = manual. */
+const AUTO_NEXT_OPTIONS = [null, 5, 8, 12] as const;
+const DEFAULT_AUTO_NEXT_SEC = 8;
 const TRACK_LABELS: Record<string, string> = {
   FRONTEND: 'Frontend',
   BACKEND: 'Python Backend',
@@ -65,13 +68,14 @@ export function LiveHost() {
 function CreateGame({ onCreated }: { onCreated: (pin: string) => void }) {
   const [selected, setSelected] = useState('');
   const [timeLimitSec, setTimeLimitSec] = useState<number>(20);
+  const [autoNextSec, setAutoNextSec] = useState<number | null>(DEFAULT_AUTO_NEXT_SEC);
   const { data, isLoading, error } = useQuery({
     queryKey: ['live', 'lessons'],
     queryFn: () => api.get<{ lessons: PlayableLesson[]; packs?: QuestionPackOption[] }>('/live/lessons'),
   });
   const round = parseRoundChoice(selected);
   const create = useMutation({
-    mutationFn: () => api.post<{ pin: string }>('/live', { ...round, timeLimitSec }),
+    mutationFn: () => api.post<{ pin: string }>('/live', { ...round, timeLimitSec, autoNextSec }),
     onSuccess: ({ pin }) => onCreated(pin),
   });
 
@@ -150,6 +154,32 @@ function CreateGame({ onCreated }: { onCreated: (pin: string) => void }) {
           </div>
         </fieldset>
 
+        <fieldset>
+          <legend className="text-sm font-medium text-gray-300">Keyingi savolga avtomatik o'tish</legend>
+          <div className="mt-2 flex gap-2">
+            {AUTO_NEXT_OPTIONS.map((sec) => (
+              <button
+                key={sec ?? 'off'}
+                type="button"
+                onClick={() => setAutoNextSec(sec)}
+                className={cn(
+                  'flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
+                  autoNextSec === sec
+                    ? 'border-brand-cyan bg-brand-cyan/15 text-brand-cyan'
+                    : 'border-brand-border text-gray-300 hover:bg-brand-card-hover'
+                )}
+              >
+                {sec === null ? "Yo'q" : `${sec} s`}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-gray-500">
+            {autoNextSec === null
+              ? "Har bir javobdan keyin \"Keyingi savol\"ni o'zingiz bosasiz."
+              : `Javob ${autoNextSec} soniya ko'rinib turadi, keyin keyingi savol o'zi ochiladi.`}
+          </p>
+        </fieldset>
+
         {create.error && <p className="text-sm text-red-400">{(create.error as ApiError).message}</p>}
 
         <button
@@ -169,6 +199,7 @@ function CreateGame({ onCreated }: { onCreated: (pin: string) => void }) {
 function HostGame({ pin, onClose }: { pin: string; onClose: () => void }) {
   const { view, connection, clockOffset } = useLiveGame<HostView>(pin);
   const seconds = useCountdown(view?.phase === 'question' ? view.question?.endsAt ?? null : null, clockOffset);
+  const nextIn = useCountdown(view?.nextAt ?? null, clockOffset);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const kick = useMutation({
@@ -228,7 +259,7 @@ function HostGame({ pin, onClose }: { pin: string; onClose: () => void }) {
             <Lobby view={view} onStart={() => act.mutate('next')} starting={act.isPending} onKick={(id) => kick.mutate(id)} />
           )}
           {view.phase === 'question' && <OpenQuestion view={view} seconds={seconds} onSkip={() => act.mutate('skip')} />}
-          {view.phase === 'reveal' && <Reveal view={view} onNext={() => act.mutate('next')} busy={act.isPending} />}
+          {view.phase === 'reveal' && <Reveal view={view} nextIn={nextIn} onNext={() => act.mutate('next')} busy={act.isPending} />}
           {view.phase === 'finished' && <Finished view={view} onNew={onClose} />}
         </motion.div>
       </AnimatePresence>
@@ -344,7 +375,15 @@ function ChoiceGrid({ choices, correctIndex }: { choices: readonly string[]; cor
   );
 }
 
-function Reveal({ view, onNext, busy }: { view: HostView; onNext: () => void; busy: boolean }) {
+interface RevealProps {
+  view: HostView;
+  /** Seconds until the next question opens by itself; only meaningful when view.nextAt is set. */
+  nextIn: number;
+  onNext: () => void;
+  busy: boolean;
+}
+
+function Reveal({ view, nextIn, onNext, busy }: RevealProps) {
   const q = view.question!;
   const r = view.reveal!;
   const max = Math.max(1, ...r.distribution);
@@ -380,6 +419,11 @@ function Reveal({ view, onNext, busy }: { view: HostView; onNext: () => void; bu
         >
           {isLast ? 'Natijalar' : 'Keyingi savol'} <SkipForward size={18} />
         </button>
+        {view.nextAt !== null && (
+          <p className="text-center text-sm text-gray-400 sm:col-start-2">
+            {isLast ? 'Natijalar' : 'Keyingi savol'} {nextIn} soniyadan keyin
+          </p>
+        )}
       </div>
     </div>
   );

@@ -49,10 +49,14 @@ export interface Game {
   lessonTitle: string;
   questions: readonly LiveQuestion[];
   timeLimitMs: number;
+  /** Pause on the answer screen before the next question opens by itself; null = the host clicks "next". */
+  autoNextMs: number | null;
   phase: Phase;
   /** -1 in the lobby, then the index of the current/last question. */
   index: number;
   questionStartedAt: number;
+  /** When the current answer screen opened — the start of the auto-advance pause. */
+  revealedAt: number;
   startedAt: number | null;
   players: Readonly<Record<string, Player>>;
 }
@@ -75,6 +79,7 @@ export function createGame(input: {
   lessonTitle: string;
   questions: readonly LiveQuestion[];
   timeLimitMs: number;
+  autoNextMs?: number | null;
 }): Game {
   if (input.questions.length === 0) {
     throw new GameRuleError("Bu darsda savollar yo'q.");
@@ -83,9 +88,11 @@ export function createGame(input: {
     ...input,
     lessonId: input.lessonId ?? null,
     packKey: input.packKey ?? null,
+    autoNextMs: input.autoNextMs ?? null,
     phase: 'lobby',
     index: -1,
     questionStartedAt: 0,
+    revealedAt: 0,
     startedAt: null,
     players: {},
   };
@@ -221,12 +228,18 @@ export function allAnswered(game: Game): boolean {
 }
 
 /** Closes the current question. Anyone who didn't answer loses their streak. */
-export function reveal(game: Game): Game {
+export function reveal(game: Game, now: number): Game {
   if (game.phase !== 'question') return game;
   const players = Object.fromEntries(
     Object.entries(game.players).map(([id, p]) => [id, p.answers[game.index] ? p : { ...p, streak: 0 }])
   );
-  return { ...game, phase: 'reveal', players };
+  return { ...game, phase: 'reveal', revealedAt: now, players };
+}
+
+/** When the answer screen gives way to the next question by itself, or null if the host drives. */
+export function autoNextAt(game: Game): number | null {
+  if (game.phase !== 'reveal' || game.autoNextMs === null) return null;
+  return game.revealedAt + game.autoNextMs;
 }
 
 /**

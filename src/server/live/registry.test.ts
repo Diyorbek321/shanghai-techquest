@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { addPlayer, advance, createGame, submitAnswer, type Game } from './game';
+import { addPlayer, advance, ANSWER_GRACE_MS, createGame, submitAnswer, type Game } from './game';
 import { createRegistry, FINISHED_ROOM_TTL_MS, RoomNotFoundError, type PersistFn } from './registry';
 import type { LiveView } from './views';
 
 const LIMIT = 10_000;
 
-function newGame(pin = '111111', hostId = 'host'): Game {
+function newGame(pin = '111111', hostId = 'host', autoNextMs: number | null = null): Game {
   return createGame({
+    autoNextMs,
     pin,
     hostId,
     lessonId: 'l1',
@@ -60,6 +61,55 @@ describe('live registry', () => {
     expect(registry.get('111111')?.phase).toBe('question');
     registry.update('111111', (g, at) => submitAnswer(g, 'vali', 0, 1, at));
     expect(registry.get('111111')?.phase).toBe('reveal');
+  });
+
+  it('waits for the host after a reveal when auto-advance is off', () => {
+    registry.update('111111', advance);
+    vi.advanceTimersByTime(LIMIT + 1000);
+    vi.advanceTimersByTime(60_000);
+    expect(registry.get('111111')?.phase).toBe('reveal');
+  });
+
+  describe('auto-advance', () => {
+    const NEXT = 8_000;
+
+    beforeEach(() => {
+      registry.open(newGame('222222', 'host2', NEXT));
+      registry.update('222222', (g) => addPlayer(g, { userId: 'ali', name: 'Ali', avatarUrl: null }));
+      registry.update('222222', advance);
+    });
+
+    it('moves to the next question on its own after the reveal pause', () => {
+      vi.advanceTimersByTime(LIMIT + ANSWER_GRACE_MS);
+      expect(registry.get('222222')?.phase).toBe('reveal');
+      vi.advanceTimersByTime(NEXT - 1);
+      expect(registry.get('222222')?.phase).toBe('reveal');
+      vi.advanceTimersByTime(1);
+      expect(registry.get('222222')).toMatchObject({ phase: 'question', index: 1 });
+    });
+
+    it('runs the whole game to the podium and saves it once', () => {
+      vi.advanceTimersByTime((LIMIT + 1000 + NEXT) * 2);
+      expect(registry.get('222222')?.phase).toBe('finished');
+      expect(persist).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not skip a question when the host presses next early', () => {
+      registry.update('222222', (g, at) => submitAnswer(g, 'ali', 0, 0, at));
+      expect(registry.get('222222')?.phase).toBe('reveal');
+      registry.update('222222', advance);
+      expect(registry.get('222222')).toMatchObject({ phase: 'question', index: 1 });
+      vi.advanceTimersByTime(NEXT);
+      expect(registry.get('222222')).toMatchObject({ phase: 'question', index: 1 });
+    });
+
+    it('tells screens when the next question opens', () => {
+      const seen: LiveView[] = [];
+      registry.subscribe('222222', { userId: 'ali', send: (v) => seen.push(v), close: () => {} });
+      expect(seen.at(-1)?.nextAt).toBeNull();
+      vi.advanceTimersByTime(LIMIT + ANSWER_GRACE_MS);
+      expect(seen.at(-1)?.nextAt).toBe(Date.now() + NEXT);
+    });
   });
 
   it('leaves state untouched when a rule throws', () => {
