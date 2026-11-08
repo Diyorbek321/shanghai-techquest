@@ -45,6 +45,11 @@ export interface BuildPlanInput {
 }
 
 export const FREE_DAY_PROBLEMS = 2;
+/**
+ * Code is written every day, class or not: a lesson day still carries one
+ * problem next to its quiz, just fewer than a free day.
+ */
+export const LESSON_DAY_PROBLEMS = 1;
 export const QUIZ_SIZE = 5;
 
 /**
@@ -86,7 +91,7 @@ export function buildDailyPlan(input: BuildPlanInput): PlanItem[] {
   if (input.taughtOrder < 1) return [];
 
   const questionIds = pickQuestions(input);
-  const problemSlots = input.lessonDay ? (questionIds.length > 0 ? 0 : 1) : FREE_DAY_PROBLEMS;
+  const problemSlots = input.lessonDay ? LESSON_DAY_PROBLEMS : FREE_DAY_PROBLEMS;
   const problems: PlanItem[] = orderProblems(input)
     .slice(0, problemSlots)
     .map((p) => ({ kind: 'problem', problemId: p.id }));

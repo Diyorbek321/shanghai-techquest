@@ -100,3 +100,35 @@ export function isLessonDay(startDate: Date, lessonDays: readonly number[], date
   const day = startOfUtcDay(date);
   return day.getTime() >= startOfUtcDay(startDate).getTime() && normalizeLessonDays(lessonDays).includes(day.getUTCDay());
 }
+
+/** How far back a timetable is searched for the last lesson day. */
+const BLOCK_LOOKBACK_DAYS = 14;
+
+/**
+ * The lessons held in the most recent run of consecutive lesson days before
+ * `date` — the weekend's three lessons for a Saturday/Sunday cohort seen from
+ * Monday, Monday's lesson for a Mon/Wed/Fri cohort seen from Tuesday. These
+ * are the lessons whose video and slides the daily plan points back to.
+ * Orders are 1-based and inclusive; null before the first lesson.
+ */
+export function latestLessonBlock(
+  startDate: Date,
+  lessonDays: readonly number[],
+  date: Date,
+  totalLessons: number
+): { from: number; to: number } | null {
+  const shift = (d: Date, days: number) => new Date(d.getTime() + days * MS_PER_DAY);
+  const today = startOfUtcDay(date);
+  let end = shift(today, -1);
+  let looked = 0;
+  while (!isLessonDay(startDate, lessonDays, end)) {
+    if (++looked > BLOCK_LOOKBACK_DAYS) return null;
+    end = shift(end, -1);
+  }
+  let start = end;
+  while (isLessonDay(startDate, lessonDays, shift(start, -1))) start = shift(start, -1);
+
+  const from = lessonsTaughtBefore(startDate, lessonDays, start, totalLessons) + 1;
+  const to = lessonsTaughtBefore(startDate, lessonDays, shift(end, 1), totalLessons);
+  return to >= from ? { from, to } : null;
+}

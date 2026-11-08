@@ -21,6 +21,8 @@ import { useQuery } from '@tanstack/react-query';
 import { ViewType } from '../types';
 import { api } from '../lib/api';
 import { LessonQuiz } from '../components/LessonQuiz';
+import { LessonVideo, type LessonVideoData } from '../components/LessonVideo';
+import { useAuth } from '../lib/AuthContext';
 
 /** Mirrors LessonMastery from src/server/routes/lessons.ts. */
 interface LessonMastery {
@@ -44,6 +46,7 @@ interface LessonSummary {
   kind: 'lesson' | 'project';
   xpReward: number;
   hasSlides: boolean;
+  video: LessonVideoData | null;
   unlocked: boolean;
   unlockedBy: UnlockedBy;
   behind: boolean;
@@ -353,6 +356,8 @@ function LessonDetailPanel({
   onOpenAssignment: (assignmentId: string) => void;
   onOpenProblems: () => void;
 }) {
+  const { user } = useAuth();
+  const canEditVideo = user?.role === 'teacher' || user?.role === 'admin';
   const { data: lesson, isLoading } = useQuery({
     queryKey: ['lesson', lessonKey],
     queryFn: () => api.get<LessonDetailData>(`/lessons/${lessonKey}`),
@@ -395,6 +400,8 @@ function LessonDetailPanel({
 
         {lesson && (
           <>
+            <LessonVideo lessonKey={lesson.key} video={lesson.video} canEdit={canEditVideo} />
+
             <div className="flex flex-wrap gap-2">
               {lesson.hasSlides && (
                 <a

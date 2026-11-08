@@ -93,6 +93,8 @@ export function Layout({ children, currentView, onNavigate, user }: LayoutProps)
     { id: 'dashboard', label: 'Boshqaruv paneli', icon: <LayoutDashboard size={20} /> },
     { id: 'teacher_portal', label: "O'qituvchi paneli", icon: <ShieldCheck size={20} />, customColor: 'text-brand-purple' },
     { id: 'classes', label: 'Sinflar', icon: <BookOpen size={20} /> },
+    // Staff open the course to attach lesson videos and check the material.
+    { id: 'backend_course', label: 'Python Backend kursi', icon: <Server size={20} />, customColor: 'text-emerald-400' },
     { id: 'live_quiz', label: 'Jonli viktorina', icon: <Gamepad2 size={20} />, customColor: 'text-brand-green' },
     { id: 'assignments', label: 'Vazifalar', icon: <CheckSquare size={20} /> },
     { id: 'homework', label: 'Uy vazifasi', icon: <BookText size={20} />, customColor: 'text-brand-orange' },

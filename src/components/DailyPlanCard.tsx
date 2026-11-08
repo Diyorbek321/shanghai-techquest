@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarCheck, CheckCircle2, Circle, Code, Flame, HelpCircle, History, X } from 'lucide-react';
+import { CalendarCheck, CheckCircle2, Circle, Code, Download, Flame, HelpCircle, History, PlayCircle, X } from 'lucide-react';
 import { User, ViewType } from '../types';
 import { api, ApiError } from '../lib/api';
 import { DailyExerciseCard } from './DailyExerciseCard';
@@ -19,10 +19,20 @@ type PlanItem =
       lessonTitle: string | null;
     };
 
+/** Video and slides of the latest class days; reference only, not counted. */
+interface PlanMaterial {
+  key: string;
+  order: number;
+  title: string;
+  hasSlides: boolean;
+  video: { watchUrl: string } | null;
+}
+
 interface PlanView {
   date: string;
   lessonDay: boolean;
   items: PlanItem[];
+  materials: PlanMaterial[];
   done: boolean;
   late: boolean;
   xpAwarded: number;
@@ -210,6 +220,8 @@ export function DailyPlanCard({ user, onNavigate, onOpenProblem }: DailyPlanCard
         )}
       </ul>
 
+      {plan.materials.length > 0 && <MaterialsList materials={plan.materials} />}
+
       {!pastDate && pending.length > 0 && (
         <div className="mt-4 border-t border-white/10 pt-3">
           <p className="text-xs text-gray-400 flex items-center gap-1 mb-2">
@@ -232,5 +244,42 @@ export function DailyPlanCard({ user, onNavigate, onOpenProblem }: DailyPlanCard
         </div>
       )}
     </section>
+  );
+}
+
+function MaterialsList({ materials }: { materials: PlanMaterial[] }) {
+  const withContent = materials.filter((m) => m.video || m.hasSlides);
+  if (withContent.length === 0) return null;
+  return (
+    <div className="mt-4 border-t border-white/10 pt-3">
+      <p className="text-xs text-gray-400 mb-2">Oxirgi darslarni takrorlang — video va taqdimot:</p>
+      <ul className="space-y-1.5">
+        {withContent.map((m) => (
+          <li key={m.key} className="flex items-center gap-2 text-sm">
+            <span className="flex-1 min-w-0 truncate text-gray-200">
+              {m.order}-dars: {m.title}
+            </span>
+            {m.video && (
+              <a
+                href={m.video.watchUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs flex items-center gap-1 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded shrink-0"
+              >
+                <PlayCircle size={12} /> Video
+              </a>
+            )}
+            {m.hasSlides && (
+              <a
+                href={`/api/lessons/${m.key}/slides`}
+                className="text-xs flex items-center gap-1 bg-white/5 text-gray-300 border border-white/10 px-2 py-1 rounded shrink-0"
+              >
+                <Download size={12} /> Taqdimot
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

@@ -308,6 +308,8 @@ model Lesson {
   nextPrompt     String?
   /// File name inside lesson-assets/<track>/ — served by GET /api/lessons/:key/slides.
   slideFile      String?
+  /// Recorded lesson video: a Google Drive or YouTube link (lessons/video.ts).
+  videoUrl       String?
   /// 'lesson' | 'project'
   kind           String   @default("lesson")
   xpReward       Int      @default(0)

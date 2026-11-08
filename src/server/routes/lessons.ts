@@ -1,8 +1,10 @@
 import fs from 'fs';
 import { Router } from 'express';
+import { z } from 'zod';
 import { Difficulty, Lesson, Role, SubmissionStatus } from '@prisma/client';
 import { prisma } from '../db';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRole } from '../middleware/auth';
+import { parseVideoLink } from '../lessons/video';
 import { resolveTrackFilter } from '../utils/trackScope';
 import { toClientTrack } from '../serializers/track';
 import { resolveSlidePath } from '../lessons/assets';
@@ -60,6 +62,7 @@ function serializeLessonSummary(
     kind: lesson.kind,
     xpReward: lesson.xpReward,
     hasSlides: Boolean(lesson.slideFile),
+    video: parseVideoLink(lesson.videoUrl),
     unlocked: gate.unlocked,
     unlockedBy: gate.unlockedBy,
     behind: gate.behind,
@@ -338,6 +341,30 @@ lessonsRouter.get('/:key', async (req, res) => {
     nextPrompt: lesson.nextPrompt,
     problems: lesson.problems,
   });
+});
+
+const videoSchema = z.object({ url: z.string().trim().max(500).nullable() });
+
+/**
+ * PUT /api/lessons/:key/video — attach (or with `url: null`, remove) the
+ * lesson's recorded video. Staff only. Anything but a Drive or YouTube video
+ * link is refused, so the page never embeds an arbitrary site.
+ */
+lessonsRouter.put('/:key/video', requireRole(Role.TEACHER, Role.ADMIN), async (req, res) => {
+  const parsed = videoSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Noto'g'ri ma'lumot." });
+  }
+  const url = parsed.data.url === '' ? null : parsed.data.url;
+  const video = url === null ? null : parseVideoLink(url);
+  if (url !== null && !video) {
+    return res.status(400).json({ error: "Faqat Google Drive yoki YouTube video havolasi qabul qilinadi." });
+  }
+  const updated = await prisma.lesson.updateMany({ where: { key: req.params.key }, data: { videoUrl: video ? url : null } });
+  if (updated.count === 0) {
+    return res.status(404).json({ error: 'Dars topilmadi.' });
+  }
+  res.json({ video });
 });
 
 lessonsRouter.get('/:key/slides', async (req, res) => {

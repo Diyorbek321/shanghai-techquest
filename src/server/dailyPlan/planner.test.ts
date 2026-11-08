@@ -73,14 +73,17 @@ describe('buildDailyPlan', () => {
     expect(plan).toEqual([{ kind: 'quiz', questionIds: ['d1', 'd2', 'f6', 'f5', 'f5b'] }]);
   });
 
-  it('keeps a lesson day light: the quiz only', () => {
+  it('keeps a lesson day light but still writes code: one problem and the quiz', () => {
     const plan = buildDailyPlan({
       ...base,
       lessonDay: true,
-      unsolvedProblems: problems(5),
+      unsolvedProblems: problems(5, 6),
       dueQuestionIds: ['d1'],
     });
-    expect(plan).toEqual([{ kind: 'quiz', questionIds: ['d1'] }]);
+    expect(plan).toEqual([
+      { kind: 'problem', problemId: 'p5-0' },
+      { kind: 'quiz', questionIds: ['d1'] },
+    ]);
   });
 
   it('gives a lesson day one problem when there is nothing to quiz on', () => {

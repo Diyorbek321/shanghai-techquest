@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_LESSON_DAYS, isLessonDay, lessonDate, lessonDueDate, lessonsTaughtBefore } from './schedule';
+import { DEFAULT_LESSON_DAYS, isLessonDay, latestLessonBlock, lessonDate, lessonDueDate, lessonsTaughtBefore } from './schedule';
 
 // 2026-09-07 is a Monday.
 const MONDAY = new Date('2026-09-07T00:00:00.000Z');
@@ -125,5 +125,33 @@ describe('isLessonDay', () => {
     expect(isLessonDay(saturday, [6, 0, 0], new Date('2026-09-13T10:00:00.000Z'))).toBe(true);
     expect(isLessonDay(saturday, [6, 0, 0], new Date('2026-09-14T00:00:00.000Z'))).toBe(false);
     expect(isLessonDay(saturday, [6, 0, 0], new Date('2026-09-06T00:00:00.000Z'))).toBe(false);
+  });
+});
+
+describe('latestLessonBlock', () => {
+  // Weekend cohort: Saturday one lesson, Sunday two. 2026-10-10 is a Saturday.
+  const weekendStart = new Date('2026-10-10T00:00:00.000Z');
+  const day = (s: string) => new Date(`${s}T00:00:00.000Z`);
+
+  it('points Monday back at the whole weekend', () => {
+    expect(latestLessonBlock(weekendStart, [6, 0, 0], day('2026-10-19'), 96)).toEqual({ from: 4, to: 6 });
+  });
+
+  it('still points at the weekend later in the week', () => {
+    expect(latestLessonBlock(weekendStart, [6, 0, 0], day('2026-10-23'), 96)).toEqual({ from: 4, to: 6 });
+  });
+
+  it('on Sunday points at Saturday only', () => {
+    expect(latestLessonBlock(weekendStart, [6, 0, 0], day('2026-10-18'), 96)).toEqual({ from: 4, to: 4 });
+  });
+
+  it('for a Mon/Wed/Fri cohort, Tuesday points at Monday', () => {
+    // 2026-10-12 is a Monday.
+    expect(latestLessonBlock(day('2026-10-12'), [1, 3, 5], day('2026-10-13'), 96)).toEqual({ from: 1, to: 1 });
+  });
+
+  it('is null before the first lesson', () => {
+    expect(latestLessonBlock(weekendStart, [6, 0, 0], day('2026-10-10'), 96)).toBeNull();
+    expect(latestLessonBlock(weekendStart, [6, 0, 0], day('2026-09-01'), 96)).toBeNull();
   });
 });

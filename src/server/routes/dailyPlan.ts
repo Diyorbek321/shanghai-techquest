@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { DailyPlan, Role } from '@prisma/client';
+import { DailyPlan, Role, Track } from '@prisma/client';
 import { prisma } from '../db';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { teacherOwnsClass } from '../utils/teacherScope';
 import { calendarDate, dayBefore, dayStart, todayKey } from '../utils/dayKey';
-import { isLessonDay } from '../lessons/schedule';
+import { isLessonDay, latestLessonBlock } from '../lessons/schedule';
+import { parseVideoLink } from '../lessons/video';
 import {
   DAILY_PLAN_XP,
   LATE_PLAN_XP,
@@ -41,7 +42,32 @@ type PlanViewItem =
       lessonTitle: string | null;
     };
 
-async function planView(plan: DailyPlan, evaluation: Evaluation, cohort: Cohort | null) {
+/**
+ * Video and slides of the lessons from the most recent class days — the
+ * weekend's lessons all week long for a Saturday/Sunday cohort. Shown beside
+ * the work as reference; they do not count toward closing the day, since
+ * "watched it" is not something the server can check.
+ */
+async function planMaterials(plan: DailyPlan, cohort: Cohort | null, track: Track | null) {
+  if (!cohort || !track) return [];
+  const total = await prisma.lesson.count({ where: { track } });
+  const block = latestLessonBlock(cohort.startDate, cohort.lessonDays, calendarDate(plan.date), total);
+  if (!block) return [];
+  const lessons = await prisma.lesson.findMany({
+    where: { track, order: { gte: block.from, lte: block.to } },
+    select: { key: true, order: true, title: true, slideFile: true, videoUrl: true },
+    orderBy: { order: 'asc' },
+  });
+  return lessons.map((lesson) => ({
+    key: lesson.key,
+    order: lesson.order,
+    title: lesson.title,
+    hasSlides: Boolean(lesson.slideFile),
+    video: parseVideoLink(lesson.videoUrl),
+  }));
+}
+
+async function planView(plan: DailyPlan, evaluation: Evaluation, cohort: Cohort | null, track: Track | null) {
   const problemIds = evaluation.items.flatMap((item) => (item.kind === 'problem' ? [item.problemId] : []));
   const problems = await prisma.problem.findMany({
     where: { id: { in: problemIds } },
@@ -73,6 +99,7 @@ async function planView(plan: DailyPlan, evaluation: Evaluation, cohort: Cohort 
         },
       ];
     }),
+    materials: await planMaterials(plan, cohort, track),
     done: plan.completedAt !== null,
     completedAt: plan.completedAt,
     late: plan.late,
@@ -114,7 +141,7 @@ dailyPlanRouter.get('/', requireRole(Role.STUDENT), async (req, res) => {
   }
 
   const fresh = await prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: { streak: true } });
-  res.json({ today: await planView(todays.plan, todays.evaluation, cohort), pending, streak: fresh.streak });
+  res.json({ today: await planView(todays.plan, todays.evaluation, cohort, user.track), pending, streak: fresh.streak });
 });
 
 async function ownPlan(userId: string, rawDate: string) {
@@ -131,7 +158,7 @@ dailyPlanRouter.get('/day/:date', requireRole(Role.STUDENT), async (req, res) =>
   }
   const cohort = req.user!.track ? await findCohort(req.user!.id, req.user!.track) : null;
   const { plan: settled, evaluation } = await evaluateAndSettle(req.user!.id, plan);
-  res.json(await planView(settled, evaluation, cohort));
+  res.json(await planView(settled, evaluation, cohort, req.user!.track ?? null));
 });
 
 /**

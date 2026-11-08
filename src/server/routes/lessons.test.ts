@@ -559,3 +559,38 @@ describe('mastery-based unlocking', () => {
     }
   });
 });
+
+describe('PUT /api/lessons/:key/video', () => {
+  const DRIVE = 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz012345/view?usp=sharing';
+  const teacherCookie = () => cookieFor(teacherId, Role.TEACHER, null);
+
+  it('refuses students', async () => {
+    const res = await request(app).put(`/api/lessons/${lessonKeys[0]}/video`).set('Cookie', backendStudentCookie).send({ url: DRIVE });
+    expect(res.status).toBe(403);
+  });
+
+  it('refuses links that are not Drive or YouTube videos', async () => {
+    const res = await request(app)
+      .put(`/api/lessons/${lessonKeys[0]}/video`)
+      .set('Cookie', teacherCookie())
+      .send({ url: 'https://evil.example/video.mp4' });
+    expect(res.status).toBe(400);
+  });
+
+  it('stores a Drive link and serves the embeddable player, then removes it', async () => {
+    const put = await request(app).put(`/api/lessons/${lessonKeys[0]}/video`).set('Cookie', teacherCookie()).send({ url: DRIVE });
+    expect(put.status).toBe(200);
+    expect(put.body.video.embedUrl).toBe('https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz012345/preview');
+
+    const lesson = await request(app).get(`/api/lessons/${lessonKeys[0]}`).set('Cookie', backendStudentCookie);
+    expect(lesson.body.video).toMatchObject({ provider: 'drive' });
+
+    const cleared = await request(app).put(`/api/lessons/${lessonKeys[0]}/video`).set('Cookie', teacherCookie()).send({ url: null });
+    expect(cleared.body.video).toBeNull();
+  });
+
+  it('returns 404 for an unknown lesson', async () => {
+    const res = await request(app).put('/api/lessons/no-such-lesson/video').set('Cookie', teacherCookie()).send({ url: null });
+    expect(res.status).toBe(404);
+  });
+});

@@ -152,6 +152,25 @@ describe('GET /api/daily-plan', () => {
     expect(res.body.today.done).toBe(false);
   });
 
+  it("points at the latest lesson's video and slides without counting them as work", async () => {
+    const lesson3 = await prisma.lesson.findFirstOrThrow({ where: { id: lessonIds[2] } });
+    await prisma.lesson.update({
+      where: { id: lesson3.id },
+      data: { videoUrl: 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz012345/view' },
+    });
+    const res = await request(app).get('/api/daily-plan').set('Cookie', studentCookie);
+    expect(res.body.today.materials).toEqual([
+      {
+        key: lesson3.key,
+        order: 3,
+        title: lesson3.title,
+        hasSlides: false,
+        video: expect.objectContaining({ provider: 'drive' }),
+      },
+    ]);
+    expect(res.body.today.items.every((item: { kind: string }) => item.kind !== 'material')).toBe(true);
+  });
+
   it('keeps the same plan for the whole day', async () => {
     const first = await request(app).get('/api/daily-plan').set('Cookie', studentCookie);
     await pass(problemIds[0]);
