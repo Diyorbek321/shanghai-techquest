@@ -11,6 +11,8 @@
  * "done" because a student pressed a button.
  */
 
+import { difficultyRank, type StudentLevel } from './level';
+
 export type PlanItem =
   | { readonly kind: 'problem'; readonly problemId: string }
   | { readonly kind: 'quiz'; readonly questionIds: readonly string[] };
@@ -18,6 +20,11 @@ export type PlanItem =
 export interface LessonLinked {
   readonly id: string;
   readonly lessonOrder: number;
+}
+
+export interface LessonProblem extends LessonLinked {
+  /** Problem difficulty (EASY, MEDIUM, ...); orders the work by level. */
+  readonly difficulty?: string;
 }
 
 export interface BuildPlanInput {
@@ -28,7 +35,9 @@ export interface BuildPlanInput {
   /** Lessons per week, which is how far back "this week's material" reaches. */
   readonly lessonsPerWeek: number;
   /** Lesson problems the student has not passed yet. */
-  readonly unsolvedProblems: readonly LessonLinked[];
+  readonly unsolvedProblems: readonly LessonProblem[];
+  /** How the student is doing lately; 'normal' keeps the plain lesson order. */
+  readonly level?: StudentLevel;
   /** Spaced-repetition reviews that are due, oldest due first. */
   readonly dueQuestionIds: readonly string[];
   /** Questions from taught lessons the student has never answered. */
@@ -44,12 +53,25 @@ export const QUIZ_SIZE = 5;
  * first. A student who is behind keeps up with the class and catches up on the
  * side, rather than being parked on month-old material forever.
  */
-function orderProblems(input: BuildPlanInput): LessonLinked[] {
+function orderProblems(input: BuildPlanInput): LessonProblem[] {
   const taught = input.unsolvedProblems.filter((p) => p.lessonOrder >= 1 && p.lessonOrder <= input.taughtOrder);
   const weekStart = input.taughtOrder - Math.max(input.lessonsPerWeek, 1);
   const thisWeek = taught.filter((p) => p.lessonOrder > weekStart).sort((a, b) => a.lessonOrder - b.lessonOrder);
   const older = taught.filter((p) => p.lessonOrder <= weekStart).sort((a, b) => b.lessonOrder - a.lessonOrder);
-  return [...thisWeek, ...older];
+  return [...byLevel(thisWeek, input.level), ...byLevel(older, input.level)];
+}
+
+/**
+ * Within one group (this week, or older), a struggling student gets the
+ * easiest problems first and a strong one the hardest; ties keep the lesson
+ * order above. Groups are never mixed: keeping up with the class still comes
+ * before catching up, whatever the level.
+ */
+function byLevel(problems: LessonProblem[], level: StudentLevel = 'normal'): LessonProblem[] {
+  if (level === 'normal') return problems;
+  const direction = level === 'struggling' ? 1 : -1;
+  // Array.prototype.sort is stable, so equal ranks keep their lesson order.
+  return [...problems].sort((a, b) => direction * (difficultyRank(a.difficulty) - difficultyRank(b.difficulty)));
 }
 
 function pickQuestions(input: BuildPlanInput): string[] {

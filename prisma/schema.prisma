@@ -846,6 +846,10 @@ model DailyPlan {
   /// Finished on a later day: still credited, but it does not carry the streak.
   late        Boolean   @default(false)
   xpAwarded   Int       @default(0)
+  /// Morning "today's work is ready" notice sent; claimed once per plan.
+  notifiedAt  DateTime?
+  /// Evening "not finished yet" reminder sent; claimed once per plan.
+  remindedAt  DateTime?
 
   @@unique([userId, date])
   @@index([classId, date])

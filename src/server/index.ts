@@ -6,6 +6,7 @@ import { apiRateLimiter } from './middleware/rateLimit';
 import { verifyOrigin } from './middleware/csrf';
 import { integrationRouter } from './routes/integration';
 import { liveRouter } from './routes/live';
+import { startDailyPlanScheduler } from './dailyPlan/scheduler';
 
 export function createApp(): express.Express {
   const app = express();
@@ -37,5 +38,6 @@ export async function startServer(): Promise<void> {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    startDailyPlanScheduler();
   });
 }

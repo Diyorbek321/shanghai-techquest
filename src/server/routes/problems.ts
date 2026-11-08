@@ -4,6 +4,7 @@ import { prisma } from '../db';
 import { requireAuth } from '../middleware/auth';
 import { runCodeRateLimiter } from '../middleware/rateLimit';
 import { askGeminiText } from '../ai/gemini';
+import { buildHintPrompt, formatHint, hintLevel } from '../ai/failureHint';
 import { checkAchievements } from '../achievements/check';
 import { notify } from '../notifications/notify';
 import { competenceContext, competenceMessage } from '../notifications/competence';
@@ -163,12 +164,14 @@ function buildDeterministicFeedback(judged: JudgeResult, alreadySolved: boolean)
 }
 
 /**
- * Gemini is optional colour only: a short Uzbek hint for a failing run. It can
- * never change the verdict, and any failure (unconfigured key, network, quota)
- * silently degrades to the deterministic summary above.
+ * Gemini is optional colour only: an Uzbek hint for a failing run, deeper the
+ * more times the student has already failed this problem (ai/failureHint.ts).
+ * It can never change the verdict, and any failure (unconfigured key,
+ * network, quota) silently degrades to the deterministic summary above.
  */
 async function buildFailureHint(
-  problemTitle: string,
+  problem: { id: string; title: string; description: string },
+  userId: string,
   language: string,
   code: string,
   judged: JudgeResult,
@@ -179,17 +182,21 @@ async function buildFailureHint(
     return fallback;
   }
 
-  const prompt = `Siz o'zbek tilida gapiradigan dasturlash o'qituvchisisiz. Talaba "${problemTitle}" masalasini ${language} tilida yechdi, lekin test o'tmadi.
-Kod:
-\`\`\`${language}
-${code}
-\`\`\`
-Test "${visibleFailure.label}": kutilgan natija ${JSON.stringify(visibleFailure.expected ?? '')}, olingan natija ${JSON.stringify(visibleFailure.actual ?? '')}.
-Faqat 1-2 gapdan iborat o'zbekcha maslahat bering. Tayyor yechimni yozmang.`;
-
   try {
+    const failedBefore = await prisma.problemSubmission.count({
+      where: { problemId: problem.id, userId, passed: false, language: { not: 'parsons' } },
+    });
+    const level = hintLevel(failedBefore);
+    const prompt = buildHintPrompt({
+      title: problem.title,
+      description: problem.description,
+      language,
+      code,
+      failure: visibleFailure,
+      level,
+    });
     const hint = (await askGeminiText(prompt)).trim();
-    return hint.length > 0 ? `${fallback} ${hint}` : fallback;
+    return hint.length > 0 ? `${fallback} ${formatHint(level, hint)}` : fallback;
   } catch (err) {
     // Unconfigured or failing Gemini is expected here — log and move on.
     console.warn('Gemini hint unavailable, using deterministic feedback:', err);
@@ -245,7 +252,7 @@ problemsRouter.post('/:id/submit', async (req, res) => {
   const feedback =
     judged.passed || testCases.length === 0
       ? deterministicFeedback
-      : await buildFailureHint(problem.title, parsed.data.language, parsed.data.code, judged, deterministicFeedback);
+      : await buildFailureHint(problem, req.user!.id, parsed.data.language, parsed.data.code, judged, deterministicFeedback);
 
   // Full points or nothing — no partial credit, and nothing for a re-solve.
   const pointsAwarded = judged.passed && !alreadySolved ? problem.points : 0;

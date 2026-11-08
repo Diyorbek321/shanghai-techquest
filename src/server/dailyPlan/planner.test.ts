@@ -13,6 +13,33 @@ const base = {
 };
 
 describe('buildDailyPlan', () => {
+  describe('level', () => {
+    const mixed = [
+      { id: 'hard4', lessonOrder: 4, difficulty: 'HARD' },
+      { id: 'easy5', lessonOrder: 5, difficulty: 'EASY' },
+      { id: 'med6', lessonOrder: 6, difficulty: 'MEDIUM' },
+      { id: 'easy1', lessonOrder: 1, difficulty: 'EASY' },
+    ];
+    const ids = (plan: PlanItem[]) => plan.map((item) => item.kind === 'problem' && item.problemId);
+
+    it('keeps lesson order for a normal student', () => {
+      expect(ids(buildDailyPlan({ ...base, unsolvedProblems: mixed, level: 'normal' }))).toEqual(['hard4', 'easy5']);
+    });
+
+    it('leads a struggling student with the easiest of this week', () => {
+      expect(ids(buildDailyPlan({ ...base, unsolvedProblems: mixed, level: 'struggling' }))).toEqual(['easy5', 'med6']);
+    });
+
+    it('leads a strong student with the hardest of this week', () => {
+      expect(ids(buildDailyPlan({ ...base, unsolvedProblems: mixed, level: 'strong' }))).toEqual(['hard4', 'med6']);
+    });
+
+    it('never pulls an older easy problem ahead of this week', () => {
+      const plan = buildDailyPlan({ ...base, unsolvedProblems: mixed, level: 'struggling' });
+      expect(ids(plan)).not.toContain('easy1');
+    });
+  });
+
   it('gives a free day two problems from the latest week, oldest of that week first', () => {
     const plan = buildDailyPlan({ ...base, unsolvedProblems: problems(6, 2, 4, 5, 4) });
     expect(plan).toEqual([

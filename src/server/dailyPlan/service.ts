@@ -5,6 +5,7 @@ import { notify } from '../notifications/notify';
 import { calendarDate, dayBefore, dayStart, todayKey } from '../utils/dayKey';
 import { buildDailyPlan, evaluatePlan, parsePlanItems, type Evaluation, type PlanItem } from './planner';
 import { streakChange } from './streak';
+import { LEVEL_WINDOW_DAYS, studentLevel, summarizeWork } from './level';
 
 /** XP for finishing the day's plan on the day itself. */
 export const DAILY_PLAN_XP = 30;
@@ -50,10 +51,10 @@ async function composeItems(userId: string, track: Track, cohort: Cohort, date: 
   if (taughtOrder < 1) return [];
 
   const taughtLesson = { track, order: { lte: taughtOrder } };
-  const [problems, passed, dueAttempts, freshQuestions] = await Promise.all([
+  const [problems, passed, dueAttempts, freshQuestions, recent] = await Promise.all([
     prisma.problem.findMany({
       where: { lesson: taughtLesson },
-      select: { id: true, lesson: { select: { order: true } } },
+      select: { id: true, difficulty: true, lesson: { select: { order: true } } },
       orderBy: { key: 'asc' },
     }),
     prisma.problemSubmission.findMany({
@@ -71,6 +72,14 @@ async function composeItems(userId: string, track: Track, cohort: Cohort, date: 
       select: { id: true, lesson: { select: { order: true } } },
       orderBy: { order: 'asc' },
     }),
+    prisma.problemSubmission.findMany({
+      where: {
+        userId,
+        language: { not: PARSONS_LANGUAGE },
+        submittedAt: { gte: new Date(Date.now() - LEVEL_WINDOW_DAYS * 24 * 60 * 60 * 1000) },
+      },
+      select: { problemId: true, passed: true },
+    }),
   ]);
 
   const solved = new Set(passed.map((row) => row.problemId));
@@ -78,17 +87,19 @@ async function composeItems(userId: string, track: Track, cohort: Cohort, date: 
     lessonDay: isLessonDay(cohort.startDate, cohort.lessonDays, day),
     taughtOrder,
     lessonsPerWeek: cohort.lessonDays.length,
+    level: studentLevel(summarizeWork(recent)),
     unsolvedProblems: problems
       .filter((p) => !solved.has(p.id) && p.lesson)
-      .map((p) => ({ id: p.id, lessonOrder: p.lesson!.order })),
+      .map((p) => ({ id: p.id, lessonOrder: p.lesson!.order, difficulty: p.difficulty })),
     dueQuestionIds: dueAttempts.map((a) => a.questionId),
     freshQuestions: freshQuestions.map((q) => ({ id: q.id, lessonOrder: q.lesson.order })),
   });
 }
 
 /**
- * Today's plan, fixed the first time it is asked for. Only today's is ever
- * created: a day nobody opened is simply missed, there is nothing to make up.
+ * Today's plan, fixed the first time it is asked for — by the student opening
+ * the dashboard or by the scheduler (scheduler.ts), whichever comes first.
+ * Only today's is ever created: a past day without a plan is never backfilled.
  */
 export async function getOrCreateTodaysPlan(userId: string, track: Track, cohort: Cohort): Promise<DailyPlan> {
   const date = todayKey();
