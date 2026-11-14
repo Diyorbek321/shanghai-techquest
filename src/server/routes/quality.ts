@@ -63,7 +63,13 @@ async function problemStats(track: Track): Promise<ProblemStats[]> {
 
 async function questionStats(track: Track): Promise<QuestionStats[]> {
   const rows = await prisma.$queryRaw<QuestionRow[]>(Prisma.sql`
-    SELECT q.id, q.prompt, l."order" AS "lessonOrder", l.title AS "lessonTitle",
+    -- Every output question shares one prompt ("Bu kod ekranga nima chiqaradi?"),
+    -- so the teacher is shown the first line of its code instead.
+    SELECT q.id,
+           CASE WHEN q.kind = 'output' AND q.code IS NOT NULL
+                THEN 'Kod: ' || split_part(q.code, chr(10), 1) || ' …'
+                ELSE q.prompt END AS prompt,
+           l."order" AS "lessonOrder", l.title AS "lessonTitle",
            COUNT(a.id) AS students,
            SUM(a."timesSeen") AS "timesSeen",
            SUM(a."timesCorrect") AS "timesCorrect"

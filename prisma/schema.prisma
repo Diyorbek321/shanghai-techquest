@@ -339,6 +339,15 @@ model QuizQuestion {
   correctIndex Int
   /// Short Uzbek explanation shown to the student after answering.
   explanation  String
+  /// 'choice' — pick one of `choices`. 'output' — read `code` and type what it
+  /// prints; graded against `expectedOutput` (quiz/output.ts). Output questions
+  /// keep `choices` empty and `correctIndex` -1.
+  kind           String  @default("choice")
+  /// Python snippet the student reads (output questions only).
+  code           String?
+  /// What `code` prints, captured by actually running it on Python 3.10
+  /// (scripts/verifyOutputQuestions.ts). Never sent before the answer.
+  expectedOutput String?
 
   attempts QuizAttempt[]
 

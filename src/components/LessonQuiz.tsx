@@ -6,8 +6,11 @@ import { api } from '../lib/api';
 
 export interface QuizQuestion {
   id: string;
+  /** 'choice' picks an option; 'output' types what `code` prints. */
+  kind: 'choice' | 'output';
   prompt: string;
   choices: string[];
+  code: string | null;
   lessonKey: string;
   isReview: boolean;
 }
@@ -20,6 +23,8 @@ interface QuizSession {
 interface AnswerResult {
   correct: boolean;
   correctIndex: number;
+  /** Set only for output questions, and only after answering. */
+  expectedOutput: string | null;
   explanation: string;
   xpAwarded: number;
   streak: number;
@@ -28,9 +33,17 @@ interface AnswerResult {
 
 /** What the student has committed for the question currently on screen. */
 interface CommittedAnswer {
+  /** -1 for an output question. */
   choiceIndex: number;
+  /** What the student typed, for an output question. */
+  output: string | null;
   result: AnswerResult;
 }
+
+type AnswerPayload = { choiceIndex: number } | { output: string };
+
+/** The server caps answers at 400 characters (quiz/output.ts). */
+const OUTPUT_ANSWER_MAX_LENGTH = 400;
 
 interface LessonQuizProps {
   lessonKey: string;
@@ -50,6 +63,7 @@ export function LessonQuiz({ lessonKey, sourcePath, onAnswered }: LessonQuizProp
   const [correctCount, setCorrectCount] = useState(0);
   const [xpEarned, setXpEarned] = useState(0);
   const [finished, setFinished] = useState(false);
+  const [typedOutput, setTypedOutput] = useState('');
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['quiz', lessonKey],
@@ -60,10 +74,14 @@ export function LessonQuiz({ lessonKey, sourcePath, onAnswered }: LessonQuizProp
   const question = questions[index] ?? null;
 
   const answer = useMutation({
-    mutationFn: ({ questionId, choiceIndex }: { questionId: string; choiceIndex: number }) =>
-      api.post<AnswerResult>(`/quiz/${questionId}/answer`, { choiceIndex }),
-    onSuccess: (result, variables) => {
-      setCommitted({ choiceIndex: variables.choiceIndex, result });
+    mutationFn: ({ questionId, payload }: { questionId: string; payload: AnswerPayload }) =>
+      api.post<AnswerResult>(`/quiz/${questionId}/answer`, payload),
+    onSuccess: (result, { payload }) => {
+      setCommitted({
+        choiceIndex: 'choiceIndex' in payload ? payload.choiceIndex : -1,
+        output: 'output' in payload ? payload.output : null,
+        result,
+      });
       if (result.correct) setCorrectCount((prev) => prev + 1);
       setXpEarned((prev) => prev + result.xpAwarded);
       // The mastery gate and the due-badge both depend on this attempt.
@@ -75,11 +93,17 @@ export function LessonQuiz({ lessonKey, sourcePath, onAnswered }: LessonQuizProp
 
   const handleChoice = (choiceIndex: number) => {
     if (!question || committed || answer.isPending) return;
-    answer.mutate({ questionId: question.id, choiceIndex });
+    answer.mutate({ questionId: question.id, payload: { choiceIndex } });
+  };
+
+  const handleOutputSubmit = () => {
+    if (!question || committed || answer.isPending || typedOutput.trim() === '') return;
+    answer.mutate({ questionId: question.id, payload: { output: typedOutput } });
   };
 
   const handleNext = () => {
     setCommitted(null);
+    setTypedOutput('');
     answer.reset();
     if (index + 1 >= questions.length) {
       setFinished(true);
@@ -91,6 +115,7 @@ export function LessonQuiz({ lessonKey, sourcePath, onAnswered }: LessonQuizProp
   const handleRestart = () => {
     setIndex(0);
     setCommitted(null);
+    setTypedOutput('');
     setCorrectCount(0);
     setXpEarned(0);
     setFinished(false);
@@ -170,19 +195,30 @@ export function LessonQuiz({ lessonKey, sourcePath, onAnswered }: LessonQuizProp
 
       <p className="mt-3 text-sm font-medium text-gray-100">{question.prompt}</p>
 
-      <ul className="mt-3 space-y-2">
-        {question.choices.map((choice, choiceIndex) => (
-          <li key={choiceIndex}>
-            <ChoiceCard
-              label={choice}
-              index={choiceIndex}
-              committed={committed}
-              disabled={!!committed || answer.isPending}
-              onSelect={handleChoice}
-            />
-          </li>
-        ))}
-      </ul>
+      {question.kind === 'output' ? (
+        <OutputAnswer
+          code={question.code ?? ''}
+          value={typedOutput}
+          onChange={setTypedOutput}
+          onSubmit={handleOutputSubmit}
+          committed={committed}
+          disabled={!!committed || answer.isPending}
+        />
+      ) : (
+        <ul className="mt-3 space-y-2">
+          {question.choices.map((choice, choiceIndex) => (
+            <li key={choiceIndex}>
+              <ChoiceCard
+                label={choice}
+                index={choiceIndex}
+                committed={committed}
+                disabled={!!committed || answer.isPending}
+                onSelect={handleChoice}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
 
       {answer.isPending && (
         <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
@@ -239,6 +275,93 @@ export function LessonQuiz({ lessonKey, sourcePath, onAnswered }: LessonQuizProp
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/**
+ * "Kod nima chiqaradi?" — the snippet, a box to type its output, and after
+ * answering the real output next to the student's own, line for line.
+ */
+function OutputAnswer({
+  code,
+  value,
+  onChange,
+  onSubmit,
+  committed,
+  disabled,
+}: {
+  code: string;
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  committed: CommittedAnswer | null;
+  disabled: boolean;
+}) {
+  const expected = committed?.result.expectedOutput ?? null;
+  return (
+    <div className="mt-3 space-y-3">
+      <pre className="overflow-x-auto rounded-lg border border-brand-border bg-black/50 p-3 font-mono text-[13px] leading-relaxed text-gray-100">
+        <code>{code}</code>
+      </pre>
+
+      {!committed ? (
+        <div>
+          <label htmlFor="quiz-output" className="text-xs text-gray-400">
+            Ekranda nima chiqadi? Har bir print alohida qatorda.
+          </label>
+          <textarea
+            id="quiz-output"
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+                event.preventDefault();
+                onSubmit();
+              }
+            }}
+            rows={Math.min(Math.max(value.split('\n').length, 2), 8)}
+            maxLength={OUTPUT_ANSWER_MAX_LENGTH}
+            disabled={disabled}
+            spellCheck={false}
+            autoCapitalize="off"
+            autoCorrect="off"
+            placeholder="Natijani shu yerga yozing"
+            className="mt-1 w-full resize-y rounded-lg border border-brand-border bg-black/30 p-3 font-mono text-sm text-gray-100 outline-none focus:border-brand-cyan/50"
+          />
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={disabled || value.trim() === ''}
+            className="mt-2 rounded-lg border border-brand-cyan/30 bg-brand-cyan/15 px-3 py-1.5 text-xs font-bold text-brand-cyan transition-colors hover:bg-brand-cyan/25 disabled:opacity-40"
+          >
+            Tekshirish
+          </button>
+        </div>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-gray-500">Sizning javobingiz</p>
+            <pre
+              className={`mt-1 overflow-x-auto rounded-lg border p-2 font-mono text-[13px] ${
+                committed.result.correct
+                  ? 'border-emerald-500/40 text-emerald-200'
+                  : 'border-red-500/40 text-red-300'
+              }`}
+            >
+              {committed.output}
+            </pre>
+          </div>
+          {expected !== null && (
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-gray-500">Haqiqiy natija</p>
+              <pre className="mt-1 overflow-x-auto rounded-lg border border-emerald-500/40 p-2 font-mono text-[13px] text-emerald-200">
+                {expected}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

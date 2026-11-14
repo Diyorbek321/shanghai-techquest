@@ -13,7 +13,7 @@
  * keyed:
  *   - Lesson          upsert on `key`
  *   - Problem         upsert on `key`
- *   - QuizQuestion    upsert on (lessonId, order)
+ *   - QuizQuestion    upsert on (lessonId, order) — choice 1..N, output 101..
  *   - ProjectRubric   upsert on lessonId, BACKEND project lessons only
  *   - ClassGroup      find-or-create on (track, title)
  *   - Assignment      syncLessonAssignments, which updates in place by moduleKey
@@ -37,6 +37,9 @@ import { PrismaClient, Prisma, Track, Role, Difficulty } from '@prisma/client';
 import { backendLessons } from '../prisma/lessonsData/backend';
 import { backendLessonProblems } from '../prisma/lessonsData/backendProblems';
 import { backendLessonQuiz } from '../prisma/lessonsData/backendQuiz';
+import { backendLessonOutput } from '../prisma/lessonsData/backendOutput';
+import { DEFAULT_OUTPUT_PROMPT, OUTPUT_ORDER_BASE } from '../prisma/lessonsData/types';
+import { validateOutputRecord } from '../src/server/quiz/output';
 import { syncLessonAssignments } from '../src/server/lessons/syncAssignments';
 import { DEFAULT_PROJECT_RUBRIC } from '../src/server/lessons/rubric';
 import { DEFAULT_LESSON_DAYS } from '../src/server/lessons/schedule';
@@ -121,6 +124,27 @@ function validateQuiz(lessonKeys: Set<string>): void {
     if (!lessonKeys.has(question.lessonKey)) {
       throw new Error(`Quiz savoli ${where}: "${question.lessonKey}" darsi dars ro'yxatida yo'q.`);
     }
+  }
+}
+
+/**
+ * Static checks only — that each snippet really prints `expectedOutput` is
+ * proven by scripts/verifyOutputQuestions.ts, which needs Python 3.10 and so
+ * runs before commit rather than inside the app container.
+ */
+function validateOutput(lessonKeys: Set<string>): void {
+  const seen = new Set<string>();
+  for (const record of backendLessonOutput) {
+    const where = `Kod savoli ${record.lessonKey} #${record.order}`;
+    if (!lessonKeys.has(record.lessonKey)) throw new Error(`${where}: dars ro'yxatida yo'q.`);
+    if (!Number.isInteger(record.order) || record.order <= OUTPUT_ORDER_BASE) {
+      throw new Error(`${where}: tartib ${OUTPUT_ORDER_BASE} dan katta bo'lishi kerak.`);
+    }
+    const id = `${record.lessonKey}#${record.order}`;
+    if (seen.has(id)) throw new Error(`${where}: tartib takrorlangan.`);
+    seen.add(id);
+    const problems = validateOutputRecord(record);
+    if (problems.length > 0) throw new Error(`${where}: ${problems.join(', ')}.`);
   }
 }
 
@@ -210,6 +234,37 @@ async function writeQuiz(): Promise<number> {
   return synced;
 }
 
+async function writeOutput(): Promise<number> {
+  const lessonIdByKey = new Map(
+    (await prisma.lesson.findMany({ where: { track: Track.BACKEND }, select: { id: true, key: true } })).map(
+      (lesson) => [lesson.key, lesson.id] as const
+    )
+  );
+  let synced = 0;
+  for (const record of backendLessonOutput) {
+    const lessonId = lessonIdByKey.get(record.lessonKey);
+    if (!lessonId) continue; // validated above
+    const data = {
+      lessonId,
+      order: record.order,
+      kind: 'output',
+      prompt: record.prompt ?? DEFAULT_OUTPUT_PROMPT,
+      code: record.code,
+      expectedOutput: record.expectedOutput,
+      choices: [],
+      correctIndex: -1,
+      explanation: record.explanation,
+    };
+    await prisma.quizQuestion.upsert({
+      where: { lessonId_order: { lessonId, order: record.order } },
+      update: data,
+      create: data,
+    });
+    synced += 1;
+  }
+  return synced;
+}
+
 /** Scoped to BACKEND, unlike the demo seed — this must not rewrite other tracks' rubrics. */
 async function writeRubrics(): Promise<number> {
   const projectLessons = await prisma.lesson.findMany({
@@ -234,7 +289,11 @@ async function main() {
 
   validateProblems();
   validateQuiz(new Set(backendLessons.map((lesson) => lesson.key)));
-  console.log(`Mazmun tekshirildi: ${backendLessons.length} dars, ${backendLessonProblems.length} masala, ${backendLessonQuiz.length} quiz savoli — xato yo'q.`);
+  validateOutput(new Set(backendLessons.map((lesson) => lesson.key)));
+  console.log(
+    `Mazmun tekshirildi: ${backendLessons.length} dars, ${backendLessonProblems.length} masala, ` +
+      `${backendLessonQuiz.length} quiz savoli, ${backendLessonOutput.length} kod savoli — xato yo'q.`
+  );
 
   const teacher = await resolveTeacher();
   const existingClass = await prisma.classGroup.findFirst({ where: { track: Track.BACKEND, title } });
@@ -255,6 +314,7 @@ async function main() {
   console.log(`  darslar:    ${backendLessons.length}`);
   console.log(`  masalalar:  ${await writeProblems()}`);
   console.log(`  quiz:       ${await writeQuiz()}`);
+  console.log(`  kod savoli: ${await writeOutput()}`);
   console.log(`  rubrikalar: ${await writeRubrics()}`);
 
   const classGroup =

@@ -94,3 +94,30 @@ export interface LessonProblemRecord {
   /** Auto-graded I/O cases; at least one visible case is expected. */
   testCases: ProblemTestCase[];
 }
+
+/**
+ * One "Kod nima chiqaradi?" question: a short Python snippet and exactly what it
+ * prints. Seeded as a `QuizQuestion` with kind 'output' and upserted on
+ * (lessonId, order). Orders start at OUTPUT_ORDER_BASE + 1 so they never collide
+ * with the lesson's multiple-choice questions (1..N).
+ *
+ * `expectedOutput` is not trusted as written: scripts/verifyOutputQuestions.ts
+ * runs every snippet on Python 3.10 (Piston's version) and fails on any
+ * mismatch, so the answer key is what Python really prints.
+ */
+export interface LessonOutputRecord {
+  lessonKey: string;
+  /** OUTPUT_ORDER_BASE + 1.. — unique per lesson. */
+  order: number;
+  /** Self-contained Python 3.10 code: no input(), no network, no randomness. */
+  code: string;
+  /** Exact stdout. Whitespace at line ends and blank lines around it are ignored. */
+  expectedOutput: string;
+  /** 1–2 Uzbek sentences on WHY it prints that. Shown after answering. */
+  explanation: string;
+  /** Overrides the default "Bu kod ekranga nima chiqaradi?". */
+  prompt?: string;
+}
+
+export const OUTPUT_ORDER_BASE = 100;
+export const DEFAULT_OUTPUT_PROMPT = 'Bu kod ekranga nima chiqaradi?';

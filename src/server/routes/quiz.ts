@@ -5,6 +5,8 @@ import { prisma } from '../db';
 import { requireAuth } from '../middleware/auth';
 import { nextReview, selectReviewQuestions, type DueCandidate } from '../quiz/schedule';
 import { settleOpenPlans } from '../dailyPlan/service';
+import { isOutputAnswerCorrect, OUTPUT_ANSWER_MAX_LENGTH } from '../quiz/output';
+import { PUBLIC_QUESTION_SELECT, toPublicQuestion, type QuestionRow } from '../quiz/publicQuestion';
 
 export const quizRouter = Router();
 
@@ -20,35 +22,6 @@ export const QUIZ_XP_REWARD = 5;
 
 /** Mirrors the 403 message used by src/server/routes/lessons.ts. */
 const WRONG_TRACK_ERROR = "Bu dars sizning yo'nalishingizga tegishli emas.";
-
-/**
- * What a student is allowed to see BEFORE answering. `correctIndex` and
- * `explanation` are the answer key and are deliberately absent — the choices
- * array is visible in devtools, so leaking the index would make the quiz
- * pointless. Same redaction principle as hidden test cases in judge.ts.
- */
-export interface PublicQuizQuestion {
-  id: string;
-  prompt: string;
-  choices: string[];
-  lessonKey: string;
-  isReview: boolean;
-}
-
-interface QuestionRow {
-  id: string;
-  prompt: string;
-  choices: string[];
-  lesson: { key: string };
-}
-
-const toPublicQuestion = (row: QuestionRow, isReview: boolean): PublicQuizQuestion => ({
-  id: row.id,
-  prompt: row.prompt,
-  choices: row.choices,
-  lessonKey: row.lesson.key,
-  isReview,
-});
 
 function isWrongTrack(role: Role, userTrack: Track | null, lessonTrack: Track): boolean {
   return role === Role.STUDENT && userTrack !== lessonTrack;
@@ -73,9 +46,7 @@ async function loadDueCandidates(
     },
     select: {
       dueAt: true,
-      question: {
-        select: { id: true, prompt: true, choices: true, lesson: { select: { key: true } } },
-      },
+      question: { select: PUBLIC_QUESTION_SELECT },
     },
     orderBy: { dueAt: 'asc' },
   });
@@ -117,7 +88,7 @@ quizRouter.get('/:lessonKey', async (req, res) => {
   const [currentRows, dueCandidates] = await Promise.all([
     prisma.quizQuestion.findMany({
       where: { lessonId: lesson.id },
-      select: { id: true, prompt: true, choices: true, lesson: { select: { key: true } } },
+      select: PUBLIC_QUESTION_SELECT,
       orderBy: { order: 'asc' },
     }),
     loadDueCandidates(user.id, lesson.track, lesson.order, now),
@@ -138,9 +109,11 @@ quizRouter.get('/:lessonKey', async (req, res) => {
   });
 });
 
-const answerBodySchema = z.object({
-  choiceIndex: z.number().int().nonnegative(),
-});
+/** A choice question takes an index, an output question the typed output. */
+const answerBodySchema = z.union([
+  z.object({ choiceIndex: z.number().int().nonnegative() }).strict(),
+  z.object({ output: z.string().max(OUTPUT_ANSWER_MAX_LENGTH) }).strict(),
+]);
 
 /** POST /api/quiz/:questionId/answer — grade one answer, server-side only. */
 quizRouter.post('/:questionId/answer', async (req, res) => {
@@ -154,8 +127,10 @@ quizRouter.post('/:questionId/answer', async (req, res) => {
     where: { id: req.params.questionId },
     select: {
       id: true,
+      kind: true,
       choices: true,
       correctIndex: true,
+      expectedOutput: true,
       explanation: true,
       lesson: { select: { track: true } },
     },
@@ -167,13 +142,23 @@ quizRouter.post('/:questionId/answer', async (req, res) => {
     return res.status(403).json({ error: WRONG_TRACK_ERROR });
   }
 
-  // Bound the choice against THIS question's options, not a hardcoded 4.
-  const { choiceIndex } = parsed.data;
-  if (choiceIndex >= question.choices.length) {
-    return res.status(400).json({ error: "Javob varianti noto'g'ri." });
+  const isOutput = question.kind === 'output';
+  let correct: boolean;
+  if (isOutput) {
+    if (!('output' in parsed.data) || question.expectedOutput === null) {
+      return res.status(400).json({ error: 'Bu savolga kod natijasini yozing.' });
+    }
+    if (parsed.data.output.trim() === '') {
+      return res.status(400).json({ error: "Javob bo'sh bo'lmasin." });
+    }
+    correct = isOutputAnswerCorrect(question.expectedOutput, parsed.data.output);
+  } else {
+    // Bound the choice against THIS question's options, not a hardcoded 4.
+    if (!('choiceIndex' in parsed.data) || parsed.data.choiceIndex >= question.choices.length) {
+      return res.status(400).json({ error: "Javob varianti noto'g'ri." });
+    }
+    correct = parsed.data.choiceIndex === question.correctIndex;
   }
-
-  const correct = choiceIndex === question.correctIndex;
   const now = new Date();
   const existing = await prisma.quizAttempt.findUnique({
     where: { userId_questionId: { userId: user.id, questionId: question.id } },
@@ -224,6 +209,7 @@ quizRouter.post('/:questionId/answer', async (req, res) => {
   res.json({
     correct,
     correctIndex: question.correctIndex,
+    expectedOutput: isOutput ? question.expectedOutput : null,
     explanation: question.explanation,
     xpAwarded,
     streak: schedule.streak,

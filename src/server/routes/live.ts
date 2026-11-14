@@ -168,8 +168,15 @@ export function createLiveRouter(registry: Registry): Router {
   /** GET /api/live/lessons — lessons that have questions to play, plus the question packs. */
   router.get('/lessons', ...staff, async (_req, res) => {
     const lessons = await prisma.lesson.findMany({
-      where: { quizQuestions: { some: {} } },
-      select: { key: true, title: true, track: true, order: true, _count: { select: { quizQuestions: true } } },
+      // A live round is tap-to-answer: output questions need typing, so they stay out.
+      where: { quizQuestions: { some: { kind: 'choice' } } },
+      select: {
+        key: true,
+        title: true,
+        track: true,
+        order: true,
+        _count: { select: { quizQuestions: { where: { kind: 'choice' } } } },
+      },
       orderBy: [{ track: 'asc' }, { order: 'asc' }],
     });
     res.json({
@@ -196,6 +203,7 @@ export function createLiveRouter(registry: Registry): Router {
         id: true,
         title: true,
         quizQuestions: {
+          where: { kind: 'choice' },
           select: { id: true, prompt: true, choices: true, correctIndex: true, explanation: true },
           orderBy: { order: 'asc' },
         },

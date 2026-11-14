@@ -148,8 +148,11 @@ async function loadMastery(userId: string, role: Role, lessons: Lesson[]): Promi
       where: { lessonId: { in: lessonIds }, difficulty: { in: REQUIRED_DIFFICULTIES } },
       select: { id: true, lessonId: true },
     }),
+    // Only multiple choice gates a lesson. Output questions arrived later; counting
+    // them would raise the bar under students who already cleared a lesson and
+    // re-lock it, so they are practice (daily plan, review) rather than a gate.
     prisma.quizQuestion.findMany({
-      where: { lessonId: { in: lessonIds } },
+      where: { lessonId: { in: lessonIds }, kind: 'choice' },
       select: { id: true, lessonId: true },
     }),
   ]);

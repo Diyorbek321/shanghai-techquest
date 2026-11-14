@@ -27,6 +27,7 @@ function cookieFor(userId: string, role: Role, track: Track | null): string {
 
 const lessonOneKey = unique('vitest-quiz-lesson-1');
 const lessonTwoKey = unique('vitest-quiz-lesson-2');
+const lessonThreeKey = unique('vitest-quiz-lesson-3');
 
 let studentId: string;
 let studentCookie: string;
@@ -37,6 +38,9 @@ let lessonTwoId: string;
 let q1Id: string;
 let q2Id: string;
 let lessonTwoQuestionId: string;
+let lessonThreeId: string;
+let outputQuestionId: string;
+const OUTPUT_CODE = 'x = 7\nprint(x // 2)\nprint(x % 2)';
 const CORRECT_INDEX = 2;
 
 const MINUTE = 60_000;
@@ -117,6 +121,23 @@ beforeAll(async () => {
   q1Id = q1.id;
   q2Id = q2.id;
   lessonTwoQuestionId = lessonTwoQuestion.id;
+
+  const lessonThree = await prisma.lesson.create({ data: lessonData(lessonThreeKey, 9802) });
+  lessonThreeId = lessonThree.id;
+  const outputQuestion = await prisma.quizQuestion.create({
+    data: {
+      lessonId: lessonThreeId,
+      order: 101,
+      kind: 'output',
+      prompt: 'Bu kod ekranga nima chiqaradi?',
+      code: OUTPUT_CODE,
+      choices: [],
+      correctIndex: -1,
+      expectedOutput: '3\n1',
+      explanation: 'MAXFIY-IZOH-SIZIB-KETMASLIGI-KERAK',
+    },
+  });
+  outputQuestionId = outputQuestion.id;
 });
 
 beforeEach(async () => {
@@ -126,8 +147,8 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await prisma.quizAttempt.deleteMany({ where: { userId: { in: [studentId, otherTrackStudentId] } } });
-  await prisma.quizQuestion.deleteMany({ where: { lessonId: { in: [lessonOneId, lessonTwoId] } } });
-  await prisma.lesson.deleteMany({ where: { key: { in: [lessonOneKey, lessonTwoKey] } } });
+  await prisma.quizQuestion.deleteMany({ where: { lessonId: { in: [lessonOneId, lessonTwoId, lessonThreeId] } } });
+  await prisma.lesson.deleteMany({ where: { key: { in: [lessonOneKey, lessonTwoKey, lessonThreeKey] } } });
   await prisma.user.deleteMany({ where: { id: { in: [studentId, otherTrackStudentId] } } });
   await prisma.$disconnect();
 });
@@ -146,7 +167,9 @@ describe('GET /api/quiz/:lessonKey', () => {
     expect(res.body.questions).toHaveLength(2);
     res.body.questions.forEach((question: Record<string, unknown>) => {
       // Exact key set — a new field must be added deliberately, never by spread.
-      expect(Object.keys(question).sort()).toEqual(['choices', 'id', 'isReview', 'lessonKey', 'prompt']);
+      expect(Object.keys(question).sort()).toEqual(['choices', 'code', 'id', 'isReview', 'kind', 'lessonKey', 'prompt']);
+      expect(question.kind).toBe('choice');
+      expect(question.code).toBeNull();
       expect(question).not.toHaveProperty('correctIndex');
       expect(question).not.toHaveProperty('explanation');
     });
@@ -369,5 +392,52 @@ describe('GET /api/quiz/due/count', () => {
     await answer(q1Id, CORRECT_INDEX).expect(200);
     const res = await request(app).get('/api/quiz/due/count').set('Cookie', studentCookie).expect(200);
     expect(res.body.count).toBe(0);
+  });
+});
+
+const answerOutput = (output: unknown, cookie = studentCookie) =>
+  request(app).post(`/api/quiz/${outputQuestionId}/answer`).set('Cookie', cookie).send({ output });
+
+describe('output questions ("Kod nima chiqaradi?")', () => {
+  it('serves the code but never the expected output or explanation', async () => {
+    const res = await request(app).get(`/api/quiz/${lessonThreeKey}`).set('Cookie', studentCookie).expect(200);
+    const question = res.body.questions.find((q: { id: string }) => q.id === outputQuestionId);
+    expect(question).toMatchObject({ kind: 'output', code: OUTPUT_CODE, choices: [] });
+    const raw = JSON.stringify(res.body);
+    expect(raw).not.toContain('expectedOutput');
+    expect(raw).not.toContain('MAXFIY-IZOH');
+  });
+
+  it('accepts the right output typed with sloppy whitespace, and reveals the key after', async () => {
+    const res = await answerOutput('3  \r\n1\n\n').expect(200);
+    expect(res.body).toMatchObject({ correct: true, expectedOutput: '3\n1', xpAwarded: QUIZ_XP_REWARD });
+    const attempt = await prisma.quizAttempt.findUnique({
+      where: { userId_questionId: { userId: studentId, questionId: outputQuestionId } },
+    });
+    expect(attempt?.correct).toBe(true);
+  });
+
+  it('marks a wrong output wrong and schedules it again', async () => {
+    const res = await answerOutput('3.5\n1').expect(200);
+    expect(res.body).toMatchObject({ correct: false, xpAwarded: 0, streak: 0 });
+  });
+
+  it('rejects an empty answer without recording an attempt', async () => {
+    await answerOutput('   \n').expect(400);
+    expect(await prisma.quizAttempt.count({ where: { userId: studentId } })).toBe(0);
+  });
+
+  it('rejects a choice index for an output question, and output text for a choice question', async () => {
+    await request(app).post(`/api/quiz/${outputQuestionId}/answer`).set('Cookie', studentCookie).send({ choiceIndex: 0 }).expect(400);
+    await request(app).post(`/api/quiz/${q1Id}/answer`).set('Cookie', studentCookie).send({ output: '3' }).expect(400);
+  });
+
+  it('rejects an oversized answer', async () => {
+    await answerOutput('x'.repeat(5000)).expect(400);
+  });
+
+  it('never reveals expectedOutput on a choice question', async () => {
+    const res = await answer(q1Id, CORRECT_INDEX).expect(200);
+    expect(res.body.expectedOutput).toBeNull();
   });
 });

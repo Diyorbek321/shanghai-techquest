@@ -7,6 +7,7 @@ import { teacherOwnsClass } from '../utils/teacherScope';
 import { calendarDate, dayBefore, dayStart, todayKey } from '../utils/dayKey';
 import { isLessonDay, latestLessonBlock } from '../lessons/schedule';
 import { parseVideoLink } from '../lessons/video';
+import { PUBLIC_QUESTION_SELECT, toPublicQuestion } from '../quiz/publicQuestion';
 import {
   DAILY_PLAN_XP,
   LATE_PLAN_XP,
@@ -176,7 +177,7 @@ dailyPlanRouter.get('/day/:date/quiz', requireRole(Role.STUDENT), async (req, re
   const [rows, attempts] = await Promise.all([
     prisma.quizQuestion.findMany({
       where: { id: { in: questionIds } },
-      select: { id: true, prompt: true, choices: true, lesson: { select: { key: true } } },
+      select: PUBLIC_QUESTION_SELECT,
     }),
     prisma.quizAttempt.findMany({
       where: { userId: req.user!.id, questionId: { in: questionIds } },
@@ -195,9 +196,7 @@ dailyPlanRouter.get('/day/:date/quiz', requireRole(Role.STUDENT), async (req, re
       .filter((id) => !doneIds.has(id))
       .flatMap((id) => {
         const row = byId.get(id);
-        return row
-          ? [{ id: row.id, prompt: row.prompt, choices: row.choices, lessonKey: row.lesson.key, isReview: true }]
-          : [];
+        return row ? [toPublicQuestion(row, true)] : [];
       }),
   });
 });
