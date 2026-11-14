@@ -215,6 +215,7 @@ model User {
   peerReviews          PeerReview[]      @relation("PeerReviewer")
   hostedLiveGames      LiveGame[]
   liveGameResults      LiveGameResult[]
+  weeklyAnswers        WeeklyAnswer[]
 
   @@index([teamId])
 }
@@ -242,6 +243,7 @@ model ClassGroup {
   attendances Attendance[]
   homework    Homework[]
   goals       ClassGoal[]
+  weeklySets  WeeklySet[]
 
   @@index([teacherId])
 }
@@ -349,7 +351,8 @@ model QuizQuestion {
   /// (scripts/verifyOutputQuestions.ts). Never sent before the answer.
   expectedOutput String?
 
-  attempts QuizAttempt[]
+  attempts      QuizAttempt[]
+  weeklyAnswers WeeklyAnswer[]
 
   @@unique([lessonId, order])
   @@index([lessonId])
@@ -907,5 +910,45 @@ model LiveGameResult {
   xpAwarded    Int
 
   @@unique([gameId, userId])
+  @@index([userId])
+}
+
+/// One cohort's homework set: every quiz question and practice problem of a
+/// run of consecutive lesson days (a weekend's three lessons), due the evening
+/// before the next lesson (weekly/block.ts). Created on first need, keyed on
+/// the block's first lesson, so a re-read never makes a second copy.
+/// Items are not stored: they are the lessons' own questions and problems,
+/// looked up by order, so content edits reach an open set immediately.
+model WeeklySet {
+  id        String     @id @default(cuid())
+  classId   String
+  class     ClassGroup @relation(fields: [classId], references: [id], onDelete: Cascade)
+  fromOrder Int
+  toOrder   Int
+  /// YYYY-MM-DD, Tashkent: the day after the block's last lesson.
+  opensOn   String
+  dueAt     DateTime
+  createdAt DateTime   @default(now())
+
+  answers WeeklyAnswer[]
+
+  @@unique([classId, fromOrder])
+  @@index([classId, dueAt])
+}
+
+/// A student's FIRST answer to one question of a set — the graded one. Later
+/// answers update QuizAttempt (spaced repetition) but never this row.
+model WeeklyAnswer {
+  id         String       @id @default(cuid())
+  setId      String
+  set        WeeklySet    @relation(fields: [setId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId String
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  correct    Boolean
+  answeredAt DateTime     @default(now())
+
+  @@unique([setId, userId, questionId])
   @@index([userId])
 }

@@ -5,6 +5,7 @@ import { prisma } from '../db';
 import { requireAuth } from '../middleware/auth';
 import { nextReview, selectReviewQuestions, type DueCandidate } from '../quiz/schedule';
 import { settleOpenPlans } from '../dailyPlan/service';
+import { recordWeeklyAnswer } from '../weekly/service';
 import { isOutputAnswerCorrect, OUTPUT_ANSWER_MAX_LENGTH } from '../quiz/output';
 import { PUBLIC_QUESTION_SELECT, toPublicQuestion, type QuestionRow } from '../quiz/publicQuestion';
 
@@ -204,6 +205,13 @@ quizRouter.post('/:questionId/answer', async (req, res) => {
   ]);
 
   if (correct) await settleOpenPlans(user.id);
+  // The homework set grades the first answer only; a failure here must not
+  // cost the student their answer, which is already saved above.
+  if (user.role === Role.STUDENT && user.track) {
+    await recordWeeklyAnswer(user.id, user.track, question.id, correct, now).catch((err) =>
+      console.error('Weekly answer record failed:', err)
+    );
+  }
 
   // The answer key is revealed only here, after the student has committed.
   res.json({

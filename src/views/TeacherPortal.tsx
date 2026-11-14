@@ -16,7 +16,8 @@ import {
   KeyRound,
   Award,
   Target,
-  ShieldAlert
+  ShieldAlert,
+  ClipboardList,
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
@@ -26,6 +27,7 @@ import { StudentAccountsPanel } from '../components/teacher/StudentAccountsPanel
 import { HomeworkPanel } from '../components/teacher/HomeworkPanel';
 import { ClassGoalsPanel } from '../components/teacher/ClassGoalsPanel';
 import { DailyPlanPanel } from '../components/teacher/DailyPlanPanel';
+import { WeeklySetPanel } from '../components/teacher/WeeklySetPanel';
 import { ContentHealthPanel } from '../components/teacher/ContentHealthPanel';
 
 interface ClassGroup {
@@ -45,7 +47,7 @@ interface StudentRow {
   lastSubmittedAt: string | null;
 }
 
-type TeacherTab = 'overview' | 'students' | 'accounts' | 'homework' | 'daily' | 'goals' | 'quality';
+type TeacherTab = 'overview' | 'students' | 'accounts' | 'homework' | 'weekly' | 'daily' | 'goals' | 'quality';
 
 export function TeacherPortal() {
   const [activeTab, setActiveTab] = useState<TeacherTab>('overview');
@@ -107,6 +109,7 @@ export function TeacherPortal() {
           { id: 'students', label: 'O\'quvchilar', icon: Users },
           { id: 'accounts', label: 'Login/parol', icon: KeyRound },
           { id: 'homework', label: 'Uy vazifasi', icon: BookText },
+          { id: 'weekly', label: 'Hafta vazifasi', icon: ClipboardList },
           { id: 'daily', label: 'Kunlik reja', icon: CalendarCheck },
           { id: 'goals', label: 'Sinf maqsadi', icon: Target },
           { id: 'quality', label: 'Kontent sifati', icon: ShieldAlert },
@@ -229,6 +232,8 @@ export function TeacherPortal() {
       {activeTab === 'accounts' && <StudentAccountsPanel classId={selectedClassId} />}
 
       {activeTab === 'goals' && <ClassGoalsPanel classId={selectedClassId} />}
+
+      {activeTab === 'weekly' && <WeeklySetPanel classId={selectedClassId} />}
 
       {activeTab === 'daily' && <DailyPlanPanel classId={selectedClassId} />}
 

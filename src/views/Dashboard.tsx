@@ -9,6 +9,7 @@ import { formatRelativeTime } from '../lib/utils';
 import { trackLabel, TRACK_STYLE } from '../lib/tracks';
 import { ClassGoalWidget } from '../components/ClassGoalWidget';
 import { DailyPlanCard } from '../components/DailyPlanCard';
+import { WeeklySetCard } from '../components/WeeklySetCard';
 
 interface DashboardProps {
   user: User;
@@ -229,6 +230,9 @@ export function Dashboard({ user, onNavigate, onTriggerSuccess, onOpenProblem }:
               </div>
             </section>
           )}
+
+          {/* This week's homework set: the lessons just taught, graded by the server. */}
+          {user.role === 'student' && <WeeklySetCard onOpenProblem={onOpenProblem} />}
 
           {/* Today's auto-checked plan; falls back to the older drill when the
               student's class has no timetable to plan against. */}

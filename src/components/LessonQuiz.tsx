@@ -54,9 +54,14 @@ interface LessonQuizProps {
   sourcePath?: string;
   /** Called after every answer, so a parent can refresh what the answer ticked off. */
   onAnswered?: () => void;
+  /**
+   * 'homework': a graded set — each question is asked once, so the summary
+   * confirms submission instead of offering a retry or a mastery threshold.
+   */
+  variant?: 'lesson' | 'homework';
 }
 
-export function LessonQuiz({ lessonKey, sourcePath, onAnswered }: LessonQuizProps) {
+export function LessonQuiz({ lessonKey, sourcePath, onAnswered, variant = 'lesson' }: LessonQuizProps) {
   const queryClient = useQueryClient();
   const [index, setIndex] = useState(0);
   const [committed, setCommitted] = useState<CommittedAnswer | null>(null);
@@ -139,6 +144,14 @@ export function LessonQuiz({ lessonKey, sourcePath, onAnswered }: LessonQuizProp
     );
   }
 
+  if (questions.length === 0 && variant === 'homework') {
+    return (
+      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-gray-200">
+        Barcha savollarga javob berdingiz. Natija hafta vazifasi kartasida.
+      </div>
+    );
+  }
+
   if (questions.length === 0) {
     return (
       <div className="rounded-lg border border-brand-border bg-black/20 p-4">
@@ -153,6 +166,7 @@ export function LessonQuiz({ lessonKey, sourcePath, onAnswered }: LessonQuizProp
   if (finished) {
     return (
       <QuizSummary
+        variant={variant}
         total={questions.length}
         correct={correctCount}
         xpEarned={xpEarned}
@@ -412,12 +426,14 @@ function ChoiceCard({
 }
 
 function QuizSummary({
+  variant,
   total,
   correct,
   xpEarned,
   onRestart,
   isRestarting,
 }: {
+  variant: 'lesson' | 'homework';
   total: number;
   correct: number;
   xpEarned: number;
@@ -446,11 +462,14 @@ function QuizSummary({
       </div>
 
       <p className="mt-1 text-sm text-gray-300">
-        {passed
-          ? "Ajoyib! Bu darsning test qismi bajarildi. Xatolarga qaytib qaraysiz — savollar keyinroq takrorlanadi."
-          : "Darsni yana bir bor ko'rib chiqing va testni qayta yeching. Ochilish uchun kamida 60% kerak."}
+        {variant === 'homework'
+          ? "Javoblaringiz qabul qilindi va baholandi. Xato qilgan savollaringiz keyingi kunlarda takrorlash uchun qaytadi."
+          : passed
+            ? "Ajoyib! Bu darsning test qismi bajarildi. Xatolarga qaytib qaraysiz — savollar keyinroq takrorlanadi."
+            : "Darsni yana bir bor ko'rib chiqing va testni qayta yeching. Ochilish uchun kamida 60% kerak."}
       </p>
 
+      {variant === 'lesson' && (
       <button
         type="button"
         onClick={onRestart}
@@ -460,6 +479,7 @@ function QuizSummary({
         {isRestarting ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
         Qaytadan yechish
       </button>
+      )}
     </div>
   );
 }
