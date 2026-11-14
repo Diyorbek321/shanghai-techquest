@@ -266,8 +266,11 @@ export function Problems({ initialProblemId = null }: ProblemsProps) {
     // Collapse the scaffolding when a different problem opens, so the student
     // meets each new problem with the editor rather than with the answer cards.
     setShowParsons(false);
+    // Keyed on the id, not the object: a submit invalidates ['problems'], the
+    // detail refetches as a new object, and resetting then would wipe the
+    // student's accepted code back to the starter.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProblem]);
+  }, [activeProblem?.id]);
 
   const handleLanguageChange = (lang: Language) => {
     setLanguage(lang);
