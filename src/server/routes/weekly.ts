@@ -5,7 +5,14 @@ import { requireAuth, requireRole } from '../middleware/auth';
 import { teacherOwnsClass } from '../utils/teacherScope';
 import { findCohort } from '../dailyPlan/service';
 import { PUBLIC_QUESTION_SELECT, toPublicQuestion } from '../quiz/publicQuestion';
-import { classSetReport, currentSetForClass, setItems, studentSetView } from '../weekly/service';
+import {
+  classNoSetReason,
+  classSetReport,
+  currentSetForClass,
+  setItems,
+  studentNoSetReason,
+  studentSetView,
+} from '../weekly/service';
 
 /**
  * "Hafta vazifasi": the cohort's homework set for the lessons just taught —
@@ -25,7 +32,7 @@ weeklyRouter.get('/current', requireRole(Role.STUDENT), async (req, res) => {
   if (!user.track) return res.status(400).json({ error: NO_TRACK_ERROR });
   try {
     const view = await studentSetView(user.id, user.track);
-    res.json(view ?? { set: null });
+    res.json(view ?? { set: null, reason: await studentNoSetReason(user.id, user.track) });
   } catch (err) {
     console.error('Weekly set load failed:', err);
     res.status(500).json({ error: "Hafta vazifasini yuklab bo'lmadi." });
@@ -75,7 +82,7 @@ weeklyRouter.get('/class/:classId', requireRole(Role.TEACHER, Role.ADMIN), async
   }
   try {
     const report = await classSetReport(req.params.classId);
-    res.json(report ?? { set: null });
+    res.json(report ?? { set: null, reason: await classNoSetReason(req.params.classId) });
   } catch (err) {
     console.error('Weekly class report failed:', err);
     res.status(500).json({ error: "Hisobotni yuklab bo'lmadi." });

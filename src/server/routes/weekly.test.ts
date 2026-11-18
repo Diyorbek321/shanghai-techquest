@@ -247,6 +247,41 @@ describe('Hafta vazifasi', () => {
     expect(res.body.set).toMatchObject({ fromOrder: 3, toOrder: 3 });
   });
 
+  it('says why there is no set, instead of an empty answer', async () => {
+    const passwordHash = await bcrypt.hash('password123', 10);
+    const loner = await prisma.user.create({
+      data: { email: `${unique('weekly-loner')}@vitest.local`, passwordHash, name: 'loner', role: Role.STUDENT, track: Track.OFFICE },
+    });
+    userIds.push(loner.id);
+    const lonerCookie = cookieFor(loner.id, loner.role, loner.track);
+
+    const none = await request(app).get('/api/weekly/current').set('Cookie', lonerCookie).expect(200);
+    expect(none.body).toEqual({ set: null, reason: 'no_class' });
+
+    // A class created by hand without a start date: the timetable cannot be computed.
+    const undated = await prisma.classGroup.create({
+      data: {
+        title: unique('Undated class'),
+        track: Track.OFFICE,
+        teacherId: userIds[1],
+        enrollments: { create: { userId: loner.id } },
+      },
+    });
+    try {
+      const student = await request(app).get('/api/weekly/current').set('Cookie', lonerCookie).expect(200);
+      expect(student.body).toEqual({ set: null, reason: 'no_start_date' });
+      const teacher = await request(app).get(`/api/weekly/class/${undated.id}`).set('Cookie', teacherCookie).expect(200);
+      expect(teacher.body).toEqual({ set: null, reason: 'no_start_date' });
+
+      // Dated, but the first lesson is still ahead.
+      await prisma.classGroup.update({ where: { id: undated.id }, data: { startDate: new Date(Date.now() + 3 * DAY) } });
+      const early = await request(app).get('/api/weekly/current').set('Cookie', lonerCookie).expect(200);
+      expect(early.body).toEqual({ set: null, reason: 'not_started' });
+    } finally {
+      await prisma.classGroup.delete({ where: { id: undated.id } });
+    }
+  });
+
   it('is for students only', async () => {
     await request(app).get('/api/weekly/current').set('Cookie', teacherCookie).expect(403);
   });

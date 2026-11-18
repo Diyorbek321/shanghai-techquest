@@ -9,7 +9,7 @@
  */
 import { Prisma, Track, type WeeklySet } from '@prisma/client';
 import { prisma } from '../db';
-import { DEFAULT_LESSON_DAYS } from '../lessons/schedule';
+import { DEFAULT_LESSON_DAYS, lessonsTaughtBefore } from '../lessons/schedule';
 import { calendarDate, todayKey } from '../utils/dayKey';
 import { findCohort } from '../dailyPlan/service';
 import { blockContaining, homeworkBlock, type HomeworkBlock } from './block';
@@ -67,6 +67,32 @@ export async function currentSetForClass(classId: string): Promise<(WeeklySet & 
   const block = homeworkBlock(group.startDate, cohortDays(group.lessonDays), calendarDate(todayKey()), totalLessons);
   if (!block) return null;
   return { ...(await ensureSet(classId, block)), track: group.track };
+}
+
+/**
+ * Why no set is in force — so the student and teacher see the cause instead of
+ * an empty dashboard. A class created by hand without a start date was exactly
+ * that: every student silently got nothing.
+ */
+export type NoSetReason = 'no_class' | 'no_start_date' | 'not_started' | 'course_over';
+
+export async function classNoSetReason(classId: string): Promise<NoSetReason> {
+  const group = await prisma.classGroup.findUnique({
+    where: { id: classId },
+    select: { startDate: true, lessonDays: true, track: true },
+  });
+  if (!group) return 'no_class';
+  if (!group.startDate) return 'no_start_date';
+  const totalLessons = await prisma.lesson.count({ where: { track: group.track } });
+  const taught = lessonsTaughtBefore(group.startDate, cohortDays(group.lessonDays), calendarDate(todayKey()), totalLessons);
+  return totalLessons > 0 && taught >= totalLessons ? 'course_over' : 'not_started';
+}
+
+export async function studentNoSetReason(userId: string, track: Track): Promise<NoSetReason> {
+  const cohort = await findCohort(userId, track);
+  if (cohort) return classNoSetReason(cohort.classId);
+  const undated = await prisma.enrollment.findFirst({ where: { userId, class: { track } }, select: { classId: true } });
+  return undated ? 'no_start_date' : 'no_class';
 }
 
 export async function setItems(set: Pick<WeeklySet, 'fromOrder' | 'toOrder'>, track: Track): Promise<SetItems> {

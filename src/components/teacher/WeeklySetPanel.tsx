@@ -22,7 +22,18 @@ interface ClassSetReport {
   missed: { id: string; prompt: string; lessonOrder: number; wrong: number; answered: number }[];
 }
 
-type ReportResponse = ClassSetReport | { set: null };
+type NoSetReason = 'no_class' | 'no_start_date' | 'not_started' | 'course_over';
+
+type ReportResponse = ClassSetReport | { set: null; reason?: NoSetReason };
+
+const NO_SET_TEXT: Record<NoSetReason, string> = {
+  no_class: 'Sinf topilmadi.',
+  no_start_date:
+    "Bu sinfga boshlanish sanasi kiritilmagan — shuning uchun o'quvchilarda hafta vazifasi ko'rinmayapti. " +
+    "Sinflar bo'limida sinfni tahrirlab, birinchi dars sanasini va dars kunlarini kiriting.",
+  not_started: 'Hafta vazifasi birinchi dars kunlari tugagach ochiladi.',
+  course_over: 'Kurs darslari tugagan — yangi hafta vazifasi yo\'q.',
+};
 
 const STATUS_LABEL: Record<SetStatus, { text: string; cls: string }> = {
   done: { text: 'Topshirdi', cls: 'text-brand-green' },
@@ -59,10 +70,12 @@ export function WeeklySetPanel({ classId }: { classId: string | null }) {
   }
   if (isError || !data) return <p className="text-sm text-red-400">Hafta vazifasini yuklab bo'lmadi.</p>;
   if (!data.set) {
+    const reason = 'reason' in data && data.reason ? data.reason : 'not_started';
+    const warn = reason === 'no_start_date';
     return (
-      <div className="glass-panel p-6 text-sm text-gray-400">
-        Hafta vazifasi birinchi dars kunlari tugagach ochiladi. Sinfning boshlanish sanasi va dars kunlari
-        belgilanganini tekshiring.
+      <div className={`glass-panel p-6 text-sm flex items-start gap-2 ${warn ? 'text-brand-orange' : 'text-gray-400'}`}>
+        {warn && <AlertTriangle size={16} className="shrink-0 mt-0.5" />}
+        <span>{NO_SET_TEXT[reason]}</span>
       </div>
     );
   }

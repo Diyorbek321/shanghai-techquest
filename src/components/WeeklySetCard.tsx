@@ -24,9 +24,34 @@ interface WeeklySetView {
   problems: { id: string; title: string; difficulty: string; lessonOrder: number; solved: boolean }[];
 }
 
-type WeeklyResponse = WeeklySetView | { set: null };
+type NoSetReason = 'no_class' | 'no_start_date' | 'not_started' | 'course_over';
+
+type WeeklyResponse = WeeklySetView | { set: null; reason?: NoSetReason };
 
 const hasSet = (data: WeeklyResponse | null | undefined): data is WeeklySetView => !!data?.set;
+
+/** What the student sees instead of an empty space. No class at all: nothing to say here. */
+const NO_SET_TEXT: Record<NoSetReason, string | null> = {
+  no_class: null,
+  no_start_date:
+    "Sinfingizga hali boshlanish sanasi kiritilmagan, shuning uchun hafta vazifasi hisoblanmayapti. O'qituvchingizga ayting.",
+  not_started: 'Hafta vazifasi birinchi dars kunlari tugagach shu yerda ochiladi.',
+  course_over: 'Kurs darslari tugagan — yangi hafta vazifasi yo\'q.',
+};
+
+function NoSetNotice({ reason }: { reason: NoSetReason }) {
+  const text = NO_SET_TEXT[reason];
+  if (!text) return null;
+  return (
+    <section className="glass-panel p-5 border-brand-cyan/20">
+      <div className="flex items-center gap-2 mb-1">
+        <ClipboardList className="text-brand-cyan" size={18} />
+        <h2 className="font-semibold text-lg text-brand-cyan">Hafta vazifasi</h2>
+      </div>
+      <p className="text-sm text-gray-400">{text}</p>
+    </section>
+  );
+}
 
 
 /**
@@ -56,7 +81,7 @@ export function WeeklySetCard({ onOpenProblem }: WeeklySetCardProps) {
     },
   });
 
-  if (!hasSet(data)) return null;
+  if (!hasSet(data)) return data?.reason ? <NoSetNotice reason={data.reason} /> : null;
 
   const { set, lessons, score, quiz, problems } = data;
   const overdue = new Date(set.dueAt).getTime() < Date.now();
