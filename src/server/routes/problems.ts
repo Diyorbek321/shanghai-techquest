@@ -10,6 +10,7 @@ import { notify } from '../notifications/notify';
 import { competenceContext, competenceMessage } from '../notifications/competence';
 import { executeCode, PistonUnavailableError } from '../code/piston';
 import { judgeSubmission, parseTestCases, type JudgeResult, type TestCaseResult } from '../code/judge';
+import { detectLeftoverStarter, LEFTOVER_STARTER_FEEDBACK } from '../code/starterHint';
 import { buildBoard, gradeOrder, isParsonsSuitable, seedFrom } from '../parsons/blocks';
 import { parsonsPoints } from '../parsons/award';
 import { settleOpenPlans } from '../dailyPlan/service';
@@ -252,12 +253,25 @@ problemsRouter.post('/:id/submit', submitCodeRateLimiter, async (req, res) => {
     }
   }
 
+  const leftoverStarter =
+    !judged.passed &&
+    parsed.data.language === 'python' &&
+    detectLeftoverStarter(
+      problem.starterCodePy,
+      parsed.data.code,
+      judged.results.flatMap((result) => (result.stderr ? [result.stderr] : []))
+    );
+
   const deterministicFeedback =
-    testCases.length === 0 ? NO_TEST_CASES_FEEDBACK : buildDeterministicFeedback(judged, alreadySolved);
+    testCases.length === 0
+      ? NO_TEST_CASES_FEEDBACK
+      : leftoverStarter
+        ? `${LEFTOVER_STARTER_FEEDBACK} ${buildDeterministicFeedback(judged, alreadySolved)}`
+        : buildDeterministicFeedback(judged, alreadySolved);
 
   // Gemini only ever decorates a failure message; the verdict above is final.
   const feedback =
-    judged.passed || testCases.length === 0
+    judged.passed || testCases.length === 0 || leftoverStarter
       ? deterministicFeedback
       : await buildFailureHint(problem, req.user!.id, parsed.data.language, parsed.data.code, judged, deterministicFeedback);
 

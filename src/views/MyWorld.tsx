@@ -800,7 +800,7 @@ export function MyWorld({ user, onNavigate }: { user: User, onNavigate: (view: V
   
   const fogDensity = isNight ? 0.01 : 0.005;
 
-  const { addXp, universalCoins } = useQuestManager();
+  const { universalCoins } = useQuestManager();
 
   const handleUpgradeNode = async () => {
     if (!selectedBuilding) return;
@@ -815,7 +815,6 @@ export function MyWorld({ user, onNavigate }: { user: User, onNavigate: (view: V
     if (confirm(`Talab qilinadigan protokol: ${requirement}\nYangilash narxi: ${cost} Tanga\n\nVizual arxitektura yangilanishi boshlansinmi?`)) {
       try {
         await upgradeBuildingMutation.mutateAsync(selectedBuilding.id);
-        addXp(100, `Protocol Upgrade: ${selectedBuilding.name}`);
       } catch (err) {
         if (err instanceof ApiError && err.status === 409) {
           alert('Yangilash uchun Neyron Tangalar yetarli emas.');
@@ -840,7 +839,6 @@ export function MyWorld({ user, onNavigate }: { user: User, onNavigate: (view: V
         secondaryColor: '#FFFFFF',
         name: `Yangi ${BUILD_TYPE_LABELS[type]}`,
       });
-      addXp(50, `Constructed ${type}`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         alert(`Neyron kredit tugadi. Kerak ${cost} Tanga. Joriy balans: ${universalCoins}`);
@@ -849,7 +847,7 @@ export function MyWorld({ user, onNavigate }: { user: User, onNavigate: (view: V
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [universalCoins, createBuildingMutation, addXp]);
+  }, [universalCoins, createBuildingMutation]);
 
   const handleGroundClick = useCallback((pos: [number, number, number]) => addBuilding('TECH', pos), [addBuilding]);
 

@@ -36,7 +36,6 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { ViewType, User, Track } from '../types';
-import { audioManager } from '../lib/audio';
 import { useAuth } from '../lib/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
@@ -123,7 +122,6 @@ export function Layout({ children, currentView, onNavigate, user }: LayoutProps)
     : studentNavItems.filter(item => !item.trackRequirement || user.track === item.trackRequirement);
 
   const handleNavigate = (id: ViewType) => {
-    audioManager.playClick();
     onNavigate(id);
   };
 
@@ -197,7 +195,6 @@ export function Layout({ children, currentView, onNavigate, user }: LayoutProps)
               <button
                 key={item.id}
                 onClick={() => !isLocked && handleNavigate(item.id)}
-                onMouseEnter={() => !isLocked && audioManager.playHover()}
                 disabled={isLocked}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group relative",
@@ -299,7 +296,6 @@ export function Layout({ children, currentView, onNavigate, user }: LayoutProps)
 
             <button
               onClick={() => handleNavigate(isStaff ? 'notifications' : 'mission_log')}
-              onMouseEnter={() => audioManager.playHover()}
               className="relative p-2 text-gray-400 hover:text-white transition-colors"
             >
               <Bell size={20} />

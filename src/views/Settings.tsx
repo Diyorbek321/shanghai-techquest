@@ -5,7 +5,6 @@ import {
   User as UserIcon,
   Bell,
   Shield,
-  Volume2,
   Monitor,
   Keyboard,
   Eye,
@@ -13,7 +12,6 @@ import {
   LogOut
 } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { audioManager } from '../lib/audio';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/AuthContext';
 import { User } from '../types';
@@ -24,12 +22,11 @@ const THEME_LABELS: Record<'dark' | 'neon' | 'cyber', string> = {
   cyber: 'Kiber',
 };
 
-type TabId = 'profile' | 'appearance' | 'audio' | 'notifications' | 'security' | 'keys';
+type TabId = 'profile' | 'appearance' | 'notifications' | 'security' | 'keys';
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: 'profile', label: 'Profil sozlamalari', icon: <UserIcon size={18} /> },
   { id: 'appearance', label: "Ko'rinish", icon: <Monitor size={18} /> },
-  { id: 'audio', label: 'Audio va effektlar', icon: <Volume2 size={18} /> },
   { id: 'notifications', label: 'Bildirishnomalar', icon: <Bell size={18} /> },
   { id: 'security', label: 'Xavfsizlik', icon: <Shield size={18} /> },
   { id: 'keys', label: 'Tezkor tugmalar', icon: <Keyboard size={18} /> },
@@ -45,21 +42,12 @@ export function Settings({ user }: SettingsProps) {
 
   const [activeTab, setActiveTab] = React.useState<TabId>('appearance');
   const [theme, setTheme] = React.useState<'dark' | 'neon' | 'cyber'>(user.theme);
-  const [audioEnabled, setAudioEnabled] = React.useState(user.audioEnabled);
   const [onlineVisible, setOnlineVisible] = React.useState(user.onlineVisible);
   const [profilePublic, setProfilePublic] = React.useState(user.profilePublic);
   const [pushEnabled, setPushEnabled] = React.useState(user.pushEnabled);
-  const [uiSfxVolume, setUiSfxVolume] = React.useState<number>(() => {
-    const stored = localStorage.getItem('techquest.uiSfxVolume');
-    return stored !== null ? Number(stored) : 50;
-  });
-  const [bgmVolume, setBgmVolume] = React.useState<number>(() => {
-    const stored = localStorage.getItem('techquest.bgmVolume');
-    return stored !== null ? Number(stored) : 50;
-  });
 
   const updateUser = useMutation({
-    mutationFn: (body: Partial<Pick<User, 'theme' | 'audioEnabled' | 'onlineVisible' | 'profilePublic' | 'pushEnabled'>>) =>
+    mutationFn: (body: Partial<Pick<User, 'theme' | 'onlineVisible' | 'profilePublic' | 'pushEnabled'>>) =>
       api.patch<User>('/users/me', body),
     onSuccess: (updatedUser) => {
       queryClient.setQueryData(['auth', 'me'], updatedUser);
@@ -69,15 +57,6 @@ export function Settings({ user }: SettingsProps) {
   const handleThemeChange = (t: 'dark' | 'neon' | 'cyber') => {
     setTheme(t);
     updateUser.mutate({ theme: t });
-  };
-
-  const handleAudioToggle = () => {
-    const next = !audioEnabled;
-    setAudioEnabled(next);
-    updateUser.mutate({ audioEnabled: next });
-    if (next) {
-      audioManager.playClick();
-    }
   };
 
   const handleOnlineVisibleToggle = () => {
@@ -96,16 +75,6 @@ export function Settings({ user }: SettingsProps) {
     const next = !pushEnabled;
     setPushEnabled(next);
     updateUser.mutate({ pushEnabled: next });
-  };
-
-  const handleUiSfxVolumeChange = (value: number) => {
-    setUiSfxVolume(value);
-    localStorage.setItem('techquest.uiSfxVolume', String(value));
-  };
-
-  const handleBgmVolumeChange = (value: number) => {
-    setBgmVolume(value);
-    localStorage.setItem('techquest.bgmVolume', String(value));
   };
 
   return (
@@ -208,58 +177,6 @@ export function Settings({ user }: SettingsProps) {
                     )}
                   </button>
                 ))}
-              </div>
-            </motion.div>
-          )}
-
-          {activeTab === 'audio' && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="glass-panel p-6 border border-white/10 rounded-2xl"
-            >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Volume2 size={20} className="text-brand-purple" />
-                  Ovoz va muhit
-                </h2>
-                <button
-                  onClick={handleAudioToggle}
-                  className={`w-12 h-6 rounded-full transition-colors relative ${audioEnabled ? 'bg-brand-cyan' : 'bg-gray-700'}`}
-                >
-                  <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${audioEnabled ? 'right-1' : 'left-1'}`} />
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-300">Interfeys effektlari</p>
-                    <p className="text-xs text-gray-500">Bosish va hover paytida yengil tovushlar chiqarish</p>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={uiSfxVolume}
-                    onChange={(e) => handleUiSfxVolumeChange(Number(e.target.value))}
-                    className="w-32 accent-brand-cyan"
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-300">Fon musiqasi</p>
-                    <p className="text-xs text-gray-500">Diqqatni jamlash uchun low-fi kiber ohanglar</p>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={bgmVolume}
-                    onChange={(e) => handleBgmVolumeChange(Number(e.target.value))}
-                    className="w-32 accent-brand-purple"
-                  />
-                </div>
               </div>
             </motion.div>
           )}

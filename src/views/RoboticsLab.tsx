@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import { ViewType } from '../types';
 import { api } from '../lib/api';
-import { useQuestManager } from '../lib/QuestManager';
 
 interface ModuleProgressRow {
   moduleKey: string;
@@ -60,7 +59,6 @@ export function RoboticsLab() {
   ]);
   const [sensors, setSensors] = useState({ distance: 45, light: 12, voltage: 12.4 });
 
-  const { addXp } = useQuestManager();
   const queryClient = useQueryClient();
 
   const { data: progressRows = [] } = useQuery({
@@ -139,9 +137,8 @@ export function RoboticsLab() {
       addLog("Joylashtirish muvaffaqiyatli yakunlandi.", "success");
       addLog("Rover Protokolni Bajarmoqda: 'moveForward(50)'", "info");
       if (!missionCompleted && !completeMission.isPending) {
-        addXp(missionXp, mission?.title ?? "Robotics: Perimetr Patruli missiyasi");
         completeMission.mutate();
-        addLog(`Missiya yakunlandi: ${mission?.title ?? 'Perimetr Patruli'}! +${missionXp} XP qo'lga kiritildi.`, "success");
+        addLog(`Missiya yakunlandi: ${mission?.title ?? 'Perimetr Patruli'}! XP o'qituvchi topshiriqni baholagach beriladi.`, "success");
       }
     }, 1500);
   };
@@ -310,7 +307,7 @@ export function RoboticsLab() {
               <p className="text-[10px] text-gray-500 leading-relaxed whitespace-pre-line">
                 {mission?.description ?? "Roverni qizil to'siqlarga urilmasdan to'siqlar trassasi bo'ylab harakatlantirishga sozlang. Yaqinlikni kuzatish uchun readSensor() dan foydalaning."}
               </p>
-              <p className="text-[9px] text-brand-purple font-mono mt-2">+{missionXp} XP</p>
+              <p className="text-[9px] text-brand-purple font-mono mt-2">O'qituvchi baholagach +{missionXp} XP</p>
             </div>
           </div>
         </div>

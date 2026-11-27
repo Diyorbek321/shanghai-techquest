@@ -110,26 +110,10 @@ usersRouter.post('/me/heartbeat', async (req, res) => {
   res.status(204).send();
 });
 
-const rewardSchema = z.object({
-  xp: z.number().int().positive().optional(),
-  coins: z.number().int().positive().optional(),
-});
-
-usersRouter.post('/me/reward', async (req, res) => {
-  const parsed = rewardSchema.safeParse(req.body);
-  if (!parsed.success || (!parsed.data.xp && !parsed.data.coins)) {
-    return res.status(400).json({ error: "Musbat XP va/yoki tanga miqdorini kiriting." });
-  }
-  const user = await prisma.user.update({
-    where: { id: req.user!.id },
-    data: {
-      xp: parsed.data.xp ? { increment: parsed.data.xp } : undefined,
-      coins: parsed.data.coins ? { increment: parsed.data.coins } : undefined,
-    },
-  });
-  await checkAchievements(req.user!.id);
-  res.json(serializeUser(user));
-});
+// There is deliberately NO self-reward endpoint: XP and coins are only ever
+// granted by the server for an action it verified itself (a passed test run,
+// a graded assignment, a correct quiz answer). A former POST /users/me/reward
+// let the browser name its own amount, and CodeLab called it +150 XP per click.
 
 const spendSchema = z.object({
   coins: z.number().int().positive(),

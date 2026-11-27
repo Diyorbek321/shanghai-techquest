@@ -238,3 +238,22 @@ describe('GET /api/problems/:id (detail)', () => {
     expect(res.body.sampleStdin).toBe('1 2\n');
   });
 });
+
+describe('POST /api/problems/:id/submit — solution written under the starter', () => {
+  it('explains that the starter input() line swallowed the first stdin line', async () => {
+    const id = await createProblem(TWO_CASES);
+    await prisma.problem.update({ where: { id }, data: { starterCodePy: 'a = input()\n# yechim' } });
+    vi.mocked(executeCode).mockResolvedValue({
+      stdout: '',
+      stderr: 'Traceback (most recent call last):\nEOFError: EOF when reading a line',
+      compileOutput: null,
+      timedOut: false,
+    });
+
+    const res = await submit(id, 'a = input()\n# yechim\na, b = map(int, input().split())\nprint(a + b)');
+
+    expect(res.status).toBe(201);
+    expect(res.body.passed).toBe(false);
+    expect(res.body.feedback).toContain("boshlang'ich kodning OSTIGA");
+  });
+});

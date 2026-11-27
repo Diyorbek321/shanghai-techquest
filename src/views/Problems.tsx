@@ -36,6 +36,12 @@ interface ProblemDetail extends ProblemListItem {
   sampleStdin?: string;
 }
 
+/** True when the starter itself already reads stdin (a live, uncommented input() call). */
+function starterReadsInput(starter: string | null): boolean {
+  if (!starter) return false;
+  return starter.split('\n').some((line) => !line.trim().startsWith('#') && line.includes('input('));
+}
+
 const LANGUAGE_LABEL: Record<Language, string> = {
   javascript: 'JavaScript',
   python: 'Python 3',
@@ -547,6 +553,16 @@ export function Problems({ initialProblemId = null }: ProblemsProps) {
 
         {/* Right Panel: Editor & Output */}
         <div className="w-2/3 flex flex-col">
+          {language === 'python' && starterReadsInput(activeProblem.starterCode.python) && (
+            <div className="flex items-start gap-2 px-4 py-2 text-xs bg-yellow-500/10 border-b border-yellow-500/30 text-yellow-200">
+              <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+              <span>
+                Boshlang'ich kod — shablon: yechimni shu kodning <b>ichida</b> davom ettiring. Butun yechimni uning
+                ostiga qayta yozsangiz, shablondagi <code>input()</code> kiritmaning birinchi qatorini o'qib qo'yadi va
+                testlar o'tmaydi.
+              </span>
+            </div>
+          )}
           {/* Monaco Editor */}
           <div className="flex-1 border-b border-brand-border">
             <Editor

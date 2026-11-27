@@ -4,7 +4,6 @@ import { useMutation } from '@tanstack/react-query';
 import { CheckCircle2, Flame, Loader2, LogIn, XCircle } from 'lucide-react';
 import type { PlayerView } from '../../server/live/views';
 import { api, ApiError } from '../../lib/api';
-import { audioManager } from '../../lib/audio';
 import { cn } from '../../lib/utils';
 import { CHOICE_STYLES, ChoiceIcon, ConnectionBanner, CountdownBadge, Podium, StandingsList } from './shared';
 import { useCountdown, useLiveGame } from './useLiveGame';
@@ -236,7 +235,6 @@ function Answering({ view, pin, seconds }: { view: PlayerView; pin: string; seco
             type="button"
             disabled={closed || submit.isPending}
             onClick={() => {
-              audioManager.playClick();
               setPending(i);
               submit.mutate(i);
             }}
@@ -260,10 +258,6 @@ function Result({ view, userId, nextIn }: { view: PlayerView; userId: string; ne
   const correct = answer?.correct === true;
   const r = view.reveal!;
   const q = view.question!;
-
-  useEffect(() => {
-    if (correct) audioManager.playNotification();
-  }, [correct]);
 
   return (
     <div className="space-y-5">

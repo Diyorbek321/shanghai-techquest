@@ -19,7 +19,6 @@ import {
 import { cn } from '../lib/utils';
 import { api } from '../lib/api';
 
-import { useQuestManager } from '../lib/QuestManager';
 
 const INITIAL_CODE = {
   html: '<div class="card">\n  <h2>Profil</h2>\n  <p>Talaba dasturchi</p>\n</div>',
@@ -43,7 +42,6 @@ export function CodeLab() {
   const [consoleLogs, setConsoleLogs] = useState<{ level: string; text: string }[]>([]);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const { addXp } = useQuestManager();
   const [aiReview, setAiReview] = useState<{ rating: number; feedback: string; cyberSuggestion: string } | null>(null);
   const [isReviewing, setIsReviewing] = useState(false);
 
@@ -75,7 +73,6 @@ export function CodeLab() {
     setTimeout(() => {
       setIsSubmitting(false);
       setShowSuccess(true);
-      addXp(150, 'CodeLab Challenge');
       setTimeout(() => setShowSuccess(false), 4000);
     }, 2000);
   };
@@ -498,7 +495,7 @@ export function CodeLab() {
                   transition={{ delay: 0.5 }}
                   className="font-mono text-3xl font-bold text-[#FFD700] mb-6 drop-shadow-[0_0_8px_rgba(255,215,0,0.5)]"
                 >
-                  +150 XP
+                  Saqlandi
                 </motion.div>
                 
                 <div className="w-64 mx-auto mb-2 text-left space-y-4">

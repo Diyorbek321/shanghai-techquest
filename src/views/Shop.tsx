@@ -70,7 +70,7 @@ const categories: { id: string; name: string; icon: typeof Crown; type: ItemType
 ];
 
 export function Shop({ user }: { user: User }) {
-  const { universalCoins, addXp } = useQuestManager();
+  const { universalCoins } = useQuestManager();
   const queryClient = useQueryClient();
 
   const { data: items = [], isLoading: itemsLoading } = useQuery({
@@ -97,7 +97,6 @@ export function Shop({ user }: { user: User }) {
   const handleBuy = async (item: Item) => {
     try {
       await purchaseMutation.mutateAsync(item.id);
-      addXp(50, `Purchased ${item.name}`);
       alert(`Sintez yakunlandi: ${item.name} qo'lga kiritildi.`);
     } catch (err) {
       if (err instanceof ApiError) {

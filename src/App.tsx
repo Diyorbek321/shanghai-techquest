@@ -44,10 +44,6 @@ import { Companion } from './components/Companion';
 import { ShortcutManager } from './components/ShortcutManager';
 import { SocialMatrix } from './components/SocialMatrix';
 import { ViewType, User } from './types';
-import { audioManager } from './lib/audio';
-
-// Initialize audio manager
-audioManager.init();
 
 export default function App({ user }: { user: User }) {
   // A signed-in user opening the public /play link lands straight on the quiz.
