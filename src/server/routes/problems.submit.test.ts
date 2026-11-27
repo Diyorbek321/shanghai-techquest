@@ -210,3 +210,31 @@ describe('POST /api/problems/:id/submit', () => {
     expect(res.body.feedback).toContain('Oddiy holat');
   });
 });
+
+describe('GET /api/problems (list)', () => {
+  it('lists only problems that can actually be graded', async () => {
+    const tag = unique('gradable');
+    const graded = await createProblem(TWO_CASES);
+    const ungraded = await createProblem([]);
+    await prisma.problem.updateMany({ where: { id: { in: [graded, ungraded] } }, data: { tags: [tag] } });
+
+    const res = await request(app).get(`/api/problems?tag=${tag}`).set('Cookie', studentCookie);
+
+    expect(res.status).toBe(200);
+    expect(res.body.items.map((p: { id: string }) => p.id)).toEqual([graded]);
+    expect(res.body.total).toBe(1);
+  });
+});
+
+describe('GET /api/problems/:id (detail)', () => {
+  it('offers the first open case as sample input and never a hidden one', async () => {
+    const hiddenFirst = [
+      { stdin: 'SECRET\n', expectedStdout: 'x', hidden: true, label: 'Yashirin' },
+      { stdin: '1 2\n', expectedStdout: '3', hidden: false, label: 'Ochiq' },
+    ];
+    const id = await createProblem(hiddenFirst);
+    const res = await request(app).get(`/api/problems/${id}`).set('Cookie', studentCookie);
+    expect(res.status).toBe(200);
+    expect(res.body.sampleStdin).toBe('1 2\n');
+  });
+});

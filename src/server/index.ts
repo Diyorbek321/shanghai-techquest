@@ -11,6 +11,11 @@ import { startDailyPlanScheduler } from './dailyPlan/scheduler';
 export function createApp(): express.Express {
   const app = express();
 
+  // Production sits behind host nginx -> docker-proxy, so the TCP peer is a
+  // private address and the real client is in X-Forwarded-For. Trusting only
+  // loopback/private peers means a public client cannot spoof its IP.
+  app.set('trust proxy', 'loopback, uniquelocal');
+
   // Before express.json(): an Eduly snapshot is larger than its 100kb default,
   // and the service calls must not draw on the browser rate limit below.
   app.use('/api/integration', integrationRouter);
@@ -18,7 +23,7 @@ export function createApp(): express.Express {
   app.use(express.json());
   app.use(cookieParser());
 
-  // Ahead of the per-IP limiter: a whole class plays from one school IP, so
+  // Ahead of the general limiter: a whole class plays from one school IP, so
   // the live quiz is rate-limited per user inside its own router instead.
   app.use('/api/live', verifyOrigin, liveRouter);
   app.use('/api', verifyOrigin, apiRateLimiter, apiRouter);

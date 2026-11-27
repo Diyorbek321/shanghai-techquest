@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db';
 import { requireAuth } from '../middleware/auth';
-import { runCodeRateLimiter } from '../middleware/rateLimit';
+import { runCodeRateLimiter, submitCodeRateLimiter } from '../middleware/rateLimit';
 import { askGeminiText } from '../ai/gemini';
 import { buildHintPrompt, formatHint, hintLevel } from '../ai/failureHint';
 import { checkAchievements } from '../achievements/check';
@@ -36,6 +36,10 @@ problemsRouter.get('/', async (req, res) => {
   const { difficulty, search, tag, page, pageSize } = parsed.data;
 
   const where = {
+    // Only problems with stored test cases: the rest can never be graded, so
+    // listing them just invites students to write code that is always
+    // answered with "no automatic check, no XP".
+    NOT: { testCases: { equals: [] } },
     ...(difficulty ? { difficulty } : {}),
     ...(tag ? { tags: { has: tag } } : {}),
     ...(search ? { title: { contains: search, mode: 'insensitive' as const } } : {}),
@@ -102,6 +106,9 @@ problemsRouter.get('/:id', async (req, res) => {
     // "a solution exists": a solution too long to shuffle usefully is stored
     // but not offered. A boolean, never the solution itself.
     hasParsons: isParsonsSuitable(problem.solutionPy),
+    // Pre-fills the "Run" input box. Taken only from an OPEN case, whose
+    // stdin students already see in their submit results — never a hidden one.
+    sampleStdin: parseTestCases(problem.testCases).find((testCase) => !testCase.hidden)?.stdin ?? '',
   });
 });
 
@@ -204,7 +211,7 @@ async function buildFailureHint(
   }
 }
 
-problemsRouter.post('/:id/submit', async (req, res) => {
+problemsRouter.post('/:id/submit', submitCodeRateLimiter, async (req, res) => {
   const parsed = submitSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Noto'g'ri ma'lumot kiritildi." });

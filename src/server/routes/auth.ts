@@ -7,7 +7,7 @@ import { signToken } from '../auth/jwt';
 import { setAuthCookie, clearAuthCookie } from '../auth/cookies';
 import { serializeUser } from '../serializers/user';
 import { requireAuth } from '../middleware/auth';
-import { authRateLimiter } from '../middleware/rateLimit';
+import { authIpRateLimiter, authRateLimiter } from '../middleware/rateLimit';
 import { TRACK_VALUES } from '../serializers/track';
 import { avatarUrlForEmail } from '../avatar';
 
@@ -25,7 +25,7 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-authRouter.post('/register', authRateLimiter, async (req, res) => {
+authRouter.post('/register', authIpRateLimiter, authRateLimiter, async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Noto'g'ri ma'lumot kiritildi." });
@@ -55,7 +55,7 @@ authRouter.post('/register', authRateLimiter, async (req, res) => {
   res.status(201).json(serializeUser(user));
 });
 
-authRouter.post('/login', authRateLimiter, async (req, res) => {
+authRouter.post('/login', authIpRateLimiter, authRateLimiter, async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Email yoki parol noto'g'ri." });

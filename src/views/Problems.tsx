@@ -32,6 +32,8 @@ interface ProblemDetail extends ProblemListItem {
   starterCode: Record<Language, string | null>;
   /** Languages this problem ships starter code for; lesson practice is Python-only. */
   languages: Language[];
+  /** First open test case's stdin, used to pre-fill the Run input box. */
+  sampleStdin?: string;
 }
 
 const LANGUAGE_LABEL: Record<Language, string> = {
@@ -180,6 +182,9 @@ export function Problems({ initialProblemId = null }: ProblemsProps) {
   const [showParsons, setShowParsons] = useState(false);
   const [language, setLanguage] = useState<Language>('javascript');
   const [code, setCode] = useState('');
+  // Most lesson problems read with input(); running without stdin would just
+  // end in EOFError, so "Run" sends whatever is in this box.
+  const [stdin, setStdin] = useState('');
   const [runResult, setRunResult] = useState<RunResult | null>(null);
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [submitFailure, setSubmitFailure] = useState<SubmitFailure | null>(null);
@@ -211,7 +216,7 @@ export function Problems({ initialProblemId = null }: ProblemsProps) {
   });
 
   const runCode = useMutation({
-    mutationFn: () => api.post<RunResult>('/problems/run', { code, language }),
+    mutationFn: () => api.post<RunResult>('/problems/run', { code, language, stdin }),
     onSuccess: (data) => {
       setRunResult(data);
       setResult(null);
@@ -263,6 +268,7 @@ export function Problems({ initialProblemId = null }: ProblemsProps) {
     const next = activeProblem.starterCode[language] !== null ? language : activeProblem.languages[0] ?? language;
     setLanguage(next);
     setCode(activeProblem.starterCode[next] ?? '');
+    setStdin(activeProblem.sampleStdin ?? '');
     // Collapse the scaffolding when a different problem opens, so the student
     // meets each new problem with the editor rather than with the answer cards.
     setShowParsons(false);
@@ -561,6 +567,23 @@ export function Problems({ initialProblemId = null }: ProblemsProps) {
                 cursorSmoothCaretAnimation: "on",
                 formatOnPaste: true,
               }}
+            />
+          </div>
+
+          {/* Run input (stdin) */}
+          <div className="bg-[#0f0f0f] border-t border-black px-4 py-2">
+            <label htmlFor="run-stdin" className="block text-[11px] font-bold text-gray-400 mb-1">
+              Kiritma (input) — «Ishga tushirish» shu ma'lumot bilan ishlaydi
+            </label>
+            <textarea
+              id="run-stdin"
+              value={stdin}
+              onChange={(e) => setStdin(e.target.value)}
+              rows={2}
+              maxLength={5000}
+              spellCheck={false}
+              placeholder="input() o'qiydigan qiymatlar, har biri yangi qatorda"
+              className="w-full resize-y bg-black/60 border border-white/10 rounded-md px-2 py-1 font-mono text-xs text-gray-200 focus:outline-none focus:border-brand-cyan/50"
             />
           </div>
 
